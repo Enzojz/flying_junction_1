@@ -1,0 +1,47 @@
+
+function data()
+return {
+	boundingInfo = {
+		bbMax = { 2.5, 2, -2 },
+		bbMin = { -2.5, -1, -4.2 },
+	},
+	collider = {
+		params = {
+			
+		},
+		type = "MESH",
+	},
+	lods = {
+		{
+			children = {
+				{
+					id = "bridge/rail/concrete_flying_junction/infra_junc_pillar_top_side.msh",
+					transf = {
+						0, 1, 0, 0,
+					   -1, 0, 0, 0,
+						0, 0, 1, 0,
+						0, 0, 0, 1 
+					},
+					type = "MESH",
+				}, 
+			},
+			matConfigs = {
+				{ 0, }, 
+			},
+			static = false,
+			visibleFrom = 0,
+			visibleTo = 1000,
+		}, 
+	},
+	metadata = {
+		availability = {
+			yearFrom = 0,
+			yearTo = 0,
+		},
+		cost = {
+			price = 0,
+		},
+	},
+	
+}
+end

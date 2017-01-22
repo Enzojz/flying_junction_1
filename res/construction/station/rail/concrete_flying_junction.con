@@ -1,0 +1,369 @@
+local laneutil = require "laneutil"
+local func = require "func"
+local coor = require "coor"
+local trackEdge = require "trackedge"
+
+local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
+local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
+local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
+local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
+local bridgeType = "z_concrete_flying_junction.lua"
+
+local newModel = function(m, ...)
+    return {
+        id = m,
+        transf = coor.mul(...)
+    }
+end
+
+local getOffsets = function(base, n, i) return i * base - 0.5 * base * n - 0.5 * base end
+
+function generateTrackGroups(numTracks, length, distance)
+    local halfLength = length * 0.5
+    local xOffsets = func.map(func.seq(1, numTracks), func.bind(getOffsets, distance, numTracks))
+    return xOffsets, laneutil.makeLanes(func.map(xOffsets, function(xOffset) return {{xOffset, -halfLength, 0}, {xOffset, halfLength, 0}, {0, 1, 0}, {0, 1, 0}} end))
+end
+
+local function getYOffsets(length, yOffset)
+    local nSeg = (function(x) return (x < 1 or (x % 1 > 0.5)) and math.ceil(x) or math.floor(x) end)(length * 0.1)
+    local yFactor = length / (nSeg * 10)
+    local yOffsets = func.pipe(
+        func.seq(1, nSeg),
+        func.bind(func.map, nil, func.bind(getOffsets, 10 * yFactor, nSeg)),
+        func.bind(func.map, nil, function(o) return o + yOffset end)
+    )
+    return yOffsets, yFactor
+end
+
+function generateUpperStructure(xOffsets, rad, uOffsets, length)
+    models = {}
+    ins = func.bind(table.insert, models)
+    
+    local yOffsets, yFactor = getYOffsets(length, 0)
+    
+    local roofs = function(yOffset)
+        return func.map(xOffsets, function(xOffset)
+            return newModel(mRoof, coor.scaleY(yFactor), coor.transX(xOffset), coor.transY(yOffset), coor.rotZ(rad))
+        end
+    )
+    end
+    
+    func.forEach(yOffsets, function(yOffset)
+        func.forEach(roofs(yOffset), ins)
+    end
+    )
+    ins(newModel(mSidePillar, coor.xXY(), coor.scaleX(#xOffsets * 0.5), coor.transY(length * 0.5 - 0.25), coor.rotZ(rad)))
+    ins(newModel(mSidePillar, coor.xXY(), coor.scaleX(#xOffsets * 0.5), coor.transY(-length * 0.5 + 0.25), coor.rotZ(rad)))
+    
+    function generateSidePillar(xOffset, uOffsetMin, uOffsetMax)
+        local y1 = -uOffsetMin / math.sin(rad) + xOffset / math.tan(rad)
+        local y2 = -uOffsetMax / math.sin(rad) + xOffset / math.tan(rad)
+        local yO1 = (length * 0.5 + y1) * 0.5
+        local yO2 = (-length * 0.5 + y2) * 0.5
+        local uyOffsets, uyFactor = getYOffsets(length * 0.5 - y1, yO1)
+        local lyOffsets, lyFactor = getYOffsets(y2 + length * 0.5, yO2)
+        
+        func.forEach(uyOffsets, function(yOffset)
+            ins(newModel(mSidePillar, coor.scaleY(uyFactor), coor.transX(xOffset), coor.transY(yOffset), coor.rotZ(rad)))
+            ins(newModel(mRoofFenceS, coor.scaleY(uyFactor), coor.transX(xOffset), coor.transY(yOffset), coor.rotZ(rad)))
+        end
+        )
+        func.forEach(lyOffsets, function(yOffset)
+            ins(newModel(mSidePillar, coor.scaleY(lyFactor), coor.transX(xOffset), coor.transY(yOffset), coor.rotZ(rad)))
+            ins(newModel(mRoofFenceS, coor.scaleY(lyFactor), coor.transX(xOffset), coor.transY(yOffset), coor.rotZ(rad)))
+        end
+    )
+    end
+    
+    generateSidePillar(xOffsets[1] - 2.75, uOffsets[1] - 2.625, uOffsets[#uOffsets] + 2.625)
+    generateSidePillar(xOffsets[#xOffsets] + 2.75, uOffsets[1] - 2.625, uOffsets[#uOffsets] + 2.625)
+    
+    
+    
+    return models
+end
+
+function generateLowerStructure(xOffsets, rad, nbUpperTracks, nbPerGroups)
+    models = {}
+    ins = func.bind(table.insert, models)
+    
+    local baseLength = 5.5 / math.tan(rad) + (nbUpperTracks * 5 + 1) / math.sin(rad)
+    
+    local coords = func.map(xOffsets,
+        function(xOffset) return {xOffset, -xOffset / math.tan(rad)} end
+    )
+    local i = 1
+    local gCoords = {}
+    while i <= #coords do
+        local subXOffsets = {}
+        local j = i + nbPerGroups
+        while i < j and i <= #coords do
+            table.insert(subXOffsets, coords[i])
+            i = i + 1
+        end
+        table.insert(gCoords, subXOffsets)
+    end
+    
+    local function generateGroupStructure(gCoords)
+        
+        local xOffsets = func.map(gCoords, function(c) return c[1] end)
+        local yOffset = 0
+        
+        func.forEach(gCoords, function(c)
+            yOffset = yOffset + c[2]
+        end)
+        yOffset = yOffset / #gCoords
+        
+        local length = baseLength + 2 * math.abs(yOffset - gCoords[1][2])
+        
+        local yOffsets, yFactor = getYOffsets(length, yOffset)
+        
+        local leftPillar = function(yOffset)
+            return newModel(mSidePillar, coor.scaleY(yFactor), coor.transX(xOffsets[1] - 2.625), coor.transY(yOffset))
+        end
+        
+        local rightPillar = function(yOffset)
+            return newModel(mSidePillar, coor.scaleY(yFactor), coor.transX(xOffsets[#xOffsets] + 2.625), coor.transY(yOffset))
+        end
+        
+        local roofs = function(yOffset)
+            return func.map(xOffsets, function(xOffset)
+                return newModel(mRoof, coor.scaleY(yFactor), coor.transX(xOffset), coor.transY(yOffset))
+            end
+        )
+        end
+        
+        local roofFront = function(xOffset)
+            return newModel(mRoofFenceF, coor.transX(xOffset), coor.transY(yOffsets[1] - 5 * yFactor + 1))
+        end
+        
+        local roofBack = function(xOffset)
+            return newModel(mRoofFenceF, coor.flipY(), coor.transX(xOffset), coor.transY(yOffsets[#yOffsets] + 5 * yFactor - 1))
+        end
+        
+        func.forEach(yOffsets, function(yOffset)
+            ins(leftPillar(yOffset))
+            ins(rightPillar(yOffset))
+            func.forEach(roofs(yOffset), ins)
+        end
+        )
+        func.forEach(xOffsets, function(xOffset)
+            ins(roofFront(xOffset))
+            ins(roofBack(xOffset))
+        end
+    )
+    end
+    
+    func.forEach(gCoords, generateGroupStructure)
+    return models
+end
+
+local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
+local heightList = {0.5, 1, 1.5, 2, 4, 6, 8, 10}
+local slopeRad = func.mapPair(
+    func.concat(slopeList, func.map(slopeList, function(s) return -s end)),
+    function(s) return s, math.atan(s * 0.001) end)
+local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
+local slopeMRotY = func.mapValues(slopeRad, coor.rotY)
+
+function data()
+    return {
+        type = "RAIL_STATION",
+        description = {
+            name = _("Concrete Flying Junction"),
+            description = _("An European style flying junction")
+        },
+        availability = {
+            yearFrom = 1892
+        },
+        -- buildMode = "MULTI",
+        -- categories = {"tracks"},
+        order = 27218,
+        -- skipCollision = false,
+        -- autoRemovable = false,
+        soundConfig = {
+            soundSet = {name = "station_cargo_old"}
+        },
+        params = {
+            {
+                key = "catenary",
+                name = _("Catenary"),
+                values = {_("No"), _("Yes")},
+                defaultIndex = 1
+            },
+            {
+                key = "trackType",
+                name = _("Track Type"),
+                values = {_("Standard"), _("High-Speed")},
+                defaultIndex = 1
+            },
+            {
+                key = "nbLowerTracks",
+                name = _("Number of lower tracks"),
+                values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
+                defaultIndex = 1
+            },
+            {
+                key = "nbUpperTracks",
+                name = _("Number of upper tracks"),
+                values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
+                defaultIndex = 1
+            },
+            {
+                key = "xDegDec",
+                name = _("Crossing angles"),
+                values = {_("5"), _("10"), _("20"), _("30"), _("40"), _("50"), _("60"), _("70"), _("80"), },
+                defaultIndex = 2
+            },
+            {
+                key = "xDegUni",
+                name = _("+"),
+                values = {_("0"), _("1"), _("2"), _("3"), _("4"), _("5"), _("6"), _("7"), _("8"), _("9"), },
+            },
+            {
+                key = "nbPerGroup",
+                name = _("Tracks per group"),
+                values = {_("1"), _("2"), _("All")},
+                defaultIndex = 1
+            },
+            {
+                key = "isMir",
+                name = _("Mirrored"),
+                values = {_("No"), _("Yes")},
+            },
+            {
+                key = "slope",
+                name = _("Slope(‰)"),
+                values = func.map(slopeList, function(s) return _(tostring(s)) end),
+                defaultIndex = 0
+            },
+            {
+                key = "height",
+                name = _("Altitude Adjustment(m)"),
+                values = func.map(heightList, function(s) return _(tostring(s)) end),
+            }
+        },
+        
+        updateFn = function(params)
+            local result = {}
+            local degrees = {5, 10, 20, 30, 40, 50, 60, 70, 80}
+            local deg = degrees[params.xDegDec + 1] + params.xDegUni
+            local rad = math.rad(deg)
+            
+            local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
+            local catenary = params.catenary == 1
+            
+            
+            local lengthTable = {50, 80, 100}
+            local nbLowerTracks = params.nbLowerTracks + 1
+            local nbUpperTracks = params.nbUpperTracks + 1
+            
+            local nbPerGroup = ({1, 2, nbLowerTracks and nbLowerTracks or 2})[params.nbPerGroup + 1]
+            
+            local upperTrackLength = (nbLowerTracks * 5.25 + 1) / math.sin(rad) + (nbUpperTracks * 5 + 1) / math.tan(rad)
+            local lowerTrackLength = (nbLowerTracks * 5.25 + 1) / math.tan(rad) + (nbUpperTracks * 5 + 1) / math.sin(rad)
+            
+            local tablength = (nbLowerTracks * 5.25 + 1) / math.tan(rad) + (nbUpperTracks * 5 + 1) / math.sin(rad)
+            
+            local xOffsets, lowerGroup = generateTrackGroups(nbLowerTracks, lowerTrackLength, 5.25)
+            local uOffsets, upperGroup = generateTrackGroups(nbUpperTracks, upperTrackLength, 5)
+            local _, upperExt1 = generateTrackGroups(nbUpperTracks, 1, 5)
+            
+            local mRotVec = coor.rotZ(rad)
+            local mRotPt = coor.mul(coor.transZ(11), mRotVec)
+            
+            local mRotExt = coor.mul(coor.transY(upperTrackLength * 0.5 + 0.5), mRotPt)
+            local mFlipXY = coor.mul(coor.flipX(), coor.flipY())
+            local mRotExt2 = coor.mul(mRotExt, mFlipXY)
+            local mRotExtVec2 = coor.mul(mRotVec, mFlipXY)
+            
+            local upperTr = coor.applyEdge(mRotPt, mRotVec)
+            local upperTr1 = coor.applyEdge(mRotExt, mRotVec)
+            local upperTr2 = coor.applyEdge(mRotExt2, mRotExtVec2)
+            result.models = func.concat(
+                generateLowerStructure(xOffsets, rad, nbUpperTracks, nbPerGroup),
+                generateUpperStructure(uOffsets, rad, xOffsets, upperTrackLength))
+            
+            local trackBuilder = trackEdge.builder(catenary, trackType)
+            local TLowerTracks = trackBuilder.normal(function(e) return func.seq(0, #e - 1) end)
+            local TUpperTracks = trackBuilder.nonAligned(function(e) return {} end)
+            local TUpperTracksBridge = trackBuilder.bridge(bridgeType,
+                function(e) return func.filter(func.seq(0, #e - 1), function(n) return n % 2 == 1 end) end)
+            
+            result.edgeLists =
+                {
+                    TLowerTracks(lowerGroup),
+                    TUpperTracks(coor.applyEdges(mRotPt, mRotVec)(upperGroup)),
+                    TUpperTracksBridge(coor.applyEdges(mRotExt, mRotVec)(upperExt1)),
+                    TUpperTracksBridge(coor.applyEdges(mRotExt2, mRotExtVec2)(upperExt1))
+                }
+            
+            local basePtU = {x = (nbUpperTracks * 5 + 1) * 0.5, y = upperTrackLength * 0.5, z = 0}
+            local facesU = {
+                basePtU,
+                coor.applyM(basePtU, coor.flipX()),
+                coor.applyM(basePtU, coor.flipX(), coor.flipY()),
+                coor.applyM(basePtU, coor.flipY())
+            }
+            facesU = func.map(facesU, function(f) return coor.apply(f, coor.rotZ(rad)) end)
+            
+            local basePtL = {x = (nbLowerTracks * 5.25 + 1) * 0.5, y = lowerTrackLength * 0.5, z = 0}
+            local facesL = {
+                basePtU,
+                coor.applyM(basePtL, coor.flipX()),
+                coor.applyM(basePtL, coor.flipX(), coor.flipY()),
+                coor.applyM(basePtL, coor.flipY())
+            }
+            
+            result.terrainAlignmentLists = {{
+                type = "EQUAL",
+                faces = {func.map(facesU, coor.vec2Tuple), func.map(facesL, coor.vec2Tuple)}
+            }}
+            
+            -- End of generation
+            -- Slope, Height, Mirror treatment
+            local slope = slopeList[params.slope + 1]
+            local ha = heightList[params.height + 1]
+            local isMir = {false, true}
+            local mirrored = isMir[params.isMir + 1]
+            
+            
+            local mz = coor.transZ(ha)
+            local mr = slopeMRotX[slope]
+            local mf = mirrored and coor.flipX() or coor.I()
+            
+            local mpt = coor.mul(mf, mr, mz)
+            local mvec = coor.mul(mf, mr)
+            
+            local mapEdgeList = function(edgeList)
+                edgeList.edges = func.map(edgeList.edges, coor.applyEdge(mpt, mvec))
+                return edgeList
+            end
+            
+            result.edgeLists = func.map(result.edgeLists, mapEdgeList)
+            
+            local mapModel = function(model)
+                model.transf = coor.mul(model.transf, mpt)
+                return model
+            end
+            
+            result.models = func.map(result.models, mapModel)
+            
+            local mapTerrainList = function(ta)
+                local mapTerrain = function(t) return func.pipe(t, coor.tuple2Vec, func.bind(coor.applyM, nil, mpt), coor.vec2Tuple) end
+                local mapFaces = func.bind(func.map, nil, mapTerrain)
+                ta.faces = func.map(ta.faces, mapFaces)
+                return ta
+            end
+            result.terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList)
+            
+            result.terminalGroups = {}
+            
+            result.cost = 1000
+            result.maintenanceCost = 1000 / 6
+            
+            return result
+        end
+    }
+
+end

@@ -144,4 +144,29 @@ function func.range(ls, from, to)
     return result
 end
 
+function func.seqValue(n, value)
+    return func.seqMap({1, n}, function(_) return value end)
+end
+
+function func.max(ls, less)
+    return func.fold(ls, ls[1], function(l, r) return less(l, r) and r or l end) 
+end
+
+function func.min(ls, less)
+    return func.fold(ls, ls[1], function(l, r) return less(l, r) and l or r end) 
+end
+
+function func.with(ls, newValues)
+    local result = {}
+    for i, e in pairs(ls) do result[i] = e end
+    for i, e in pairs(newValues) do result[i] = e end
+    return result
+end
+
+function func.sort(ls, fn)
+    local result = func.with(ls, {})
+    table.sort(result, fn)
+    return result
+end
+
 return func

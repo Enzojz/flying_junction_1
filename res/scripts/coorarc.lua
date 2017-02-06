@@ -1,12 +1,16 @@
 local coor = require "coor"
 local vec2 = require "vec2"
 local line = require "coorline"
+
+local dump = require "datadumper"
 local arc = {}
 
 -- The circle in form of (x - a)² + (y - b)² = r²
 function arc.new(a, b, r) return {o = {x = a; y = b}; r = r} end
 
 function arc.byOR(o, r) return arc.new(o.x, o.y, r) end
+
+function arc.byXYR(x, y, r) return arc.byOR({x = x, y = y}, r) end
 
 function arc.byDR(arc, dr) return arc.byOR(arc.o, dr + arc.r) end
 
@@ -40,19 +44,22 @@ function arc.intersectionLine(arc, line)
         
         -- (- l - m.y - a)² + (y - b)² = r²
         -- ( l + a + m.y)² + (y - b)² = r²
-        local n = l + a
+        local n = l + arc.o.x
         -- (n + m.y)² + (y - b)² = r²
         -- n² + m.n.2.y + m².y² + y² - 2.b.y + b² = r²
         -- (m² + 1).y² + (m.n.2 - 2b).y + b² + n² = r²
         -- (m + 1).y² + 2(m.n - b).y + b² + n² - r²
         local o = m * m + 1;
-        local p = 2 * (m * n - b);
-        local q = b * b + n * n - arc.r * arc.r;
+        local p = 2 * (m * n - arc.o.y);
+        local q = arc.o.y * arc.o.y + n * n - arc.r * arc.r;
         -- oy² + p.y + q = 0;
         -- y = (-p ± Sqrt(p² - 4.o.q)) / 2.o
         local delta = p * p - 4 * o * q;
-        if (delta < 0 and math.abs(delta) < 0.000001) then delta = 0 end
-        if (delta >= 0) then
+        if (math.abs(delta) < 1e-10) then
+            local y = -p / (2 * o)
+            local x = -l - m * y
+            return {{x = x, y = y}}
+        elseif (delta > 0) then
             local y0 = (-p + math.sqrt(delta)) / (2 * o)
             local y1 = (-p - math.sqrt(delta)) / (2 * o)
             local x0 = -l - m * y0
@@ -66,8 +73,9 @@ function arc.intersectionLine(arc, line)
         -- (x - a)² = r² - (y - b)²
         local y = -line.c / line.b;
         local delta = arc.r * arc.r - (y - b) * (y - b);
-        if (delta < 0 and math.abs(delta) < 0.000001) then delta = 0 end
-        if (delta >= 0) then
+        if (math.abs(delta) < 1e-10) then
+            return {{x = a, y = y}}
+        elseif (delta > 0) then
             -- (x - a) = ± Sqrt(delta)
             -- x = ± Sqrt(delta) + a
             local x0 = math.sqrt(delta) + a;
@@ -87,8 +95,8 @@ function arc.intersectionArc(arc1, arc2)
         arc1.o.x * arc1.o.x + arc1.o.y * arc1.o.y -
         arc2.o.x * arc2.o.x - arc2.o.y * arc2.o.y -
         arc1.r * arc1.r + arc2.r * arc2.r
-
+    )
+    dump.dump(chord)
     return arc.intersectionLine(arc1, chord)
-)
 end
 return arc

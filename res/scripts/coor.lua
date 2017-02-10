@@ -26,17 +26,83 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --]]
 local laneutil = require "laneutil"
-local vec4 = require "vec4"
-local vec3 = require "vec3"
-local transf = require "transf"
 
 local coor = {}
 coor.make = laneutil.makeLanes
 
-coor.o = vec3.new(0, 0, 0)
+local vecXyMeta = {
+    __add = function(lhs, rhs)
+        return coor.xy(lhs.x + rhs.x, lhs.y + rhs.y)
+    end
+    ,
+    __sub = function(lhs, rhs)
+        return coor.xy(lhs.x - rhs.x, lhs.y - rhs.y)
+    end
+    ,
+    __mul = function(lhs, rhs)
+        return coor.xy(lhs.x * rhs, lhs.y * rhs)
+    end,
+    __div = function(lhs, rhs)
+        return coor.xy(lhs.x / rhs, lhs.y / rhs)
+    end,
+    __mod = function(lhs, rhs)
+        return (lhs - rhs):length()
+    end
+}
+
+local vecXyLength = function(self) return math.sqrt(self.x * self.x + self.y * self.y) end
+local vecXyNormalized = function(self) return self / self:length() end
+
+function coor.xy(x, y)
+    local result = {x = x, y = y}
+    setmetatable(result, vecXyMeta)
+    
+    result.length = vecXyLength
+    result.normalized = vecXyNormalized
+    
+    return result
+end
+
+local vecXyzMeta = {
+    __add = function(lhs, rhs)
+        return coor.xyz(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z)
+    end
+    ,
+    __sub = function(lhs, rhs)
+        return coor.xyz(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z)
+    end
+    ,
+    __mul = function(lhs, rhs)
+        return coor.xyz(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs)
+    end,
+    __div = function(lhs, rhs)
+        return coor.xyz(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs)
+    end,
+    __concat = function(lhs, rhs)
+        return coor.apply(lhs, rhs)
+    end,
+    __mod = function(lhs, rhs)
+        return (lhs - rhs):length()
+    end
+}
+
+local vecXyzLength = function(self) return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z) end
+local vecXyzNormalized  = function(self) return self / self:length() end
+local vecXyzToTuple  = function(self) return {self.x, self.y, self.z} end
+
+function coor.xyz(x, y, z)
+    local result = {x = x, y = y, z = z}
+    setmetatable(result, vecXyzMeta)
+    result.length = vecXyzLength
+    result.normalized = vecXyzNormalized
+    result.toTuple = vecXyzToTuple
+    return result
+end
+
+coor.o = coor.xyz(0, 0, 0)
 
 function coor.tuple2Vec(tuple)
-    return vec3.new(table.unpack(tuple))
+    return coor.xyz(table.unpack(tuple))
 end
 
 function coor.vec2Tuple(vec)
@@ -49,159 +115,7 @@ function coor.edge2Vec(edge)
 end
 
 function coor.vec2Edge(pt, vec)
-    return {coor.vec2Tuple(pt), coor.vec2Tuple(vec)}
-end
-
-function coor.I()
-    return {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.rotZ(rotX)
-    local sx = math.sin(rotX)
-    local cx = math.cos(rotX)
-    
-    return {
-        cx, sx, 0, 0,
-        -sx, cx, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.rotY(rotX)
-    local sx = math.sin(rotX)
-    local cx = math.cos(rotX)
-    
-    return {
-        cx, 0, sx, 0,
-        0, 1, 0, 0,
-        -sx, 0, cx, 0,
-        0, 0, 0, 1
-    }
-end
-
-
-function coor.rotX(rotX)
-    local sx = math.sin(rotX)
-    local cx = math.cos(rotX)
-    
-    return {
-        1, 0, 0, 0,
-        0, cx, sx, 0,
-        0, -sx, cx, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.xXY()
-    return {
-        0, 1, 0, 0,
-        1, 0, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.xXZ()
-    return {
-        0, 0, 1, 0,
-        0, 1, 0, 0,
-        1, 0, 0, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.flipX()
-    return {
-        -1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-
-function coor.flipY()
-    return {
-        1, 0, 0, 0,
-        0, -1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.flipZ()
-    return {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, -1, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.trans(vec)
-    return coor.mul(coor.transX(vec.x), coor.transY(vec.y), coor.transZ(vec.z))
-end
-
-function coor.transX(dx)
-    return {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        dx, 0, 0, 1
-    }
-end
-
-function coor.transY(dy)
-    return {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, dy, 0, 1
-    }
-end
-
-function coor.transZ(dz)
-    return {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, dz, 1
-    }
-end
-
-
-function coor.scaleX(sx)
-    return {
-       sx, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-
-function coor.scaleY(sy)
-    return {
-        1, 0, 0, 0,
-        0,sy, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }
-end
-
-function coor.scaleZ(sz)
-    return {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0,sz, 0,
-        0, 0, 0, 1
-    }
+    return {pt:toTuple(), vec:toTuple()}
 end
 
 -- the original transf.mul is ill-formed. The matrix is in form of Y = X.A + b, but mul transposed the matrix for Y = A.X + b
@@ -218,38 +132,197 @@ local function mul(m1, m2)
     }
 end
 
+local meta = {
+    __mul = function(lhs, rhs)
+        local result = mul(lhs, rhs)
+        setmetatable(result, getmetatable(lhs))
+        return result
+    end
+}
+
+local init = {}
+setmetatable(init,
+    {
+        __mul = function(_, rhs)
+            setmetatable(rhs, meta)
+            return rhs
+        end
+    })
+
+function coor.I()
+    return init * {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.rotZ(rotX)
+    local sx = math.sin(rotX)
+    local cx = math.cos(rotX)
+    
+    return init * {
+        cx, sx, 0, 0,
+        -sx, cx, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.rotY(rotX)
+    local sx = math.sin(rotX)
+    local cx = math.cos(rotX)
+    
+    return init * {
+        cx, 0, sx, 0,
+        0, 1, 0, 0,
+        -sx, 0, cx, 0,
+        0, 0, 0, 1
+    }
+end
+
+
+function coor.rotX(rotX)
+    local sx = math.sin(rotX)
+    local cx = math.cos(rotX)
+    
+    return init * {
+        1, 0, 0, 0,
+        0, cx, sx, 0,
+        0, -sx, cx, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.xXY()
+    return init * {
+        0, 1, 0, 0,
+        1, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.xXZ()
+    return init * {
+        0, 0, 1, 0,
+        0, 1, 0, 0,
+        1, 0, 0, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.flipX()
+    return init * {
+        -1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+
+function coor.flipY()
+    return init * {
+        1, 0, 0, 0,
+        0, -1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.flipZ()
+    return init * {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, -1, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.trans(vec)
+    return coor.transX(vec.x) * coor.transY(vec.y) * coor.transZ(vec.z)
+end
+
+function coor.transX(dx)
+    return init * {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        dx, 0, 0, 1
+    }
+end
+
+function coor.transY(dy)
+    return init * {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, dy, 0, 1
+    }
+end
+
+function coor.transZ(dz)
+    return init * {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, dz, 1
+    }
+end
+
+
+function coor.scaleX(sx)
+    return init * {
+        sx, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+
+function coor.scaleY(sy)
+    return init * {
+        1, 0, 0, 0,
+        0, sy, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
+function coor.scaleZ(sz)
+    return init * {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, sz, 0,
+        0, 0, 0, 1
+    }
+end
+
+
 function coor.mul(...)
     local params = {...}
     local m = params[1]
     for i = 2, #params do
-        m = mul(m, params[i])
+        m = m * params[i]
     end
     return m
 end
-
-coor.sub = vec3.sub
-coor.add = vec3.add
-coor.normalize = vec3.normalize
-coor.nmul = vec3.mul
-coor.length = vec3.length
-coor.distance = vec3.distance
 
 function coor.apply(vec, trans)
     local applyVal = function(col)
         return vec.x * trans[0 + col] + vec.y * trans[4 + col] + vec.z * trans[8 + col] + trans[12 + col]
     end
-    return vec3.new(applyVal(1), applyVal(2), applyVal(3))
-end
-
-function coor.applyM(vec, ...)
-    return coor.apply(vec, coor.mul(...))
+    return coor.xyz(applyVal(1), applyVal(2), applyVal(3))
 end
 
 function coor.applyEdge(mpt, mvec)
     return function(edge)
         local pt, vec = coor.edge2Vec(edge)
-        local newPt = coor.applyM(pt, mpt)
-        local newVec = coor.applyM(vec, mvec)
+        local newPt = coor.apply(pt, mpt)
+        local newVec = coor.apply(vec, mvec)
         return coor.vec2Edge(newPt, newVec)
     end
 end
@@ -265,27 +338,15 @@ function coor.rotate(edge, mt0, mtr, mt1)
 end
 
 function coor.translateAndBack(center)
-    return coor.trans(vec3.sub(coor.o, center)),
+    return coor.trans(coor.o - center),
         coor.trans(center)
 end
 
 
-function coor.rotYCentered(rad, center)
+function coor.centered(op, rad, center)
     local mt0, mt1 = coor.translateAndBack(center)
-    local mtr = coor.rotY(rad)
-    return coor.mul(mt0, mtr, mt1)
-end
-
-function coor.rotXCentered(rad, center)
-    local mt0, mt1 = coor.translateAndBack(center)
-    local mtr = coor.rotX(rad)
-    return coor.mul(mt0, mtr, mt1)
-end
-
-function coor.rotZCentered(rad, center)
-    local mt0, mt1 = coor.translateAndBack(center)
-    local mtr = coor.rotZ(rad)
-    return coor.mul(mt0, mtr, mt1)
+    local mtr = op(rad)
+    return mt0 * mtr * mt1
 end
 
 function coor.rotateEdgeByZ(degree, center, edge)
@@ -303,7 +364,7 @@ end
 function coor.setHeight(height, edge)
     local mz = coor.transZ(height)
     local pt, vec = coor.edge2Vec(edge)
-    local newPt = coor.applyM(pt, mz)
+    local newPt = coor.apply(pt, mz)
     return coor.vec2Edge(newPt, vec)
 end
 

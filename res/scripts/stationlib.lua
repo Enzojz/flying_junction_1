@@ -65,7 +65,7 @@ stationlib.buildCoors = function(nSeg)
     local function buildGroup(level, baseX, nbTracks, xOffsets, uOffsets, xuIndex)
         local project = function(x, p) return func.map2(x, p, function(offset, parity) return
             {
-                mpt = coor.mul(coor.transX(offset), level.mdr, level.mz),
+                mpt = coor.transX(offset) * level.mdr * level.mz,
                 mvec = level.mr,
                 parity = parity,
                 id = level.id,
@@ -162,7 +162,7 @@ stationlib.setHeight = function(result, height)
     result.edgeLists = func.map(result.edgeLists, mapEdgeList)
     
     local mapModel = function(model)
-        model.transf = coor.mul(model.transf, mpt)
+        model.transf = model.transf *  mpt
         return model
     end
     
@@ -171,7 +171,7 @@ end
 
 stationlib.faceMapper = function(m)
     return function(face)
-        return func.map(face, function(pt) return func.pipe(pt, coor.tuple2Vec, func.bind(coor.apply, nil, m), coor.vec2Tuple) end)
+        return func.map(face, function(pt) return (coor.tuple2Vec(pt) .. m):toTuple() end)
     end
 end
 

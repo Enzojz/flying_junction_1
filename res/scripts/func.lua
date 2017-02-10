@@ -10,29 +10,29 @@ Anyone is free to use the program below, however the auther do not guarantee:
 * The invariance of program in future
 =====!!!PLEASE  R_E_N_A_M_E  BEFORE USE IN YOUR OWN PROJECT!!!=====
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the "Software"), to deal in the Software without restriction, 
-including the right to distribute and without limitation the rights to use, copy and/or modify 
-the Software, and to permit persons to whom the Software is furnished to do so, subject to the 
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including the right to distribute and without limitation the rights to use, copy and/or modify
+the Software, and to permit persons to whom the Software is furnished to do so, subject to the
 following conditions:
-The above copyright notice and this permission notice shall be included in all copies or substantial 
+The above copyright notice and this permission notice shall be included in all copies or substantial
 portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT 
-NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --]]
-
 func = {}
 
 function func.fold(ls, init, fun)
+    local result = init
     for _, e in ipairs(ls) do
-        init = fun(init, e)
+        result = fun(result, e)
     end
-    return init
+    return result
 end
 
 function func.forEach(ls, fun)
@@ -56,14 +56,14 @@ function func.mapPair(ls, fun)
     local result = {}
     for i, e in ipairs(ls) do
         local k, v = fun(e)
-        result[k] = v 
+        result[k] = v
     end
     return result
 end
 
 function func.filter(ls, pre)
     local result = {}
-    for _,e in ipairs(ls) do
+    for _, e in ipairs(ls) do
         if pre(e) then result[#result + 1] = e end
     end
     return result
@@ -94,7 +94,7 @@ end
 
 function func.bind(fun, ...)
     local rest = {...}
-    return function (...)
+    return function(...)
         local param = {...}
         for i = 1, #rest do
             if (rest[i] == nil and #param > 0) then
@@ -149,11 +149,11 @@ function func.seqValue(n, value)
 end
 
 function func.max(ls, less)
-    return func.fold(ls, ls[1], function(l, r) return less(l, r) and r or l end) 
+    return func.fold(ls, ls[1], function(l, r) return less(l, r) and r or l end)
 end
 
 function func.min(ls, less)
-    return func.fold(ls, ls[1], function(l, r) return less(l, r) and l or r end) 
+    return func.fold(ls, ls[1], function(l, r) return less(l, r) and l or r end)
 end
 
 function func.with(ls, newValues)
@@ -168,5 +168,34 @@ function func.sort(ls, fn)
     table.sort(result, fn)
     return result
 end
+
+local pipeMeta = {
+    __mul = function(lhs, rhs)
+        local result = {op = {rhs(lhs())}}
+        setmetatable(result, getmetatable(lhs))
+        return result
+    end
+    ,
+    __call = function(r)
+        return table.unpack(r.op)
+    end
+    ,
+    __div = function(r, _)
+        return table.unpack(r.op)
+    end
+}
+
+func.p = {}
+pMeta = {
+    __mul = function(_, rhs)
+        local result = {op = {rhs}}
+        setmetatable(result, pipeMeta)
+        return result
+    end
+}
+setmetatable(func.p, pMeta)
+
+func.b = func.bind
+
 
 return func

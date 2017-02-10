@@ -1,22 +1,31 @@
 local coor = require "coor"
-
 local line = {}
+
+
 -- line in form of
 -- a.x + b.y + 1 = 0, if c != 0
 -- if not
 -- a.x + b.y + 0 = 0;
-function line.new(a, b, c) return {a = a, b = b, c = c} end
+function line.new(a, b, c)
+    local result = {a = a, b = b, c = c}
+    result.vector = line.vec
+    setmetatable(result, 
+    {
+        __sub = line.intersection
+    })
+    return result
+end
 
 function line.byVecPt(vec, pt)
     local a = vec.y
     local b = -vec.x
     local c = -(a * pt.x + b * pt.y)
     
-    return (c ~= 0) and {a = a / c, b = b / c, c = 1} or {a = a, b = b, c = 0}
+    return (c ~= 0) and line.new(a / c, b / c, 1) or line.new(a, b, 0)
 end
 
 function line.byPtPt(pt1, pt2)
-    return line.byVecPt(coor.sub(pt2, pt1), pt2)
+    return line.byVecPt(pt2 - pt1, pt2)
 end
 
 function line.byRadPt(rad, pt)
@@ -24,7 +33,7 @@ function line.byRadPt(rad, pt)
 end
 
 function line.vec(l)
-    return { x = -l.b, y = l.a }
+    return coor.xy(-l.b, l.a):normalized()
 end
 
 function line.intersection(l1, l2)
@@ -42,7 +51,7 @@ function line.intersection(l1, l2)
     local c21 = -a21 * idet
     local c22 = a11 * idet
     
-    return {x = c11 * b1 + c12 * b2, y = c21 * b1 + c22 * b2}
+    return coor.xy(c11 * b1 + c12 * b2, c21 * b1 + c22 * b2)
 end
 
 return line

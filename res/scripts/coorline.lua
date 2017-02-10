@@ -11,7 +11,8 @@ function line.new(a, b, c)
     result.vector = line.vec
     setmetatable(result, 
     {
-        __sub = line.intersection
+        __sub = line.intersection,
+        __div = function(lhs, rhs) return rhs / lhs end
     })
     return result
 end

@@ -189,6 +189,12 @@ local function params()
 
 end
 
+local intersectioner = {
+    lineByLine = line.intersection,
+    arcByArc = function(selector) return function(lhs, rhs) return func.min(lhs - rhs, selector) end end,
+    arcByLine = function(selector) return function(lhs, rhs) return func.min(lhs / rhs, selector) end end,
+}
+
 function data()
     return {
         type = "RAIL_STATION",
@@ -239,10 +245,10 @@ function data()
                 lower = buildCoors(info.lower.nbTracks, nbPerGroup),
                 upper = buildCoors(info.upper.nbTracks, info.upper.nbTracks)
             }
-
+            
             info.lower.guideliner = (info.lower.r == 0) and fLines or func.bind(fArcs, nil, nil, info.lower.r)
             info.upper.guideliner = (info.upper.r == 0) and fLines or func.bind(fArcs, nil, nil, info.upper.r)
-
+            
             local guidelines = {
                 lower = {
                     tracks = info.lower.guideliner(offsets.lower.tracks, 0),
@@ -255,20 +261,30 @@ function data()
                     level = line.byVecPt(coor.xy(math.cos(rad), math.sin(rad)), coor.o)
                 }
             }
-
+            
+            local limits = {
+                lower = {L = guidelines.lower.walls[1], R = guidelines.lower.walls[#guidelines.lower.walls]},
+                upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
+            }
+            
             if (info.lower.r == 0 and info.upper.r == 0) then
+
+                local xer = {
+                    lower = intersectioner.lineByLine,
+                    upper = intersectioner.lineByLine
+                }
                 
                 local limitVecs = {
                     lower = {
-                        sup = (guidelines.upper.walls[#guidelines.upper.walls] - guidelines.lower.walls[1]) - (guidelines.lower.walls[1] - guidelines.lower.level),
-                        inf = (guidelines.upper.walls[1] - guidelines.lower.walls[#guidelines.lower.walls]) - (guidelines.lower.walls[#guidelines.lower.walls] - guidelines.lower.level)
+                        sup = xer.lower(limits.lower.L, limits.upper.R) - (limits.lower.L - guidelines.lower.level),
+                        inf = xer.lower(limits.lower.R, limits.upper.L) - (limits.lower.R - guidelines.lower.level)
                     },
                     upper = {
-                        sup = (guidelines.upper.walls[#guidelines.upper.walls] - guidelines.lower.walls[1]) - (guidelines.upper.walls[#guidelines.upper.walls] - guidelines.upper.level),
-                        inf = (guidelines.upper.walls[1] - guidelines.lower.walls[#guidelines.lower.walls]) - (guidelines.upper.walls[1] - guidelines.upper.level)
+                        sup = xer.upper(limits.upper.R, limits.lower.L) - (limits.upper.R - guidelines.upper.level),
+                        inf = xer.upper(limits.upper.L, limits.lower.R) - (limits.upper.L - guidelines.upper.level)
                     }
                 }
-                
+
                 local groups = {
                     lower = {
                         tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x) return
@@ -286,8 +302,8 @@ function data()
                                 xOffset = x,
                                 line = l,
                                 limits = {
-                                    sup = guidelines.upper.walls[#guidelines.upper.walls] - l,
-                                    inf = guidelines.upper.walls[1] - l
+                                    sup = xer.lower(l, limits.upper.R),
+                                    inf = xer.lower(l, limits.upper.L)
                                 },
                                 gen = generateLineSegment
                             } end)
@@ -308,8 +324,8 @@ function data()
                                 xOffset = x,
                                 line = l,
                                 limits = {
-                                    sup = l - guidelines.lower.walls[1],
-                                    inf = l - guidelines.lower.walls[#guidelines.lower.walls]
+                                    sup = xer.upper(l, limits.lower.L),
+                                    inf = xer.upper(l, limits.lower.R)
                                 },
                                 gen = generateLineSegment
                             } end)
@@ -330,16 +346,22 @@ function data()
                     }
             elseif (info.lower.r == 0 and info.upper.r > 0) then
                 
-                local intersectionSelector = function(l, r) if (rad > 0) then return (l.y < r.y) else return (l.y > r.y) end end
+                local ptXSelector = function(l, r) if (rad > 0) then return (l.y < r.y) else return (l.y > r.y) end end
+                
+                local xer = {
+                    lower = intersectioner.arcByLine(ptXSelector),
+                    upper = intersectioner.arcByLine(ptXSelector)
+                }
+                
                 
                 local limitVecs = {
                     lower = {
-                        sup = func.min(guidelines.upper.walls[#guidelines.upper.walls] / guidelines.lower.walls[1], intersectionSelector) - (guidelines.lower.walls[1] - guidelines.lower.level),
-                        inf = func.min(guidelines.upper.walls[1] / guidelines.lower.walls[#guidelines.lower.walls], intersectionSelector) - (guidelines.lower.walls[#guidelines.lower.walls] - guidelines.lower.level)
+                        sup = xer.upper(limits.upper.R, limits.lower.L) - (limits.lower.L - guidelines.lower.level),
+                        inf = xer.upper(limits.upper.L, limits.lower.R) - (limits.lower.R - guidelines.lower.level)
                     },
                     upper = {
-                        sup = guidelines.upper.walls[#guidelines.upper.walls]:rad(func.min(guidelines.upper.walls[#guidelines.upper.walls] / guidelines.lower.walls[1], intersectionSelector)),
-                        inf = guidelines.upper.walls[1]:rad(func.min(guidelines.upper.walls[1] / guidelines.lower.walls[#guidelines.lower.walls], intersectionSelector))
+                        sup = limits.upper.R:rad(xer.upper(limits.upper.R, limits.lower.L)),
+                        inf = limits.upper.L:rad(xer.upper(limits.upper.L, limits.lower.R))
                     }
                 }
                 
@@ -360,8 +382,8 @@ function data()
                                 xOffset = x,
                                 line = l,
                                 limits = {
-                                    sup = func.min(guidelines.upper.walls[#guidelines.upper.walls] / l, intersectionSelector),
-                                    inf = func.min(guidelines.upper.walls[1] / l, intersectionSelector)
+                                    sup = xer.lower(l, limits.upper.R),
+                                    inf = xer.lower(l, limits.upper.L)
                                 },
                                 gen = generateLineSegment
                             } end)

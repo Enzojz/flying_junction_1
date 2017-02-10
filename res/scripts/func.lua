@@ -28,11 +28,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 func = {}
 
 function func.fold(ls, init, fun)
-    local result = init
     for _, e in ipairs(ls) do
-        result = fun(result, e)
+        init = fun(init, e)
     end
-    return result
+    return init
 end
 
 function func.forEach(ls, fun)
@@ -96,13 +95,15 @@ function func.bind(fun, ...)
     local rest = {...}
     return function(...)
         local param = {...}
+        local args = {}
         for i = 1, #rest do
             if (rest[i] == nil and #param > 0) then
-                rest[i] = table.remove(param, 1)
+                table.insert(args, table.remove(param, 1))
+            else
+                table.insert(args, rest[i])
             end
         end
-        local args = func.concat(rest, param)
-        return fun(table.unpack(args))
+        return fun(table.unpack(func.concat(args, param)))
     end
 end
 

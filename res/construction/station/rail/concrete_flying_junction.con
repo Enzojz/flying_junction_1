@@ -79,9 +79,9 @@ local generateArc = function(arc)
     local vecSup = toVector(radSup)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
-    local sup = toXyz(arc.arc:pt(radSup))
-    local inf = toXyz(arc.arc:pt(radInf))
-    local mid = toXyz(arc.arc:pt(radMid))
+    local sup = toXyz(arc.guideline:pt(radSup))
+    local inf = toXyz(arc.guideline:pt(radInf))
+    local mid = toXyz(arc.guideline:pt(radMid))
     
     return laneutil.makeLanes({
         {inf:toTuple(), mid:toTuple(), vecInf:toTuple(), vecMid:toTuple()},
@@ -124,6 +124,104 @@ local fArcs = function(offsets, rad, r)
             r - x
     ) end
 )
+end
+
+local intersectioner = {
+    lineByLine = line.intersection,
+    arcByArc = function(selector) return function(lhs, rhs) return func.min(lhs - rhs, selector) end end,
+    arcByLine = function(selector) return function(lhs, rhs) return func.min(lhs / rhs, selector) end end,
+}
+
+
+local function attach(limits)
+    return function(l, x)
+        return {
+            limits = limits,
+            xOffsets = x,
+            guideline = l,
+            gen = l.o and generateArc or generateLineSegment
+        }
+    end
+end
+
+local function lineByLine(offsets, guidelines, limits, rad)
+    local xer = intersectioner.lineByLine
+    
+    local limitVecs = {
+        lower = {
+            sup = xer(limits.lower.L, limits.upper.R) - (limits.lower.L - guidelines.lower.level),
+            inf = xer(limits.lower.R, limits.upper.L) - (limits.lower.R - guidelines.lower.level)
+        },
+        upper = {
+            sup = xer(limits.upper.R, limits.lower.L) - (limits.upper.R - guidelines.upper.level),
+            inf = xer(limits.upper.L, limits.lower.R) - (limits.upper.L - guidelines.upper.level)
+        }
+    }
+    
+    return {
+        lower = {
+            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x)
+                return attach({
+                    sup = (l - guidelines.lower.level) + limitVecs.lower.sup,
+                    inf = (l - guidelines.lower.level) + limitVecs.lower.inf
+                })(l, x) end),
+            walls = func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, x)
+                return attach({
+                    sup = xer(l, limits.upper.R),
+                    inf = xer(l, limits.upper.L)
+                })(l, x) end)
+        },
+        upper = {
+            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks, function(l, x)
+                return attach({
+                    sup = (l - guidelines.upper.level) + limitVecs.upper.sup,
+                    inf = (l - guidelines.upper.level) + limitVecs.upper.inf
+                })(l, x) end),
+            walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(l, x)
+                return attach({
+                    sup = xer(l, limits.lower.L),
+                    inf = xer(l, limits.lower.R)
+                })(l, x) end)
+        }
+    }
+end
+
+local function lineByArc(offsets, guidelines, limits, rad)
+    local ptXSelector = function(l, r) if (rad > 0) then return (l.y < r.y) else return (l.y > r.y) end end
+    
+    local xer = intersectioner.arcByLine(ptXSelector)
+    
+    local limitVecs = {
+        lower = {
+            sup = xer(limits.upper.R, limits.lower.L) - (limits.lower.L - guidelines.lower.level),
+            inf = xer(limits.upper.L, limits.lower.R) - (limits.lower.R - guidelines.lower.level)
+        },
+        upper = {
+            sup = limits.upper.R:rad(xer(limits.upper.R, limits.lower.L)),
+            inf = limits.upper.L:rad(xer(limits.upper.L, limits.lower.R))
+        }
+    }
+    
+    return {
+        lower = {
+            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x)
+                return attach({
+                    sup = (l - guidelines.lower.level) + limitVecs.lower.sup,
+                    inf = (l - guidelines.lower.level) + limitVecs.lower.inf
+                })(l, x) end),
+            walls = func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, x)
+                return attach({
+                    sup = xer(l, limits.upper.R),
+                    inf = xer(l, limits.upper.L)
+                })(l, x) end)
+        },
+        upper = {
+            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
+                attach(limitVecs.upper)),
+            walls = func.map2(guidelines.upper.walls, offsets.upper.walls,
+                attach(limitVecs.upper))
+        }
+    }
 end
 
 local function params()
@@ -188,12 +286,6 @@ local function params()
     }
 
 end
-
-local intersectioner = {
-    lineByLine = line.intersection,
-    arcByArc = function(selector) return function(lhs, rhs) return func.min(lhs - rhs, selector) end end,
-    arcByLine = function(selector) return function(lhs, rhs) return func.min(lhs / rhs, selector) end end,
-}
 
 function data()
     return {
@@ -267,172 +359,28 @@ function data()
                 upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
             }
             
+            local groups = {}
+            
             if (info.lower.r == 0 and info.upper.r == 0) then
-
-                local xer = {
-                    lower = intersectioner.lineByLine,
-                    upper = intersectioner.lineByLine
-                }
-                
-                local limitVecs = {
-                    lower = {
-                        sup = xer.lower(limits.lower.L, limits.upper.R) - (limits.lower.L - guidelines.lower.level),
-                        inf = xer.lower(limits.lower.R, limits.upper.L) - (limits.lower.R - guidelines.lower.level)
-                    },
-                    upper = {
-                        sup = xer.upper(limits.upper.R, limits.lower.L) - (limits.upper.R - guidelines.upper.level),
-                        inf = xer.upper(limits.upper.L, limits.lower.R) - (limits.upper.L - guidelines.upper.level)
-                    }
-                }
-
-                local groups = {
-                    lower = {
-                        tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x) return
-                            {
-                                xOffset = x,
-                                line = l,
-                                limits = {
-                                    sup = (l - guidelines.lower.level) + limitVecs.lower.sup,
-                                    inf = (l - guidelines.lower.level) + limitVecs.lower.inf
-                                },
-                                gen = generateLineSegment
-                            } end),
-                        walls = func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, x) return
-                            {
-                                xOffset = x,
-                                line = l,
-                                limits = {
-                                    sup = xer.lower(l, limits.upper.R),
-                                    inf = xer.lower(l, limits.upper.L)
-                                },
-                                gen = generateLineSegment
-                            } end)
-                    },
-                    upper = {
-                        tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks, function(l, x) return
-                            {
-                                xOffset = x,
-                                line = l,
-                                limits = {
-                                    sup = (l - guidelines.upper.level) + limitVecs.upper.sup,
-                                    inf = (l - guidelines.upper.level) + limitVecs.upper.inf
-                                },
-                                gen = generateLineSegment
-                            } end),
-                        walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(l, x) return
-                            {
-                                xOffset = x,
-                                line = l,
-                                limits = {
-                                    sup = xer.upper(l, limits.lower.L),
-                                    inf = xer.upper(l, limits.lower.R)
-                                },
-                                gen = generateLineSegment
-                            } end)
-                    
-                    }
-                }
-                
-                local lowerTracks = generateTrackGroups(groups.lower.tracks)
-                local upperTracks = generateTrackGroups(groups.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
-                
-                result.models = {}
-                
-                result.edgeLists =
-                    {
-                        TUpperTracks(upperTracks),
-                        TLowerTracks(lowerTracks),
-                    -- TUpperTracksBridge(func.concat(coor.applyEdges(mRotExt, mRotVec)(upperExt1), coor.applyEdges(mRotExt2, mRotExtVec2)(upperExt1))),
-                    }
+                groups = lineByLine(offsets, guidelines, limits, rad)
             elseif (info.lower.r == 0 and info.upper.r > 0) then
-                
-                local ptXSelector = function(l, r) if (rad > 0) then return (l.y < r.y) else return (l.y > r.y) end end
-                
-                local xer = {
-                    lower = intersectioner.arcByLine(ptXSelector),
-                    upper = intersectioner.arcByLine(ptXSelector)
-                }
-                
-                
-                local limitVecs = {
-                    lower = {
-                        sup = xer.upper(limits.upper.R, limits.lower.L) - (limits.lower.L - guidelines.lower.level),
-                        inf = xer.upper(limits.upper.L, limits.lower.R) - (limits.lower.R - guidelines.lower.level)
-                    },
-                    upper = {
-                        sup = limits.upper.R:rad(xer.upper(limits.upper.R, limits.lower.L)),
-                        inf = limits.upper.L:rad(xer.upper(limits.upper.L, limits.lower.R))
-                    }
-                }
-                
-                local groups = {
-                    lower = {
-                        tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x) return
-                            {
-                                xOffset = x,
-                                line = l,
-                                limits = {
-                                    sup = (l - guidelines.lower.level) + limitVecs.lower.sup,
-                                    inf = (l - guidelines.lower.level) + limitVecs.lower.inf
-                                },
-                                gen = generateLineSegment
-                            } end),
-                        walls = func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, x) return
-                            {
-                                xOffset = x,
-                                line = l,
-                                limits = {
-                                    sup = xer.lower(l, limits.upper.R),
-                                    inf = xer.lower(l, limits.upper.L)
-                                },
-                                gen = generateLineSegment
-                            } end)
-                    },
-                    upper = {
-                        tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks, function(a, x) return
-                            {
-                                xOffset = x,
-                                arc = a,
-                                limits = limitVecs.upper,
-                                gen = generateArc
-                            } end),
-                        walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(a, x) return
-                            {
-                                xOffset = x,
-                                arc = a,
-                                limits = limitVecs.upper,
-                                gen = generateArc
-                            } end)
-                    
-                    }
-                }
-                
-                local lowerTracks = generateTrackGroups(groups.lower.tracks)
-                local upperTracks = generateTrackGroups(groups.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
-                
-                result.models = {}
-                
-                result.edgeLists =
-                    {
-                        TUpperTracks(upperTracks),
-                        TLowerTracks(lowerTracks),
-                    -- TUpperTracksBridge(func.concat(coor.applyEdges(mRotExt, mRotVec)(upperExt1), coor.applyEdges(mRotExt2, mRotExtVec2)(upperExt1))),
-                    }
+                groups = lineByArc(offsets, guidelines, limits, rad)
             end
             
+            local lowerTracks = generateTrackGroups(groups.lower.tracks)
+            local upperTracks = generateTrackGroups(groups.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
             
-            -- local basePt = {
-            --     coor.xyz(-0.5, -0.5, 0),
-            --     coor.xyz(0.5, -0.5, 0),
-            --     coor.xyz(0.5, 0.5, 0),
-            --     coor.xyz(-0.5, 0.5, 0)
-            -- }
-            -- facesU = func.map(basePt, function(f) return f .. coor.scaleX(nbUpperTracks * 5 + 1) * coor.scaleY(upperTrackLength) * coor.rotZ(rad) end)
-            -- facesL = func.map(basePt, function(f) return f .. coor.scaleX(nbLowerTracks * 5.25) * coor.scaleY(lowerTrackLength) end)
+            result.edgeLists =
+                {
+                    TUpperTracks(upperTracks),
+                    TLowerTracks(lowerTracks),
+                }
+            
+            result.models = {}
+            
             result.terrainAlignmentLists = {{
                 type = "EQUAL",
                 faces = {
-                -- func.map(facesU, coor.vec2Tuple),
                 }
             },
             }

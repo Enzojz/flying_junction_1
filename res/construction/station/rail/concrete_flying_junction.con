@@ -16,7 +16,9 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {99999, 0.3, 0.5, 0.8, 1, 1.5, 2, 5, 8}
+local rList = {0.1, 0.3, 0.5, 0.8, 1, 1.5, 2, 5, 8}
+
+local snapRule = station.noSnap
 
 local newModel = function(m, ...)
     return {
@@ -57,29 +59,43 @@ local generateLineSegment = function(line)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     local sup = toXyz(line.limits.sup)
     local inf = toXyz(line.limits.inf)
-    
-    local vector = (sup - inf)
-    
+    local mid = (sup + inf) * 0.5
+
+    local halfLength = sup % inf
+    local vector = (sup - inf):normalized() * halfLength
+
     return laneutil.makeLanes({
-        func.map({inf, sup, vector, vector}, coor.vec2Tuple)
+        {inf:toTuple(), mid:toTuple(), vector:toTuple(), vector:toTuple()},
+        {mid:toTuple(), sup:toTuple(), vector:toTuple(), vector:toTuple()},
     })
+
 end
+
+
 
 local generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     local toVector = function(rad) return coor.xyz(0, -1, 0) .. coor.rotZ(rad) end
+
     local radSup = arc.limits.sup
     local radInf = arc.limits.inf
-    
+    local radMid = (radSup + radInf) * 0.5
+
     local vecSup = toVector(radSup)
     local vecInf = toVector(radInf)
+    local vecMid = toVector(radMid)
+
     local sup = toXyz(arc.guideline:pt(radSup))
     local inf = toXyz(arc.guideline:pt(radInf))
-    
+    local mid = toXyz(arc.guideline:pt(radMid))
+
     return laneutil.makeLanes({
-        func.map({inf, sup, vecInf, vecSup}, coor.vec2Tuple)
+        {inf:toTuple(), mid:toTuple(), vecInf:toTuple(), vecMid:toTuple()},
+        {mid:toTuple(), sup:toTuple(), vecMid:toTuple(), vecSup:toTuple()},
     })
 end
+
+
 
 local generateTrackGroups = function(limits, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
@@ -317,12 +333,12 @@ local function params()
         {
             key = "rLower",
             name = _("R of lower tracks"),
-            values = func.map(rList, tostring)
+            values = func.concat({"-"}, func.map(rList, tostring))
         },
         {
             key = "rUpper",
             name = _("R of upper tracks"),
-            values = func.map(rList, tostring)
+            values = func.concat({"-"}, func.map(rList, tostring))
         },
         {
             key = "nbPerGroup",
@@ -381,19 +397,19 @@ function data()
             local info = {
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
-                    r = rList[params.rLower + 1] * -1000
+                    r = params.rLower == 0 and 0 or rList[params.rLower] * -1000
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
-                    r = rList[params.rUpper + 1] * 1000
+                    r = params.rUpper == 0 and 0 or rList[params.rUpper] * 1000
                 }
             }
             
             local nbPerGroup = ({1, 2, info.lower.nbTracks})[params.nbPerGroup + 1]
             
             local trackBuilder = trackEdge.builder(catenary, trackType)
-            local TLowerTracks = trackBuilder.normal(function(e) return func.seq(0, #e - 1) end)
-            local TUpperTracks = trackBuilder.nonAligned(function(e) return func.seq(0, #e - 1) end)
+            local TLowerTracks = trackBuilder.normal(snapRule)
+            local TUpperTracks = trackBuilder.nonAligned(snapRule)
             local TUpperTracksBridge = trackBuilder.bridge(bridgeType, station.noSnap)
             
             local offsets = {

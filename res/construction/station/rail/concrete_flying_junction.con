@@ -401,6 +401,50 @@ function data()
                 upper = buildCoors(info.upper.nbTracks, info.upper.nbTracks)
             }
             
+            local function leastR(rLower, rUpper)
+
+                local function incr(r)
+                    return r == 0 and 0 or (r > 0 and r + 1 or r - 1)
+                end
+                if (rUpper == 0 and rLower == 0) then return rLower, rUpper end
+                local upperGuideliner = (rUpper == 0) and fLines or func.bind(fArcs, nil, nil, rUpper)
+                local lowerGuideliner = (rLower == 0) and fLines or func.bind(fArcs, nil, nil, rLower)
+                
+                local lowerGuideline = lowerGuideliner({offsets.lower.walls[1], offsets.lower.walls[#offsets.lower.walls]}, 0)
+                local upperGuideline = upperGuideliner({offsets.upper.walls[1], offsets.upper.walls[#offsets.upper.walls]}, rad)
+                
+                local resultTest = (function()
+                    if (rUpper ~= 0 and rLower ~= 0) then
+                        return (
+                            #(lowerGuideline[1] - upperGuideline[1]) > 1 and
+                            #(lowerGuideline[1] - upperGuideline[2]) > 1 and
+                            #(lowerGuideline[2] - upperGuideline[1]) > 1 and
+                            #(lowerGuideline[2] - upperGuideline[2]) > 1
+                    )
+                    else
+                        return (
+                            #(lowerGuideline[1] / upperGuideline[1]) > 1 and
+                            #(lowerGuideline[1] / upperGuideline[2]) > 1 and
+                            #(lowerGuideline[2] / upperGuideline[1]) > 1 and
+                            #(lowerGuideline[2] / upperGuideline[2]) > 1
+                    )
+                    end
+                end)()
+                
+                if (resultTest) then
+                    return rLower, rUpper
+                else
+                    return leastR(incr(rLower), incr(rUpper))
+                end
+            end
+            
+            local leastLowerR, leastUpperR = leastR(info.lower.r, info.upper.r)
+            
+            local chooseR = function(r, lr) return math.abs(r) < math.abs(lr) and lr or r end
+
+            info.lower.r = chooseR(info.lower.r, leastLowerR)
+            info.upper.r = chooseR(info.upper.r, leastUpperR)
+            
             info.lower.guideliner = (info.lower.r == 0) and fLines or func.bind(fArcs, nil, nil, info.lower.r)
             info.upper.guideliner = (info.upper.r == 0) and fLines or func.bind(fArcs, nil, nil, info.upper.r)
             
@@ -426,9 +470,9 @@ function data()
             
             if (info.lower.r == 0 and info.upper.r == 0) then
                 groups = lineByLine(offsets, guidelines, limits, rad)
-            elseif (info.lower.r == 0 and info.upper.r > 0) then
+            elseif (info.lower.r == 0 and info.upper.r ~= 0) then
                 groups = lineByArc(offsets, guidelines, limits, rad)
-            elseif (info.lower.r < 0 and info.upper.r == 0) then
+            elseif (info.lower.r ~= 0 and info.upper.r == 0) then
                 groups = arcByLine(offsets, guidelines, limits, rad)
             else
                 groups = arcByArc(offsets, guidelines, limits, rad)

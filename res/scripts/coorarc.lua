@@ -104,4 +104,5 @@ function arc.intersectionArc(arc1, arc2)
     )
     return arc.intersectionLine(arc1, chord)
 end
+
 return arc

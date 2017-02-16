@@ -75,17 +75,17 @@ end
 
 local generateArc = function(arc, n)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
-
+    
     local radSup = arc.limits.sup
     local radMid = arc.limits.mid
     local radInf = arc.limits.inf
-
+    
     local sup = toXyz(arc.guideline:pt(radSup))
     local inf = toXyz(arc.guideline:pt(radInf))
     local mid = toXyz(arc.guideline:pt(radMid))
     
     local toVector = function(rad) return coor.xyz(0, (arc.limits.mid > math.pi * 0.5 or arc.limits.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad) end
-
+    
     local vecSup = toVector(radSup)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
@@ -144,7 +144,7 @@ local function attach(limits)
     end
 end
 
-local function lineByLine(offsets, guidelines, info, limits)
+local function lineByLine(offsets, guidelines, limits)
     local limitVecs = {
         lower = {
             sup = (limits.lower.L - limits.upper.R) - (limits.lower.L - guidelines.lower.level),
@@ -188,8 +188,9 @@ local function lineByLine(offsets, guidelines, info, limits)
     }
 end
 
-local function lineByArc(offsets, guidelines, info, limits)
-    local ptXSelector = function (lhs, rhs) return lhs:length() < rhs:length() end
+local ptXSelector = function(lhs, rhs) return  lhs:length() < rhs:length() end
+
+local function lineByArc(offsets, guidelines, limits)
     
     local xer = intersectioner.arcByLine(ptXSelector)
     
@@ -230,8 +231,7 @@ local function lineByArc(offsets, guidelines, info, limits)
 end
 
 
-local function arcByLine(offsets, guidelines, info, limits)
-    local ptXSelector = function (lhs, rhs) return lhs:length() < rhs:length() end
+local function arcByLine(offsets, guidelines, limits)
     local xer = intersectioner.arcByLine(ptXSelector)
     
     local limitVecs = {
@@ -271,9 +271,7 @@ local function arcByLine(offsets, guidelines, info, limits)
 end
 
 
-local function arcByArc(offsets, guidelines, info, limits)
-    local ptXSelector = function (lhs, rhs) return lhs:length() < rhs:length() end
-    
+local function arcByArc(offsets, guidelines, limits)
     local limitVecs = {
         lower = {
             inf = limits.lower.R:rad(func.min(limits.lower.R - limits.upper.L, ptXSelector)),
@@ -376,13 +374,13 @@ local function part(rad)
         }
         
         if (info.lower.r == 0 and info.upper.r == 0) then
-            return lineByLine(offsets, guidelines, info, limits)
+            return lineByLine(offsets, guidelines, limits)
         elseif (info.lower.r == 0 and info.upper.r ~= 0) then
-            return lineByArc(offsets, guidelines, info, limits)
+            return lineByArc(offsets, guidelines, limits)
         elseif (info.lower.r ~= 0 and info.upper.r == 0) then
-            return arcByLine(offsets, guidelines, info, limits)
+            return arcByLine(offsets, guidelines, limits)
         else
-            return arcByArc(offsets, guidelines, info, limits)
+            return arcByArc(offsets, guidelines, limits)
         end
     end
 end
@@ -509,7 +507,7 @@ function data()
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
                     r = params.rLower1 == 4 and 0 or rList[params.rLower1 + 1] * -1000,
-                    rad = - 0.5 * rad
+                    rad = -0.5 * rad
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
@@ -521,7 +519,7 @@ function data()
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
                     r = params.rLower2 == 4 and 0 or rList[params.rLower2 + 1] * -1000,
-                    rad = - 0.5 * rad
+                    rad = -0.5 * rad
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
@@ -550,7 +548,7 @@ function data()
             
             local lowerTracks2 = generateTrackGroups(2)(group2.lower.tracks)
             local upperTracks2 = generateTrackGroups(2)(group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
-
+            
             result.edgeLists =
                 {
                     TUpperTracks(func.concat(upperTracks1, upperTracks2)),

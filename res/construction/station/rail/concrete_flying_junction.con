@@ -18,7 +18,7 @@ local bridgeType = "z_concrete_flying_junction.lua"
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
 local rList = {-1, -0.5, -0.3, -0.1, 0, 0.1, 0.3, 0.5, 1}
 
-local snapRule = station.noSnap
+local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
 
 local newModel = function(m, ...)
     return {
@@ -55,23 +55,23 @@ local slopeRad = func.mapPair(
     function(s) return s, math.atan(s * 0.001) end)
 local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
 
-local generateLineSegment = function(line, n)
+local generateLineSegment = function(line)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     local sup = toXyz(line.limits.sup)
-    local inf = toXyz(line.limits.inf)
     local mid = toXyz(line.limits.mid)
+    local inf = toXyz(line.limits.inf)
     
     local halfLength = sup % inf
     local vector = (sup - inf):normalized() * halfLength
     
-    return laneutil.makeLanes({({
+    return laneutil.makeLanes({
         {inf:toTuple(), mid:toTuple(), vector:toTuple(), vector:toTuple()},
         {mid:toTuple(), sup:toTuple(), vector:toTuple(), vector:toTuple()},
-    })[n]})
+    })
 
 end
 
-local generateArc = function(arc, n)
+local generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
     local radSup = arc.limits.sup
@@ -88,19 +88,23 @@ local generateArc = function(arc, n)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
     
-    return laneutil.makeLanes({({
+    return laneutil.makeLanes({
         {inf:toTuple(), mid:toTuple(), vecInf:toTuple(), vecMid:toTuple()},
         {mid:toTuple(), sup:toTuple(), vecMid:toTuple(), vecSup:toTuple()},
-    })[n]})
+    })
 end
 
 
 
-local generateTrackGroups = function(n)
-    return function(limits, trans)
-        trans = trans or {mpt = coor.I(), mvec = coor.I()}
-        return func.mapFlatten(limits, function(info) return coor.applyEdges(trans.mpt, trans.mvec)(info.gen(info, n)) end)
-    end
+local generateTrackGroups = function(tracks1, tracks2, trans)
+    trans = trans or {mpt = coor.I(), mvec = coor.I()}
+    return func.flatten(func.map2(tracks1, tracks2,
+        function(t1, t2) return
+            coor.applyEdges(trans.mpt, trans.mvec)(func.concat(
+                func.range(t1:gen(), 1, 2),
+                func.range(t2:gen(), 3, 4)
+        ))
+        end))
 end
 
 local fLines = function(offsets, rad)
@@ -294,7 +298,7 @@ local minimalR = function(offsets, info)
     local offsetUpper = {offsets.upper.walls[1], offsets.upper.walls[#offsets.upper.walls]}
     
     local function incr(r)
-        return r == 0 and 0 or (r > 0 and r + 1 or r -1)
+        return r == 0 and 0 or (r > 0 and r + 1 or r - 1)
     end
     
     local function calculate(rLower, rUpper)
@@ -529,17 +533,16 @@ function data()
             local group1 = part(rad)(info1, offsets)
             local group2 = part(rad)(info2, offsets)
             
-            local lowerTracks1 = generateTrackGroups(1)(group1.lower.tracks)
-            local upperTracks1 = generateTrackGroups(1)(group1.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
-            
-            local lowerTracks2 = generateTrackGroups(2)(group2.lower.tracks)
-            local upperTracks2 = generateTrackGroups(2)(group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
+            local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
+            local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
             
             result.edgeLists =
                 {
-                    TUpperTracks(func.concat(upperTracks1, upperTracks2)),
-                    TLowerTracks(func.concat(lowerTracks1, lowerTracks2)),
+                    TUpperTracks(upperTracks),
+                    TLowerTracks(lowerTracks),
                 }
+            
+            dump.dump(result.edgeLists)
             
             result.models = {}
             

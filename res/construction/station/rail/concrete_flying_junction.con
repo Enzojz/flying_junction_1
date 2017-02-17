@@ -110,36 +110,8 @@ local function attach(limits)
         }
     end
 end
+
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
-local function arcByArc(offsets, guidelines, limits)
-    local limitVecs = {
-        lower = {
-            inf = limits.lower.R:rad(func.min(limits.lower.R - limits.upper.L, ptXSelector)),
-            mid = limits.lower.R:rad(coor.xy(0, 0)),
-            sup = limits.lower.L:rad(func.min(limits.lower.L - limits.upper.R, ptXSelector)),
-        },
-        upper = {
-            sup = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.L, ptXSelector)),
-            mid = limits.upper.R:rad(coor.xy(0, 0)),
-            inf = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.R, ptXSelector)),
-        }
-    }
-    
-    return {
-        lower = {
-            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
-                attach(limitVecs.lower)),
-            walls = func.map2(guidelines.lower.walls, offsets.lower.walls,
-                attach(limitVecs.lower))
-        },
-        upper = {
-            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
-                attach(limitVecs.upper)),
-            walls = func.map2(guidelines.upper.walls, offsets.upper.walls,
-                attach(limitVecs.upper))
-        }
-    }
-end
 
 local minimalR = function(offsets, info)
     local offsetLower = {offsets.lower.walls[1], offsets.lower.walls[#offsets.lower.walls]}
@@ -160,7 +132,6 @@ local minimalR = function(offsets, info)
             #(lowerGuideline[2] - upperGuideline[1]) > 1 and
             #(lowerGuideline[2] - upperGuideline[2]) > 1
         )
-
         if (resultTest) then
             return rLower, rUpper
         else
@@ -193,7 +164,33 @@ local function part(rad)
             upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
         }
         
-        return arcByArc(offsets, guidelines, limits)
+        local limitVecs = {
+            lower = {
+                inf = limits.lower.R:rad(func.min(limits.lower.R - limits.upper.L, ptXSelector)),
+                mid = limits.lower.R:rad(coor.xy(0, 0)),
+                sup = limits.lower.L:rad(func.min(limits.lower.L - limits.upper.R, ptXSelector)),
+            },
+            upper = {
+                sup = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.L, ptXSelector)),
+                mid = limits.upper.R:rad(coor.xy(0, 0)),
+                inf = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.R, ptXSelector)),
+            }
+        }
+        
+        return {
+            lower = {
+                tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
+                    attach(limitVecs.lower)),
+                walls = func.map2(guidelines.lower.walls, offsets.lower.walls,
+                    attach(limitVecs.lower))
+            },
+            upper = {
+                tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
+                    attach(limitVecs.upper)),
+                walls = func.map2(guidelines.upper.walls, offsets.upper.walls,
+                    attach(limitVecs.upper))
+            }
+        }
     end
 end
 

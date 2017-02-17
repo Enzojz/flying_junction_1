@@ -78,7 +78,7 @@ function arc.intersectionLine(arc, line)
         -- (x - a)² + (y - b)² = r²
         -- (x - a)² = r² - (y - b)²
         local y = -line.c / line.b;
-        local delta = arc.r * arc.r - (y - line.b) * (y - line.b);
+        local delta = arc.r * arc.r - (y - arc.o.y) * (y - arc.o.y);
         if (math.abs(delta) < 1e-10) then
             return {coor.xy(arc.o.x, y)}
         elseif (delta > 0) then
@@ -93,15 +93,18 @@ function arc.intersectionLine(arc, line)
     end
 end
 
-
-function arc.intersectionArc(arc1, arc2)
-    local chord = line.new(
+function arc.commonChord(arc1, arc2)
+    return line.new(
         2 * arc2.o.x - 2 * arc1.o.x,
         2 * arc2.o.y - 2 * arc1.o.y,
         arc1.o.x * arc1.o.x + arc1.o.y * arc1.o.y -
         arc2.o.x * arc2.o.x - arc2.o.y * arc2.o.y -
         arc1.r * arc1.r + arc2.r * arc2.r
     )
+end
+
+function arc.intersectionArc(arc1, arc2)
+    local chord = arc.commonChord(arc1, arc2)
     return arc.intersectionLine(arc1, chord)
 end
 

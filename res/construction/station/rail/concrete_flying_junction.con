@@ -16,7 +16,7 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {-1, -0.5, -0.3, -0.1, 0, 0.1, 0.3, 0.5, 1}
+local rList = {-1, -0.5, -0.3, -0.1, 1e8, 0.1, 0.3, 0.5, 1}
 
 local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
 
@@ -64,10 +64,10 @@ local generateLineSegment = function(line)
     local halfLength = sup % inf
     local vector = (sup - inf):normalized() * halfLength
     
-    return laneutil.makeLanes({
-        {inf:toTuple(), mid:toTuple(), vector:toTuple(), vector:toTuple()},
-        {mid:toTuple(), sup:toTuple(), vector:toTuple(), vector:toTuple()},
-    })
+    return {
+        {inf, mid, vector, vector},
+        {mid, sup, vector, vector},
+    }
 
 end
 
@@ -88,22 +88,23 @@ local generateArc = function(arc)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
     
-    return laneutil.makeLanes({
-        {inf:toTuple(), mid:toTuple(), vecInf:toTuple(), vecMid:toTuple()},
-        {mid:toTuple(), sup:toTuple(), vecMid:toTuple(), vecSup:toTuple()},
-    })
+    
+    return {
+        {inf, mid, vecInf, vecMid},
+        {mid, sup, vecMid, vecSup},
+    }
 end
-
-
 
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     return func.flatten(func.map2(tracks1, tracks2,
-        function(t1, t2) return
-            coor.applyEdges(trans.mpt, trans.mvec)(func.concat(
-                func.range(t1:gen(), 1, 2),
-                func.range(t2:gen(), 3, 4)
-        ))
+        function(t1, t2) 
+            local seg = { t1:gen()[1], t2:gen()[2] }
+            seg[1][2], seg[2][1] = (seg[1][2] + seg[2][1]) * 0.5, (seg[1][2] + seg[2][1]) * 0.5
+            seg[1][4], seg[2][3] = (seg[1][4] + seg[2][3]) * 0.5, (seg[1][4] + seg[2][3]) * 0.5
+
+        return
+            func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
         end))
 end
 
@@ -331,7 +332,7 @@ local minimalR = function(offsets, info)
         if (resultTest) then
             return rLower, rUpper
         else
-            return calculate(incr(rLower), rLower == rUpper and rUpper or incr(rUpper))
+            return calculate(incr(rLower), rLower == rUpper and rUpper or incr(rUpper))-- if else to prevent infinit loop
         end
     end
     return calculate(info.lower.r, info.upper.r)
@@ -493,27 +494,30 @@ function data()
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
             local catenary = params.catenary == 1
             
+            -- In theory I can use R = ∞ to simplify all cases in Arc VS Arc, however, the game doesn't like it.
+            local retriveR = function(param) return rList[param + 1] * 1000 end
+            
             local info1 = {
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
-                    r = params.rLower1 == 4 and 0 or rList[params.rLower1 + 1] * -1000,
+                    r = retriveR(params.rLower1),
                     rad = -0.5 * rad
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
-                    r = params.rUpper1 == 4 and 0 or rList[params.rUpper1 + 1] * 1000,
+                    r = retriveR(params.rUpper1),
                     rad = 0.5 * rad
                 }
             }
             local info2 = {
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
-                    r = params.rLower2 == 4 and 0 or rList[params.rLower2 + 1] * -1000,
+                    r = retriveR(params.rLower2),
                     rad = -0.5 * rad
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
-                    r = params.rUpper2 == 4 and 0 or rList[params.rUpper2 + 1] * 1000,
+                    r = retriveR(params.rUpper2),
                     rad = 0.5 * rad
                 }
             }
@@ -541,8 +545,6 @@ function data()
                     TUpperTracks(upperTracks),
                     TLowerTracks(lowerTracks),
                 }
-            
-            dump.dump(result.edgeLists)
             
             result.models = {}
             

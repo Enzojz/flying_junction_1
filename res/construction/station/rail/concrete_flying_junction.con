@@ -16,7 +16,7 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {-1, -0.5, -0.3, -0.1, 1e8, 0.1, 0.3, 0.5, 1}
+local rList = {-1, -0.5, -0.3, -0.1, 1e5, 0.1, 0.3, 0.5, 1}
 
 local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
 
@@ -55,22 +55,6 @@ local slopeRad = func.mapPair(
     function(s) return s, math.atan(s * 0.001) end)
 local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
 
-local generateLineSegment = function(line)
-    local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
-    local sup = toXyz(line.limits.sup)
-    local mid = toXyz(line.limits.mid)
-    local inf = toXyz(line.limits.inf)
-    
-    local halfLength = sup % inf
-    local vector = (sup - inf):normalized() * halfLength
-    
-    return {
-        {inf, mid, vector, vector},
-        {mid, sup, vector, vector},
-    }
-
-end
-
 local generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
@@ -88,34 +72,24 @@ local generateArc = function(arc)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
     
-    
     return {
         {inf, mid, vecInf, vecMid},
         {mid, sup, vecMid, vecSup},
     }
 end
 
+local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
+
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     return func.flatten(func.map2(tracks1, tracks2,
-        function(t1, t2) 
-            local seg = { t1:gen()[1], t2:gen()[2] }
-            seg[1][2], seg[2][1] = (seg[1][2] + seg[2][1]) * 0.5, (seg[1][2] + seg[2][1]) * 0.5
-            seg[1][4], seg[2][3] = (seg[1][4] + seg[2][3]) * 0.5, (seg[1][4] + seg[2][3]) * 0.5
-
-        return
-            func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
+        function(t1, t2)
+            local seg = {generateArc(t1)[1], generateArc(t2)[2]}
+            seg[1][2], seg[2][1] = average(seg[1][2], seg[2][1])
+            seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
+            return
+                func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
         end))
-end
-
-local fLines = function(offsets, rad)
-    return func.map(offsets, function(x) return
-        line.byVecPt(
-            coor.xyz(0, 1, 0) .. coor.rotZ(rad),
-            coor.xyz(x, 0, 0) .. coor.rotZ(rad)
-    )
-    end
-)
 end
 
 local fArcs = function(offsets, rad, r)
@@ -133,135 +107,10 @@ local function attach(limits)
             limits = limits,
             xOffsets = x,
             guideline = l,
-            gen = l.o and generateArc or generateLineSegment
         }
     end
 end
-
-local function lineByLine(offsets, guidelines, limits)
-    local limitVecs = {
-        lower = {
-            sup = (limits.lower.L - limits.upper.R) - (limits.lower.L - guidelines.lower.level),
-            inf = (limits.lower.R - limits.upper.L) - (limits.lower.R - guidelines.lower.level)
-        },
-        upper = {
-            sup = (limits.upper.R - limits.lower.L) - (limits.upper.R - guidelines.upper.level),
-            inf = (limits.upper.L - limits.lower.R) - (limits.upper.L - guidelines.upper.level)
-        }
-    }
-    
-    return {
-        lower = {
-            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x)
-                return attach({
-                    sup = (l - guidelines.lower.level) + limitVecs.lower.sup,
-                    mid = (l - guidelines.lower.level),
-                    inf = (l - guidelines.lower.level) + limitVecs.lower.inf
-                })(l, x) end),
-            walls = func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, x)
-                return attach({
-                    sup = (l - limits.upper.R),
-                    mid = (l - guidelines.lower.level),
-                    inf = (l - limits.upper.L)
-                })(l, x) end)
-        },
-        upper = {
-            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks, function(l, x)
-                return attach({
-                    sup = (l - guidelines.upper.level) + limitVecs.upper.sup,
-                    mid = (l - guidelines.upper.level),
-                    inf = (l - guidelines.upper.level) + limitVecs.upper.inf
-                })(l, x) end),
-            walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(l, x)
-                return attach({
-                    sup = (l - limits.lower.L),
-                    mid = (l - guidelines.upper.level),
-                    inf = (l - limits.lower.R)
-                })(l, x) end)
-        }
-    }
-end
-
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
-
-local function lineByArc(offsets, guidelines, limits)
-    local xer = function(lhs, rhs) return func.min(lhs / rhs, ptXSelector) end
-    
-    local limitVecs = {
-        lower = {
-            sup = xer(limits.upper.R, limits.lower.L) - (limits.lower.L - guidelines.lower.level),
-            inf = xer(limits.upper.L, limits.lower.R) - (limits.lower.R - guidelines.lower.level)
-        },
-        upper = {
-            sup = limits.upper.R:rad(xer(limits.upper.R, limits.lower.L)),
-            mid = limits.upper.R:rad(coor.xy(0, 0)),
-            inf = limits.upper.L:rad(xer(limits.upper.L, limits.lower.R))
-        }
-    }
-    
-    return {
-        lower = {
-            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks, function(l, x)
-                return attach({
-                    sup = (l - guidelines.lower.level) + limitVecs.lower.sup,
-                    mid = (l - guidelines.lower.level),
-                    inf = (l - guidelines.lower.level) + limitVecs.lower.inf
-                })(l, x) end),
-            walls = func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, x)
-                return attach({
-                    sup = xer(l, limits.upper.R),
-                    mid = (l - guidelines.lower.level),
-                    inf = xer(l, limits.upper.L)
-                })(l, x) end)
-        },
-        upper = {
-            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
-                attach(limitVecs.upper)),
-            walls = func.map2(guidelines.upper.walls, offsets.upper.walls,
-                attach(limitVecs.upper))
-        }
-    }
-end
-
-local function arcByLine(offsets, guidelines, limits)
-    local xer = function(lhs, rhs) return func.min(lhs / rhs, ptXSelector) end
-    
-    local limitVecs = {
-        lower = {
-            inf = limits.lower.R:rad(xer(limits.lower.R, limits.upper.L)),
-            mid = limits.lower.R:rad(coor.xy(0, 0)),
-            sup = limits.lower.L:rad(xer(limits.lower.L, limits.upper.R))
-        },
-        upper = {
-            sup = xer(limits.lower.R, limits.upper.L) - (limits.upper.L - guidelines.upper.level),
-            inf = xer(limits.lower.L, limits.upper.R) - (limits.upper.R - guidelines.upper.level)
-        }
-    }
-    
-    return {
-        lower = {
-            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
-                attach(limitVecs.lower)),
-            walls = func.map2(guidelines.lower.walls, offsets.lower.walls,
-                attach(limitVecs.lower))
-        },
-        upper = {
-            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks, function(l, x)
-                return attach({
-                    sup = (l - guidelines.upper.level) + limitVecs.upper.sup,
-                    mid = (l - guidelines.upper.level),
-                    inf = (l - guidelines.upper.level) + limitVecs.upper.inf
-                })(l, x) end),
-            walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(l, x)
-                return attach({
-                    sup = xer(l, limits.lower.R),
-                    mid = (l - guidelines.upper.level),
-                    inf = xer(l, limits.lower.L)
-                })(l, x) end)
-        },
-    }
-end
-
 local function arcByArc(offsets, guidelines, limits)
     local limitVecs = {
         lower = {
@@ -292,8 +141,6 @@ local function arcByArc(offsets, guidelines, limits)
     }
 end
 
-local selectGuideliner = function(r) return (r == 0) and fLines or func.bind(fArcs, nil, nil, r) end
-
 local minimalR = function(offsets, info)
     local offsetLower = {offsets.lower.walls[1], offsets.lower.walls[#offsets.lower.walls]}
     local offsetUpper = {offsets.upper.walls[1], offsets.upper.walls[#offsets.upper.walls]}
@@ -303,32 +150,17 @@ local minimalR = function(offsets, info)
     end
     
     local function calculate(rLower, rUpper)
-        if (rUpper == 0 and rLower == 0) then return rLower, rUpper end
         
-        local upperGuideliner = selectGuideliner(rUpper)
-        local lowerGuideliner = selectGuideliner(rLower)
+        local lowerGuideline = fArcs(offsetLower, info.lower.rad, rLower)
+        local upperGuideline = fArcs(offsetUpper, info.upper.rad, rUpper)
         
-        local lowerGuideline = lowerGuideliner(offsetLower, info.lower.rad)
-        local upperGuideline = upperGuideliner(offsetUpper, info.upper.rad)
-        
-        local resultTest = (function()
-            if (rUpper ~= 0 and rLower ~= 0) then
-                return (
-                    #(lowerGuideline[1] - upperGuideline[1]) > 1 and
-                    #(lowerGuideline[1] - upperGuideline[2]) > 1 and
-                    #(lowerGuideline[2] - upperGuideline[1]) > 1 and
-                    #(lowerGuideline[2] - upperGuideline[2]) > 1
-            )
-            else
-                return (
-                    #(lowerGuideline[1] / upperGuideline[1]) > 1 and
-                    #(lowerGuideline[1] / upperGuideline[2]) > 1 and
-                    #(lowerGuideline[2] / upperGuideline[1]) > 1 and
-                    #(lowerGuideline[2] / upperGuideline[2]) > 1
-            )
-            end
-        end)()
-        
+        local resultTest = (
+            #(lowerGuideline[1] - upperGuideline[1]) > 1 and
+            #(lowerGuideline[1] - upperGuideline[2]) > 1 and
+            #(lowerGuideline[2] - upperGuideline[1]) > 1 and
+            #(lowerGuideline[2] - upperGuideline[2]) > 1
+        )
+
         if (resultTest) then
             return rLower, rUpper
         else
@@ -342,19 +174,16 @@ local function part(rad)
     return function(info, offsets)
         info.lower.r, info.upper.r = minimalR(offsets, info)
         
-        info.lower.guideliner = selectGuideliner(info.lower.r)
-        info.upper.guideliner = selectGuideliner(info.upper.r)
-        
         local guidelines =
             {
                 lower = {
-                    tracks = info.lower.guideliner(offsets.lower.tracks, info.lower.rad),
-                    walls = info.lower.guideliner(offsets.lower.walls, info.lower.rad),
+                    tracks = fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r),
+                    walls = fArcs(offsets.lower.walls, info.lower.rad, info.lower.r),
                     level = line.byVecPt(coor.xy(math.cos(info.lower.rad), math.sin(info.lower.rad)), coor.o)
                 },
                 upper = {
-                    tracks = info.upper.guideliner(offsets.upper.tracks, info.upper.rad),
-                    walls = info.upper.guideliner(offsets.upper.walls, info.upper.rad),
+                    tracks = fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r),
+                    walls = fArcs(offsets.upper.walls, info.upper.rad, info.upper.r),
                     level = line.byVecPt(coor.xy(math.cos(info.upper.rad), math.sin(info.upper.rad)), coor.o)
                 }
             }
@@ -364,15 +193,7 @@ local function part(rad)
             upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
         }
         
-        if (info.lower.r == 0 and info.upper.r == 0) then
-            return lineByLine(offsets, guidelines, limits)
-        elseif (info.lower.r == 0 and info.upper.r ~= 0) then
-            return lineByArc(offsets, guidelines, limits)
-        elseif (info.lower.r ~= 0 and info.upper.r == 0) then
-            return arcByLine(offsets, guidelines, limits)
-        else
-            return arcByArc(offsets, guidelines, limits)
-        end
+        return arcByArc(offsets, guidelines, limits)
     end
 end
 

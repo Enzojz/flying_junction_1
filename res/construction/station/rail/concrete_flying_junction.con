@@ -137,7 +137,7 @@ local function attach(limits)
     return function(l, x)
         return {
             limits = limits,
-            xOffsets = x,
+            xOffset = x,
             guideline = l,
         }
     end
@@ -179,18 +179,39 @@ local function part(rad)
             }
         }
         
+        local lowerWalls = func.p
+            * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
+                return attach(
+                    {
+                        inf = l:rad(func.min(l - limits.upper.L, ptXSelector)),
+                        mid = l:rad(coor.xy(0, 0)),
+                        sup = l:rad(func.min(l - limits.upper.R, ptXSelector)),
+                    }
+                )(l, o) end)
+            * function(walls)
+                for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
+                for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
+                return walls
+            end / 0
+        
         return {
             lower = {
                 tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
                     attach(limitRads.lower)),
-                walls = func.map2(guidelines.lower.walls, offsets.lower.walls,
-                    attach(limitRads.lower))
+                walls = lowerWalls
             },
             upper = {
                 tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
                     attach(limitRads.upper)),
-                walls = func.map2(guidelines.upper.walls, offsets.upper.walls,
-                    attach(limitRads.upper))
+                walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(l, o)
+                    return attach(
+                        {
+                            sup = l:rad(func.min(l - limits.lower.L, ptXSelector)),
+                            mid = l:rad(coor.xy(0, 0)),
+                            inf = l:rad(func.min(l - limits.lower.R, ptXSelector)),
+                        }
+                    )(l, o)
+                end)
             }
         }
     end
@@ -201,19 +222,55 @@ local function normalizeRad(rad)
 end
 
 local function generateStructure(group)
-    local coordsGen = arc.coords(group.guideline, 10)
-    
-    local function makeModel(seq, scale)
-        return func.map2(func.range(seq, 1, #seq - 1), func.range(seq,2, #seq), function(rad1, rad2)
-            local rad = (rad1 + rad2) * 0.5
-            local pt = group.guideline:pt( rad )
-            return newModel(mSidePillar, coor.scaleY(scale), coor.rotZ(rad), coor.transX(pt.x), coor.transY(pt.y))
-        end)
+    local function makeFn(model)
+        return function(obj)
+            local coordsGen = arc.coords(obj.guideline, 5)
+            local function makeModel(seq, scale)
+                return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
+                    local rad = (rad1 + rad2) * 0.5
+                    local pt = obj.guideline:pt(rad)
+                    return newModel(model, coor.scaleX(1.1), coor.scaleY(0.5 * scale), coor.rotZ(rad), coor.transX(pt.x), coor.transY(pt.y))
+                end)
+            end
+            return {
+                makeModel(coordsGen(normalizeRad(obj.limits.inf), normalizeRad(obj.limits.mid) - normalizeRad(obj.limits.inf))),
+                makeModel(coordsGen(normalizeRad(obj.limits.mid), normalizeRad(obj.limits.sup) - normalizeRad(obj.limits.mid)))
+            }
+        end
     end
     
+    local makeWall = makeFn(mSidePillar)
+    local makeRoof = makeFn(mRoof)
+    
+    local walls = group.walls
+    local trackSets = func.p
+        * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
+            function(w1, w2) return func.p
+                * func.filter(group.tracks, function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
+                * func.bind(func.map, nil, function(t)
+                    return func.with(t,
+                        {
+                            limits = {
+                                sup = w2.limits.sup,
+                                mid = t.guideline:rad(coor.xy(0, 0)),
+                                inf = w1.limits.inf,
+                            }
+                        }
+                ) end)
+                / 0
+            end)
+        * func.flatten / 0
+    
     return {
-        makeModel(coordsGen(normalizeRad(group.limits.inf), normalizeRad(group.limits.mid) - normalizeRad(group.limits.inf))),
-        makeModel(coordsGen(normalizeRad(group.limits.mid), normalizeRad(group.limits.sup) - normalizeRad(group.limits.mid))),
+        func.flatten({
+            func.mapFlatten(walls, function(w) return makeWall(w)[1] end),
+            func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
+        }),
+        func.flatten({
+            func.mapFlatten(walls, function(w) return makeWall(w)[2] end),
+            func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
+        }),
+    
     }
 end
 
@@ -387,10 +444,12 @@ function data()
                     TLowerTracks(lowerTracks),
                 }
             
-            result.models = func.concat(
-                func.mapFlatten(group1.lower.walls, function(w) return generateStructure(w)[1] end),
-                func.mapFlatten(group2.lower.walls, function(w) return generateStructure(w)[2] end)
-            )
+            result.models = func.flatten({
+                generateStructure(group1.lower)[1],
+                generateStructure(group2.lower)[2]
+            })
+
+            dump.dump(result.models)
 
             result.terrainAlignmentLists = {{
                 type = "EQUAL",

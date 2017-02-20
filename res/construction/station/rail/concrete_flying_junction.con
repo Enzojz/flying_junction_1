@@ -75,7 +75,7 @@ local generateArc = function(arc)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
     
-    local supExt = sup + vecSup
+    local supExt = sup + vecSup 
     local infExt = inf - vecInf
     
     return {
@@ -213,9 +213,7 @@ local function part(rad)
                     for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
                     for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
                     return walls
-                end / 0,
-                outlines = func.map2({limits.lower.L, limits.lower.R},
-                    attach(limitRads.lower)),
+                end / 0
             },
             upper = {
                 tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
@@ -232,8 +230,6 @@ local function part(rad)
                         sup = limitRads.upper.sup,
                     })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
                 },
-                outlines = func.map2({limits.upper.L, limits.upper.R},
-                    attach(limitRads.upper)),
             }
         }
     end

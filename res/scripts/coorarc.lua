@@ -114,7 +114,7 @@ function arc.coords(a, baseLength)
         local nSeg = (function(x) return (x < 1 or (x % 1 > 0.5)) and math.ceil(x) or math.floor(x) end)(length / baseLength)
         local scale = length / (nSeg * baseLength)
         local dRad = rad / nSeg
-        local seq = func.seqMap({0, nSeg}, function(n) return from + n * dRad end)
+        local seq = math.abs(scale) < 1e-5 and {} or func.seqMap({0, nSeg}, function(n) return from + n * dRad end)
         return seq, scale
     end
 end

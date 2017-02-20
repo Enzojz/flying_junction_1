@@ -7,8 +7,6 @@ local line = require "coorline"
 local arc = require "coorarc"
 local station = require "stationlib"
 
-local dump = require "datadumper"
-
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -16,7 +14,8 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {-1, -0.5, -0.3, -0.1, 1e5, 0.1, 0.3, 0.5, 1}
+local rList = {-0.1, -0.3, -0.5, -1, 1e5, 1, 0.5, 0.3, 0.1}
+local rTxtList = {"●", "●", "•", "∙", "0", "∙", "•", "●", "●"}
 
 local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
 
@@ -32,8 +31,8 @@ function buildCoors(numTracks, groupSize)
         local function caller(n)
             return builder(
                 func.concat(xOffsets, func.seqMap({1, n}, function(n) return baseX - 0.5 * station.trackWidth + n * station.trackWidth end)),
-                func.concat(uOffsets, {baseX + n * station.trackWidth + 0.5}),
-                baseX + n * station.trackWidth + 1,
+                func.concat(uOffsets, {baseX + n * station.trackWidth + 0.25}),
+                baseX + n * station.trackWidth + 0.5,
                 nbTracks - n)
         end
         if (nbTracks == 0) then
@@ -45,7 +44,7 @@ function buildCoors(numTracks, groupSize)
             return caller(groupSize)
         end
     end
-    return builder({}, {0.5}, 1, numTracks)
+    return builder({}, {0.25}, 0.5, numTracks)
 end
 
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
@@ -55,12 +54,16 @@ local slopeRad = func.mapPair(
     function(s) return s, math.atan(s * 0.001) end)
 local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
 
+local function normalizeRad(rad)
+    return (rad > math.pi * -0.5) and rad or normalizeRad(rad + math.pi * 2)
+end
+
 local generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
-    local radSup = arc.limits.sup
-    local radMid = arc.limits.mid
-    local radInf = arc.limits.inf
+    local radSup = normalizeRad(arc.limits.sup)
+    local radMid = normalizeRad(arc.limits.mid)
+    local radInf = normalizeRad(arc.limits.inf)
     
     local sup = toXyz(arc.guideline:pt(radSup))
     local inf = toXyz(arc.guideline:pt(radInf))
@@ -72,9 +75,14 @@ local generateArc = function(arc)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
     
+    local supExt = sup + vecSup
+    local infExt = inf - vecInf
+    
     return {
         {inf, mid, vecInf, vecMid},
         {mid, sup, vecMid, vecSup},
+        {infExt, inf, vecInf, vecInf},
+        {sup, supExt, vecSup, vecSup},
     }
 end
 
@@ -82,15 +90,24 @@ local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
 
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
-    return func.flatten(func.map2(tracks1, tracks2,
-        function(t1, t2)
-            local seg = {generateArc(t1)[1], generateArc(t2)[2]}
-            seg[1][2], seg[2][1] = average(seg[1][2], seg[2][1])
-            seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
-            return
-                func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
-        end)
-)
+    return {
+        normal = func.flatten(func.map2(tracks1, tracks2,
+            function(t1, t2)
+                local seg = {generateArc(t1)[1], generateArc(t2)[2]}
+                seg[1][2], seg[2][1] = average(seg[1][2], seg[2][1])
+                seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
+                return
+                    func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
+            end)
+        ),
+        ext = func.flatten(func.map2(tracks1, tracks2,
+            function(t1, t2)
+                local seg = {generateArc(t1)[3], generateArc(t2)[4]}
+                return
+                    func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
+            end)
+    ),
+    }
 end
 
 local fArcs = function(offsets, rad, r)
@@ -179,74 +196,81 @@ local function part(rad)
             }
         }
         
-        local lowerWalls = func.p
-            * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
-                return attach(
-                    {
-                        inf = l:rad(func.min(l - limits.upper.L, ptXSelector)),
-                        mid = l:rad(coor.xy(0, 0)),
-                        sup = l:rad(func.min(l - limits.upper.R, ptXSelector)),
-                    }
-                )(l, o) end)
-            * function(walls)
-                for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
-                for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
-                return walls
-            end / 0
-        
         return {
             lower = {
                 tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
                     attach(limitRads.lower)),
-                walls = lowerWalls
+                walls = func.p
+                * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
+                    return attach(
+                        {
+                            inf = l:rad(func.min(l - limits.upper.L, ptXSelector)),
+                            mid = l:rad(coor.xy(0, 0)),
+                            sup = l:rad(func.min(l - limits.upper.R, ptXSelector)),
+                        }
+                    )(l, o) end)
+                * function(walls)
+                    for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
+                    for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
+                    return walls
+                end / 0,
+                outlines = func.map2({limits.lower.L, limits.lower.R},
+                    attach(limitRads.lower)),
             },
             upper = {
                 tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
                     attach(limitRads.upper)),
-                walls = func.map2(guidelines.upper.walls, offsets.upper.walls, function(l, o)
-                    return attach(
-                        {
-                            sup = l:rad(func.min(l - limits.lower.L, ptXSelector)),
-                            mid = l:rad(coor.xy(0, 0)),
-                            inf = l:rad(func.min(l - limits.lower.R, ptXSelector)),
-                        }
-                    )(l, o)
-                end)
+                walls = {
+                    attach({
+                        inf = limitRads.upper.inf,
+                        mid = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.L, ptXSelector)),
+                        sup = limitRads.upper.sup,
+                    })(limits.upper.L, offsets.upper.walls[1]),
+                    attach({
+                        inf = limitRads.upper.inf,
+                        mid = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.R, ptXSelector)),
+                        sup = limitRads.upper.sup,
+                    })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
+                },
+                outlines = func.map2({limits.upper.L, limits.upper.R},
+                    attach(limitRads.upper)),
             }
         }
     end
 end
 
-local function normalizeRad(rad)
-    return (rad > math.pi * -0.5) and rad or normalizeRad(rad + math.pi * 2)
+local function mPlace(guideline, rad)
+    local pt = guideline:pt(rad)
+    return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y)
 end
 
-local function generateStructure(group)
-    local function makeFn(model)
-        return function(obj)
-            local coordsGen = arc.coords(obj.guideline, 5)
-            local function makeModel(seq, scale)
-                return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
-                    local rad = (rad1 + rad2) * 0.5
-                    local pt = obj.guideline:pt(rad)
-                    return newModel(model, coor.scaleX(1.1), coor.scaleY(0.5 * scale), coor.rotZ(rad), coor.transX(pt.x), coor.transY(pt.y))
-                end)
-            end
-            return {
-                makeModel(coordsGen(normalizeRad(obj.limits.inf), normalizeRad(obj.limits.mid) - normalizeRad(obj.limits.inf))),
-                makeModel(coordsGen(normalizeRad(obj.limits.mid), normalizeRad(obj.limits.sup) - normalizeRad(obj.limits.mid)))
-            }
+local function makeFn(model, m)
+    local m = m or coor.I()
+    return function(obj)
+        local coordsGen = arc.coords(obj.guideline, 5)
+        local function makeModel(seq, scale)
+            return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
+                return newModel(model, m, coor.scaleY(0.5 * scale), mPlace(obj.guideline, (rad1 + rad2) * 0.5))
+            end)
         end
+        return {
+            makeModel(coordsGen(normalizeRad(obj.limits.inf), normalizeRad(obj.limits.mid) - normalizeRad(obj.limits.inf))),
+            makeModel(coordsGen(normalizeRad(obj.limits.mid), normalizeRad(obj.limits.sup) - normalizeRad(obj.limits.mid)))
+        }
     end
+end
+
+local function generateStructure(lowerGroup, upperGroup)
+    local makeWall = makeFn(mSidePillar, coor.scaleY(1.05))
+    local makeRoof = makeFn(mRoof, coor.scaleY(1.05))
+    local makeFence = makeFn(mRoofFenceF)
+    local makeSideFence = makeFn(mRoofFenceS)
     
-    local makeWall = makeFn(mSidePillar)
-    local makeRoof = makeFn(mRoof)
-    
-    local walls = group.walls
+    local walls = lowerGroup.walls
     local trackSets = func.p
         * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
             function(w1, w2) return func.p
-                * func.filter(group.tracks, function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
+                * func.filter(lowerGroup.tracks, function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
                 * func.bind(func.map, nil, function(t)
                     return func.with(t,
                         {
@@ -261,16 +285,62 @@ local function generateStructure(group)
             end)
         * func.flatten / 0
     
+    local upperFences = func.map(upperGroup.tracks, function(t)
+        return {
+            newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t.guideline, t.limits.inf)),
+            newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t.guideline, t.limits.sup)),
+        }
+    end)
+    
+    local fences = func.map(trackSets, function(t)
+        local m = coor.scaleX(1.091) * coor.transY(0.18) * coor.transZ(-1) * coor.centered(coor.scaleZ, 3.5 / 1.5, coor.xyz(0, 0, 10.75))
+        return {
+            newModel(mRoofFenceF, m, mPlace(t.guideline, t.limits.inf)),
+            newModel(mRoofFenceF, m, coor.flipY(), mPlace(t.guideline, t.limits.sup)),
+        }
+    end)
+    
+    local sideFencesL = func.map(func.range(lowerGroup.walls, 1, #lowerGroup.walls - 1), function(t)
+        return func.with(t, {
+            limits = {
+                sup = t.guideline:rad(func.min(upperGroup.walls[1].guideline - t.guideline, ptXSelector)),
+                mid = t.guideline:rad(func.min(upperGroup.walls[1].guideline - t.guideline, ptXSelector)),
+                inf = t.limits.inf,
+            }
+        })
+    end)
+    
+    local sideFencesR = func.map(func.range(lowerGroup.walls, 2, #lowerGroup.walls), function(t)
+        return func.with(t, {
+            limits = {
+                inf = t.guideline:rad(func.min(upperGroup.walls[2].guideline - t.guideline, ptXSelector)),
+                mid = t.guideline:rad(func.min(upperGroup.walls[2].guideline - t.guideline, ptXSelector)),
+                sup = t.limits.sup,
+            }
+        })
+    end)
+    
     return {
         func.flatten({
             func.mapFlatten(walls, function(w) return makeWall(w)[1] end),
-            func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
+            func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end),
+            func.map(fences, function(f) return f[1] end),
+            func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end),
+            makeSideFence(upperGroup.walls[2])[1],
+            makeWall(upperGroup.walls[2])[1],
+            func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end),
+            func.map(upperFences, function(f) return f[1] end)
         }),
         func.flatten({
             func.mapFlatten(walls, function(w) return makeWall(w)[2] end),
-            func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
+            func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end),
+            func.map(fences, function(f) return f[2] end),
+            func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end),
+            makeSideFence(upperGroup.walls[1])[2],
+            makeWall(upperGroup.walls[1])[2],
+            func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end),
+            func.map(upperFences, function(f) return f[2] end)
         }),
-    
     }
 end
 
@@ -315,27 +385,27 @@ local function params()
             values = func.seqMap({0, 9}, tostring),
         },
         {
-            key = "rLower1",
-            name = _("R of lower tracks"),
-            values = func.map(rList, tostring),
-            defaultIndex = 4
-        },
-        {
-            key = "rUpper1",
-            name = _("R of upper tracks"),
-            values = func.map(rList, tostring),
-            defaultIndex = 4
-        },
-        {
             key = "rLower2",
-            name = _("R of lower tracks"),
-            values = func.map(rList, tostring),
+            name = _("Curvature of lower tracks"),
+            values = rTxtList,
+            defaultIndex = 4
+        },
+        {
+            key = "rLower1",
+            name = "",
+            values = rTxtList,
             defaultIndex = 4
         },
         {
             key = "rUpper2",
-            name = _("R of upper tracks"),
-            values = func.map(rList, tostring),
+            name = _("Curvature of upper tracks"),
+            values = rTxtList,
+            defaultIndex = 4
+        },
+        {
+            key = "rUpper1",
+            name = "",
+            values = rTxtList,
             defaultIndex = 4
         },
         {
@@ -374,11 +444,7 @@ function data()
         availability = {
             yearFrom = 1892
         },
-        -- buildMode = "MULTI",
-        -- categories = {"tracks"},
         order = 27218,
-        -- skipCollision = false,
-        -- autoRemovable = false,
         params = params(),
         
         updateFn = function(params)
@@ -423,9 +489,10 @@ function data()
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             
             local trackBuilder = trackEdge.builder(catenary, trackType)
-            local TLowerTracks = trackBuilder.normal(snapRule)
-            local TUpperTracks = trackBuilder.nonAligned(snapRule)
-            local TUpperTracksBridge = trackBuilder.bridge(bridgeType, station.noSnap)
+            local TLowerTracks = trackBuilder.normal(station.noSnap)
+            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
+            local TLowerExtTracks = trackBuilder.normal(snapRule)
+            local TUpperExtTracks = trackBuilder.bridge(bridgeType, snapRule)
             
             local offsets = {
                 lower = buildCoors(info1.lower.nbTracks, nbPerGroup),
@@ -440,17 +507,17 @@ function data()
             
             result.edgeLists =
                 {
-                    TUpperTracks(upperTracks),
-                    TLowerTracks(lowerTracks),
+                    TUpperTracks(upperTracks.normal),
+                    TLowerTracks(lowerTracks.normal),
+                    TLowerExtTracks(lowerTracks.ext),
+                    TUpperExtTracks(upperTracks.ext),
                 }
             
             result.models = func.flatten({
-                generateStructure(group1.lower)[1],
-                generateStructure(group2.lower)[2]
+                generateStructure(group1.lower, group1.upper)[1],
+                generateStructure(group2.lower, group2.upper)[2],
             })
-
-            dump.dump(result.models)
-
+            
             result.terrainAlignmentLists = {{
                 type = "EQUAL",
                 faces = {

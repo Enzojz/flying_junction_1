@@ -7,8 +7,6 @@ local line = require "coorline"
 local arc = require "coorarc"
 local station = require "stationlib"
 
-local dump = require "datadumper"
-
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -20,11 +18,7 @@ local rList = {-0.1, -0.3, -0.5, -1, 1e5, 1, 0.5, 0.3, 0.1}
 local rTxtList = {"●", "●", "•", "∙", "0", "∙", "•", "●", "●"}
 
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
-local heightList = {0.5, 1, 1.5, 2, 4, 6, 8, 10}
-local slopeRad = func.mapPair(
-    func.concat(slopeList, func.map(slopeList, function(s) return -s end)),
-    function(s) return s, math.atan(s * 0.001) end)
-local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
+local heightList = {-5, -2.5, -0.5, 0, 0.5, 2.5, 5}
 
 local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
 
@@ -120,7 +114,6 @@ local fArcs = function(offsets, rad, r)
     ) end
 )
 end
-
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
 
@@ -342,13 +335,11 @@ local function generateStructure(lowerGroup, upperGroup)
     }
 end
 
-
 local generatePolyArcEdge = function(guideline, from, to)
     return func.map(
         arc.coords(guideline, 5)(normalizeRad(from), normalizeRad(to) - normalizeRad(from)),
         function(rad) return (function(p) return {p.x, p.y, 0} end)(guideline:pt(rad)) end)
 end
-
 
 local function defaultParams(params)
     params.trackType = params.trackType or 0
@@ -387,12 +378,12 @@ local function params()
         },
         {
             key = "xDegUni",
-            name = _("+"),
+            name = "+",
             values = func.seqMap({0, 9}, tostring),
         },
         {
             key = "rLower2",
-            name = _("Curvature of lower tracks"),
+            name = _("Curvature of lower tracks : Far/Near"),
             values = rTxtList,
             defaultIndex = 4
         },
@@ -404,7 +395,7 @@ local function params()
         },
         {
             key = "rUpper2",
-            name = _("Curvature of upper tracks"),
+            name = _("Curvature of upper tracks : Far/Near"),
             values = rTxtList,
             defaultIndex = 4
         },
@@ -435,6 +426,7 @@ local function params()
             key = "height",
             name = _("Altitude Adjustment(m)"),
             values = func.map(heightList, tostring),
+            defaultIndex = 3
         }
     }
 
@@ -553,9 +545,9 @@ function data()
             -- Slope, Height, Mirror treatment
             local slope = slopeList[params.slope + 1]
             local ha = heightList[params.height + 1]
-            local mirrored = ({false, true})[params.isMir + 1]
+            local mirrored = params.isMir == 1
             local mz = coor.transZ(ha)
-            local mr = slopeMRotX[slope]
+            local mr = coor.rotX(math.atan(slope * 0.001))
             local mf = mirrored and coor.flipX() or coor.I()
             local mpt = mf * mr * mz
             local mvec = mf * mr

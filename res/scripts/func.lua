@@ -170,6 +170,14 @@ function func.sort(ls, fn)
     return result
 end
 
+function func.rev(ls)
+    local result = {}
+    for i = #ls, 1, -1 do
+        table.insert(result, ls[i]) 
+    end
+    return result
+end
+
 local pipeMeta = {
     __mul = function(lhs, rhs)
         local result = {op = {rhs(lhs())}}
@@ -195,7 +203,7 @@ pMeta = {
     end
 }
 setmetatable(func.p, pMeta)
-
+func.nop = function(x) return x end
 func.b = func.bind
 
 

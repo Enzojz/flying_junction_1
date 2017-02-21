@@ -7,6 +7,8 @@ local line = require "coorline"
 local arc = require "coorarc"
 local station = require "stationlib"
 
+local dump = require "datadumper"
+
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -16,6 +18,13 @@ local bridgeType = "z_concrete_flying_junction.lua"
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
 local rList = {-0.1, -0.3, -0.5, -1, 1e5, 1, 0.5, 0.3, 0.1}
 local rTxtList = {"●", "●", "•", "∙", "0", "∙", "•", "●", "●"}
+
+local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
+local heightList = {0.5, 1, 1.5, 2, 4, 6, 8, 10}
+local slopeRad = func.mapPair(
+    func.concat(slopeList, func.map(slopeList, function(s) return -s end)),
+    function(s) return s, math.atan(s * 0.001) end)
+local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
 
 local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
 
@@ -47,13 +56,6 @@ function buildCoors(numTracks, groupSize)
     return builder({}, {0.25}, 0.5, numTracks)
 end
 
-local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
-local heightList = {0.5, 1, 1.5, 2, 4, 6, 8, 10}
-local slopeRad = func.mapPair(
-    func.concat(slopeList, func.map(slopeList, function(s) return -s end)),
-    function(s) return s, math.atan(s * 0.001) end)
-local slopeMRotX = func.mapValues(slopeRad, coor.rotX)
-
 local function normalizeRad(rad)
     return (rad > math.pi * -0.5) and rad or normalizeRad(rad + math.pi * 2)
 end
@@ -75,7 +77,7 @@ local generateArc = function(arc)
     local vecInf = toVector(radInf)
     local vecMid = toVector(radMid)
     
-    local supExt = sup + vecSup 
+    local supExt = sup + vecSup
     local infExt = inf - vecInf
     
     return {
@@ -514,43 +516,72 @@ function data()
                 generateStructure(group2.lower, group2.upper)[2],
             })
             
-            result.terrainAlignmentLists = {{
-                type = "EQUAL",
-                faces = {
+            local generatePolygons = function(guideline, from, to)
+                return func.map(
+                    arc.coords(guideline, 5)(normalizeRad(from), normalizeRad(to) - normalizeRad(from)),
+                    function(rad) return (function(p) return {p.x, p.y, 0} end)(guideline:pt(rad)) end)
+            end
+            
+            local upperPolys = func.flatten(
+                {
+                    generatePolygons(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid),
+                    generatePolygons(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup),
+                    generatePolygons(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid),
+                    generatePolygons(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
+                })
+            
+            local lowerPolys = func.flatten(
+                {
+                    generatePolygons(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid),
+                    generatePolygons(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup),
+                    generatePolygons(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid),
+                    generatePolygons(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
+                })
+            
+            result.terrainAlignmentLists = {
+                {
+                    type = "GREATER",
+                    faces = {upperPolys}
+                },
+                {
+                    type = "EQUAL",
+                    faces = {lowerPolys}
                 }
-            },
             }
             
-            -- -- End of generation
-            -- -- Slope, Height, Mirror treatment
-            -- local slope = slopeList[params.slope + 1]
-            -- local ha = heightList[params.height + 1]
-            -- local isMir = {false, true}
-            -- local mirrored = isMir[params.isMir + 1]
-            -- local mz = coor.transZ(ha)
-            -- local mr = slopeMRotX[slope]
-            -- local mf = mirrored and coor.flipX() or coor.I()
-            -- local mpt = coor.mul(mf, mr, mz)
-            -- local mvec = coor.mul(mf, mr)
-            -- local mapEdgeList = function(edgeList)
-            --     edgeList.edges = func.map(edgeList.edges, coor.applyEdge(mpt, mvec))
-            --     return edgeList
-            -- end
-            -- result.edgeLists = func.map(result.edgeLists, mapEdgeList)
-            -- local mapModel = function(model)
-            --     model.transf = coor.mul(model.transf, mpt)
-            --     return model
-            -- end
-            -- result.models = func.map(result.models, mapModel)
-            -- local mapTerrainList = function(ta)
-            --     local mapTerrain = function(t) return (coor.tuple2Vec(t) .. mpt):toTuple() end
-            --     local mapFaces = func.bind(func.map, nil, mapTerrain)
-            --     ta.faces = func.map(ta.faces, mapFaces)
-            --     return ta
-            -- end
-            -- result.terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList)
-            result.terminalGroups = {}
             
+            -- End of generation
+            -- Slope, Height, Mirror treatment
+            local slope = slopeList[params.slope + 1]
+            local ha = heightList[params.height + 1]
+            local mirrored = ({false, true})[params.isMir + 1]
+            local mz = coor.transZ(ha)
+            local mr = slopeMRotX[slope]
+            local mf = mirrored and coor.flipX() or coor.I()
+            local mpt = mf * mr * mz
+            local mvec = mf * mr
+            
+            local mapEdgeList = function(edgeList)
+                return func.with(edgeList, {edges = func.map(edgeList.edges, coor.applyEdge(mpt, mvec))})
+            end
+            
+            local mapModel = function(model) return func.with(model, {transf = model.transf * mpt}) end
+            
+            local mapTerrainList = function(ta)
+                local mapTerrain = function(t) return (coor.tuple2Vec(t) .. mpt):toTuple() end
+                local mapFaces =  function(faces) return (mirrored and func.rev or func.nop)(func.map(faces, mapTerrain)) end
+                return func.with(ta, {faces = func.map(ta.faces, mapFaces)})
+            end
+            
+            result = func.with(result,
+                {
+                    edgeLists = func.map(result.edgeLists, mapEdgeList),
+                    models = func.map(result.models, mapModel),
+                    terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList),
+                })
+            
+            result.groundFaces = {}
+            result.terminalGroups = {}
             result.cost = 1000
             result.maintenanceCost = 1000 / 6
             

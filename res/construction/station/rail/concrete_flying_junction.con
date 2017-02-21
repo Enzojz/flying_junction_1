@@ -342,6 +342,14 @@ local function generateStructure(lowerGroup, upperGroup)
     }
 end
 
+
+local generatePolyArcEdge = function(guideline, from, to)
+    return func.map(
+        arc.coords(guideline, 5)(normalizeRad(from), normalizeRad(to) - normalizeRad(from)),
+        function(rad) return (function(p) return {p.x, p.y, 0} end)(guideline:pt(rad)) end)
+end
+
+
 local function defaultParams(params)
     params.trackType = params.trackType or 0
     params.catenary = params.catenary or 1
@@ -455,8 +463,14 @@ function data()
             
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
             local catenary = params.catenary == 1
+            local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             
-            -- In theory I can use R = ∞ to simplify all cases in Arc VS Arc, however, the game doesn't like it.
+            local trackBuilder = trackEdge.builder(catenary, trackType)
+            local TLowerTracks = trackBuilder.normal(station.noSnap)
+            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
+            local TLowerExtTracks = trackBuilder.normal(snapRule)
+            local TUpperExtTracks = trackBuilder.bridge(bridgeType, snapRule)
+            
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
             local info1 = {
@@ -484,14 +498,6 @@ function data()
                 }
             }
             
-            local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
-            
-            local trackBuilder = trackEdge.builder(catenary, trackType)
-            local TLowerTracks = trackBuilder.normal(station.noSnap)
-            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
-            local TLowerExtTracks = trackBuilder.normal(snapRule)
-            local TUpperExtTracks = trackBuilder.bridge(bridgeType, snapRule)
-            
             local offsets = {
                 lower = buildCoors(info1.lower.nbTracks, nbPerGroup),
                 upper = buildCoors(info1.upper.nbTracks, info1.upper.nbTracks)
@@ -503,52 +509,45 @@ function data()
             local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
             local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
             
-            result.edgeLists =
+            local upperPolys = func.flatten(
+                {
+                    generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid),
+                    generatePolyArcEdge(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup),
+                    generatePolyArcEdge(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid),
+                    generatePolyArcEdge(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
+                })
+            
+            local lowerPolys = func.flatten(
+                {
+                    generatePolyArcEdge(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid),
+                    generatePolyArcEdge(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup),
+                    generatePolyArcEdge(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid),
+                    generatePolyArcEdge(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
+                })
+            
+            result = {
+                edgeLists =
                 {
                     TUpperTracks(upperTracks.normal),
                     TLowerTracks(lowerTracks.normal),
                     TLowerExtTracks(lowerTracks.ext),
                     TUpperExtTracks(upperTracks.ext),
-                }
-            
-            result.models = func.flatten({
-                generateStructure(group1.lower, group1.upper)[1],
-                generateStructure(group2.lower, group2.upper)[2],
-            })
-            
-            local generatePolygons = function(guideline, from, to)
-                return func.map(
-                    arc.coords(guideline, 5)(normalizeRad(from), normalizeRad(to) - normalizeRad(from)),
-                    function(rad) return (function(p) return {p.x, p.y, 0} end)(guideline:pt(rad)) end)
-            end
-            
-            local upperPolys = func.flatten(
-                {
-                    generatePolygons(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid),
-                    generatePolygons(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup),
-                    generatePolygons(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid),
-                    generatePolygons(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
-                })
-            
-            local lowerPolys = func.flatten(
-                {
-                    generatePolygons(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid),
-                    generatePolygons(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup),
-                    generatePolygons(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid),
-                    generatePolygons(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
-                })
-            
-            result.terrainAlignmentLists = {
-                {
-                    type = "GREATER",
-                    faces = {upperPolys}
                 },
-                {
-                    type = "EQUAL",
-                    faces = {lowerPolys}
+                models = func.flatten({
+                    generateStructure(group1.lower, group1.upper)[1],
+                    generateStructure(group2.lower, group2.upper)[2],
+                }),
+                terrainAlignmentLists = {
+                    {
+                        type = "GREATER",
+                        faces = {upperPolys}
+                    },
+                    {
+                        type = "EQUAL",
+                        faces = {lowerPolys}
+                    }
                 }
             }
-            
             
             -- End of generation
             -- Slope, Height, Mirror treatment
@@ -569,23 +568,20 @@ function data()
             
             local mapTerrainList = function(ta)
                 local mapTerrain = function(t) return (coor.tuple2Vec(t) .. mpt):toTuple() end
-                local mapFaces =  function(faces) return (mirrored and func.rev or func.nop)(func.map(faces, mapTerrain)) end
+                local mapFaces = function(faces) return (mirrored and func.rev or func.nop)(func.map(faces, mapTerrain)) end
                 return func.with(ta, {faces = func.map(ta.faces, mapFaces)})
             end
             
-            result = func.with(result,
+            return func.with(result,
                 {
                     edgeLists = func.map(result.edgeLists, mapEdgeList),
                     models = func.map(result.models, mapModel),
                     terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList),
+                    groundFaces = {},
+                    terminalGroups = {},
+                    cost = 1000,
+                    maintenanceCost = 1000 / 6
                 })
-            
-            result.groundFaces = {}
-            result.terminalGroups = {}
-            result.cost = 1000
-            result.maintenanceCost = 1000 / 6
-            
-            return result
         end
     }
 

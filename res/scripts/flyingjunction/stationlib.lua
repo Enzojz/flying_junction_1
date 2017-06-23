@@ -1,6 +1,7 @@
-local func = require "func"
-local coor = require "coor"
-local trackEdge = require "trackedge"
+local func = require "flyingjunction/func"
+local pipe = require "flyingjunction/pipe"
+local coor = require "flyingjunction/coor"
+local trackEdge = require "flyingjunction/trackedge"
 
 local newModel = function(m, ...)
     return {
@@ -19,19 +20,18 @@ local stationlib = {
 
 stationlib.generateTrackGroups = function(xOffsets, length, extra)
     local halfLength = length * 0.5
-    extra = extra or { mpt = coor.I(), mvec = coor.I() }
-    return func.flatten(
-        func.map(xOffsets,
-            function(xOffset)
-                return coor.applyEdges(coor.mul(xOffset.parity, extra.mpt, xOffset.mpt), coor.mul(xOffset.parity, extra.mvec, xOffset.mvec))(
-                    {
-                        {{0, -halfLength, 0}, {0, halfLength, 0}},
-                        {{0, 0, 0}, {0, halfLength, 0}},
-                        {{0, 0, 0}, {0, halfLength, 0}},
-                        {{0, halfLength, 0}, {0, halfLength, 0}},
-                    })
-            end
-))
+    extra = extra or {mpt = coor.I(), mvec = coor.I()}
+    return func.mapFlatten(xOffsets,
+        function(xOffset)
+            return coor.applyEdges(coor.mul(xOffset.parity, extra.mpt, xOffset.mpt), coor.mul(xOffset.parity, extra.mvec, xOffset.mvec))(
+                {
+                    {{0, -halfLength, 0}, {0, halfLength, 0}},
+                    {{0, 0, 0}, {0, halfLength, 0}},
+                    {{0, 0, 0}, {0, halfLength, 0}},
+                    {{0, halfLength, 0}, {0, halfLength, 0}},
+                })
+        end
+)
 end
 
 stationlib.preBuild = function(totalTracks, baseX, ignoreFst, ignoreLst)
@@ -162,7 +162,7 @@ stationlib.setHeight = function(result, height)
     result.edgeLists = func.map(result.edgeLists, mapEdgeList)
     
     local mapModel = function(model)
-        model.transf = model.transf *  mpt
+        model.transf = model.transf * mpt
         return model
     end
     
@@ -175,5 +175,46 @@ stationlib.faceMapper = function(m)
     end
 end
 
+stationlib.toEdge = function(o, vec) return {o:toTuple(), (o + vec):toTuple(), vec:toTuple(), vec:toTuple()} end
+
+local function edgesBuilder(result, o, vec, ...)
+    local vecs = {...}
+    return #vecs == 0 and result / stationlib.toEdge(o, vec) or edgesBuilder(result / stationlib.toEdge(o, vec), o + vec, ...)
+end
+
+stationlib.toEdges = function(o, ...)
+    return edgesBuilder(pipe.new, o, ...)
+end
+
+local snapNodes = function(edges)
+    return edges
+        * pipe.map(pipe.select("snap"))
+        * pipe.flatten()
+        * function(ls) return ls * pipe.map2(func.seq(0, #ls - 1), function(s, n) return {snap = s, index = n} end) end
+        * pipe.filter(pipe.select("snap"))
+        * pipe.map(pipe.select("index"))
+end
+
+stationlib.prepareEdges = function(edges)
+    return {
+        edges = edges * pipe.map(pipe.select("edge")) * coor.make,
+        snapNodes = snapNodes(edges)
+    }
+end
+
+stationlib.basePt = pipe.new * {
+    coor.xyz(-0.5, -0.5, 0),
+    coor.xyz(0.5, -0.5, 0),
+    coor.xyz(0.5, 0.5, 0),
+    coor.xyz(-0.5, 0.5, 0)
+}
+
+stationlib.surfaceOf = function(size, center, ...)
+    local tr = {...}
+    return stationlib.basePt
+        * pipe.map(function(f) return (f .. coor.scale(size) * coor.trans(center)) end)
+        * pipe.map(function(f) return func.fold(tr, f, function(v, m) return v .. m end) end)
+        * pipe.map(function(v) return v:toTuple() end)
+end
 
 return stationlib

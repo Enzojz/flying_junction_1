@@ -1,11 +1,12 @@
 local laneutil = require "laneutil"
 local paramsutil = require "paramsutil"
-local func = require "func"
-local coor = require "coor"
-local trackEdge = require "trackedge"
-local line = require "coorline"
-local arc = require "coorarc"
-local station = require "stationlib"
+local func = require "flyingjunction/func"
+local coor = require "flyingjunction/coor"
+local trackEdge = require "flyingjunction/trackedge"
+local line = require "flyingjunction/coorline"
+local arc = require "flyingjunction/coorarc"
+local station = require "flyingjunction/stationlib"
+local pipe = require "flyingjunction/pipe"
 
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
@@ -92,15 +93,19 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 local seg = {generateArc(t1)[1], generateArc(t2)[2]}
                 seg[1][2], seg[2][1] = average(seg[1][2], seg[2][1])
                 seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
-                return
-                    func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
+                return pipe.new
+                    * seg
+                    * pipe.map(function(s) return func.map(s, coor.vec2Tuple) end)
+                    * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec)
             end)
         ),
         ext = func.flatten(func.map2(tracks1, tracks2,
             function(t1, t2)
                 local seg = {generateArc(t1)[3], generateArc(t2)[4]}
-                return
-                    func.p * seg * func.bind(func.map, nil, function(s) return func.map(s, coor.vec2Tuple) end) * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec) / 0
+                return pipe.new
+                    * seg
+                    * pipe.map(function(s) return func.map(s, coor.vec2Tuple) end)
+                    * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec)
             end)
     ),
     }
@@ -195,7 +200,7 @@ local function part(rad)
             lower = {
                 tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
                     attach(limitRads.lower)),
-                walls = func.p
+                walls = pipe.new
                 * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
                     return attach(
                         {
@@ -208,7 +213,7 @@ local function part(rad)
                     for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
                     for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
                     return walls
-                end / 0
+                end
             },
             upper = {
                 tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
@@ -258,11 +263,12 @@ local function generateStructure(lowerGroup, upperGroup)
     local makeSideFence = makeFn(mRoofFenceS)
     
     local walls = lowerGroup.walls
-    local trackSets = func.p
+    local trackSets = pipe.new
         * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
-            function(w1, w2) return func.p
-                * func.filter(lowerGroup.tracks, function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
-                * func.bind(func.map, nil, function(t)
+            function(w1, w2) return pipe.new
+                * lowerGroup.tracks
+                * pipe.filter(function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
+                * pipe.map(function(t)
                     return func.with(t,
                         {
                             limits = {
@@ -272,9 +278,8 @@ local function generateStructure(lowerGroup, upperGroup)
                             }
                         }
                 ) end)
-                / 0
             end)
-        * func.flatten / 0
+        * func.flatten
     
     local upperFences = func.map(upperGroup.tracks, function(t)
         return {
@@ -312,26 +317,25 @@ local function generateStructure(lowerGroup, upperGroup)
     end)
     
     return {
-        func.flatten({
-            func.mapFlatten(walls, function(w) return makeWall(w)[1] end),
-            func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end),
-            func.map(fences, function(f) return f[1] end),
-            func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end),
-            makeSideFence(upperGroup.walls[2])[1],
-            makeWall(upperGroup.walls[2])[1],
-            func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end),
-            func.map(upperFences, function(f) return f[1] end)
-        }),
-        func.flatten({
-            func.mapFlatten(walls, function(w) return makeWall(w)[2] end),
-            func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end),
-            func.map(fences, function(f) return f[2] end),
-            func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end),
-            makeSideFence(upperGroup.walls[1])[2],
-            makeWall(upperGroup.walls[1])[2],
-            func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end),
-            func.map(upperFences, function(f) return f[2] end)
-        }),
+        pipe.new
+        + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
+        + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
+        + func.map(fences, function(f) return f[1] end)
+        + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
+        + makeSideFence(upperGroup.walls[2])[1]
+        + makeWall(upperGroup.walls[2])[1]
+        + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
+        + func.map(upperFences, function(f) return f[1] end)
+        ,
+        pipe.new
+        + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
+        + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
+        + func.map(fences, function(f) return f[2] end)
+        + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
+        + makeSideFence(upperGroup.walls[1])[2]
+        + makeWall(upperGroup.walls[1])[2]
+        + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
+        + func.map(upperFences, function(f) return f[2] end)
     }
 end
 
@@ -383,25 +387,25 @@ local function params()
         },
         {
             key = "rLower2",
-            name = _("Curvature of lower tracks : Far/Near"),
+            name = _("Curvature of lower tracks : Far"),
             values = rTxtList,
             defaultIndex = 4
         },
         {
             key = "rLower1",
-            name = "",
+            name = _("Curvature of lower tracks : Near"),
             values = rTxtList,
             defaultIndex = 4
         },
         {
             key = "rUpper2",
-            name = _("Curvature of upper tracks : Far/Near"),
+            name = _("Curvature of upper tracks : Far"),
             values = rTxtList,
             defaultIndex = 4
         },
         {
             key = "rUpper1",
-            name = "",
+            name = _("Curvature of upper tracks : Near"),
             values = rTxtList,
             defaultIndex = 4
         },
@@ -501,21 +505,17 @@ function data()
             local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
             local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
             
-            local upperPolys = func.flatten(
-                {
-                    generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid),
-                    generatePolyArcEdge(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup),
-                    generatePolyArcEdge(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid),
-                    generatePolyArcEdge(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
-                })
+            local upperPolys = pipe.new
+                + generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid)
+                + generatePolyArcEdge(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup)
+                + generatePolyArcEdge(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid)
+                + generatePolyArcEdge(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
             
-            local lowerPolys = func.flatten(
-                {
-                    generatePolyArcEdge(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid),
-                    generatePolyArcEdge(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup),
-                    generatePolyArcEdge(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid),
-                    generatePolyArcEdge(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
-                })
+            local lowerPolys = pipe.new
+                + generatePolyArcEdge(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid)
+                + generatePolyArcEdge(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup)
+                + generatePolyArcEdge(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid)
+                + generatePolyArcEdge(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
             
             result = {
                 edgeLists =
@@ -525,10 +525,10 @@ function data()
                     TLowerExtTracks(lowerTracks.ext),
                     TUpperExtTracks(upperTracks.ext),
                 },
-                models = func.flatten({
+                models = func.concat(
                     generateStructure(group1.lower, group1.upper)[1],
-                    generateStructure(group2.lower, group2.upper)[2],
-                }),
+                    generateStructure(group2.lower, group2.upper)[2]
+                ),
                 terrainAlignmentLists = {
                     {
                         type = "GREATER",

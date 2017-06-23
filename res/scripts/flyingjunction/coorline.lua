@@ -1,4 +1,4 @@
-local coor = require "coor"
+local coor = require "flyingjunction/coor"
 local line = {}
 
 

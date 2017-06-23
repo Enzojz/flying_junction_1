@@ -95,8 +95,9 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
                 return pipe.new
                     * seg
-                    * pipe.map(function(s) return func.map(s, coor.vec2Tuple) end)
-                    * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec)
+                    * pipe.map(pipe.map(coor.vec2Tuple))
+                    * laneutil.makeLanes 
+                    * coor.applyEdges(trans.mpt, trans.mvec)
             end)
         ),
         ext = func.flatten(func.map2(tracks1, tracks2,
@@ -104,8 +105,9 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 local seg = {generateArc(t1)[3], generateArc(t2)[4]}
                 return pipe.new
                     * seg
-                    * pipe.map(function(s) return func.map(s, coor.vec2Tuple) end)
-                    * laneutil.makeLanes * coor.applyEdges(trans.mpt, trans.mvec)
+                    * pipe.map(pipe.map(coor.vec2Tuple))
+                    * laneutil.makeLanes
+                    * coor.applyEdges(trans.mpt, trans.mvec)
             end)
     ),
     }

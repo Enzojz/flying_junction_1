@@ -174,6 +174,15 @@ function pipe.rev()
     end
 end
 
+function pipe.zip(ls2, name)
+    name = name or {1, 2}
+    return function(ls1)
+        local result = {}
+        for i, e in ipairs(ls1) do result[i] = {[name[1]] = e, [name[2]] = ls2[i]} end
+        return result
+    end
+end
+
 function pipe.select(name)
     return function(el)
         return el[name]

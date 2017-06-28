@@ -100,7 +100,7 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 return pipe.new
                     * seg
                     * pipe.map(pipe.map(coor.vec2Tuple))
-                    * station.snapOn({{false, false}, {false, false}})
+                    * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"})
             end)
         * pipe.flatten()
         * station.prepareEdges
@@ -112,7 +112,7 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 return pipe.new
                     * seg
                     * pipe.map(pipe.map(coor.vec2Tuple))
-                    * station.snapOn({{true, false}, {false, true}})
+                    * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
             end)
         * pipe.flatten()
         * station.prepareEdges

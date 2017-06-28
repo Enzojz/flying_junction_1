@@ -94,22 +94,24 @@ function data()
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
             local catenary = params.catenary == 1
             local fixedHeight = 11
-            local slope = slopeList[params.slope + 1] * 0.001
-            local length = 11 / slope
-            local slopeRad = math.atan(slope)
-            local slopeR = 100
-            
-            
-            local trackBuilder = trackEdge.builder(catenary, trackType)
-            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
-            
-            
-            local transitionLength = slopeR * slopeRad
             
             local nbTracks = params.nbUpperTracks + 1
             local r = rList[params.rUpper + 1] * 1000
-            local rad = length / r
-            local tRad = transitionLength / length * rad
+            
+            local slope = slopeList[params.slope + 1] * 0.001
+            
+            local slopeRad = math.atan(slope)
+            local slopeTr = 300
+            
+            local slopeTdz = slopeTr * (1 - math.cos(slopeRad))
+            local slopeTLength = slopeTr * math.sin(slopeRad)
+            local slopeLength = (fixedHeight - 2 * slopeTdz) / slope + 2 * slopeTLength
+            
+            local rad = slopeLength / r
+            local radT = slopeTLength / slopeLength * rad
+            
+            local trackBuilder = trackEdge.builder(catenary, trackType)
+            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
             
             local offsets = junction.buildCoors(nbTracks, nbTracks)
             
@@ -122,7 +124,6 @@ function data()
                     R = walls[#walls]
                 }
             
-            
             local ar = pipe.new
                 * junction.fArcs(offsets.tracks, 0, r)
                 * pipe.map(function(t) return
@@ -131,7 +132,7 @@ function data()
                             limits =
                             {
                                 inf = (r > 0 and math.pi or 0) + rad,
-                                mid = (r > 0 and math.pi or 0) + rad - tRad,
+                                mid = (r > 0 and math.pi or 0) + rad - radT,
                                 sup = (r > 0 and math.pi or 0) + 0.5 * rad,
                             },
                             guideline = t,
@@ -140,7 +141,7 @@ function data()
                             limits =
                             {
                                 inf = (r > 0 and math.pi or 0) + 0.5 * rad,
-                                mid = (r > 0 and math.pi or 0) + tRad,
+                                mid = (r > 0 and math.pi or 0) + radT,
                                 sup = (r > 0 and math.pi or 0),
                             },
                             guideline = t,
@@ -151,23 +152,21 @@ function data()
                 pipe.new
                 * func.map(ar, function(ar) return {junction.generateArc(ar[1]), junction.generateArc(ar[2])} end)
                 * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
-                * pipe.map(function(ar)
-                    local dt = slopeR * (1 - math.cos(tRad))
-                    return pipe.new
-                        * {-11, -11, -11 + dt, -5.5, -dt, 0, 0}
-                        * pipe.zip({0, 0, slope, slope, slope, 0, 0}, {"z", "s"})
-                        * function(lz) return lz
-                            * pipe.range(1, #lz - 1)
-                            * pipe.map2(lz * pipe.range(2, #lz), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
-                        end
-                        * pipe.map2(ar, function(nz, ar) return func.map2(ar, nz, coor.apply) end)
+                * pipe.map(function(ar) return pipe.new
+                    * {-11, -11, -11 + slopeTdz, -5.5, -slopeTdz, 0, 0}
+                    * pipe.zip({0, 0, slope, slope, slope, 0, 0}, {"z", "s"})
+                    * function(lz) return lz
+                        * pipe.range(1, #lz - 1)
+                        * pipe.map2(lz * pipe.range(2, #lz), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
+                    end
+                    * pipe.map2(ar, function(nz, ar) return func.map2(ar, nz, coor.apply) end)
                 end)
                 * pipe.map(pipe.map(pipe.map(coor.vec2Tuple)))
                 * pipe.map(pipe.zip({{true, false}, {false, false}, {false, false}, {false, false}, {false, false}, {false, true}}, {"edge", "snap"}))
                 * pipe.flatten()
                 * station.prepareEdges
             
-            local x =
+            return
                 {
                     edgeLists = {TUpperTracks(tG)},
                     models = {},
@@ -182,10 +181,6 @@ function data()
                     cost = 1000,
                     maintenanceCost = 1000 / 6
                 }
-            
-            return x
-        
-        
         end
     }
 

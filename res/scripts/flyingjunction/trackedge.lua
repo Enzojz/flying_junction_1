@@ -2,51 +2,45 @@ local func = require "flyingjunction/func"
 trackEdge = {}
 
 
-function trackEdge.normal(c, t, aligned, snapNodeRule)
-    return function(edges)
-        return {
+function trackEdge.normal(c, t, aligned)
+    return function(p)
+        return func.with(p, {
             type = "TRACK",
             alignTerrain = aligned,
             params = {
                 type = t,
                 catenary = c,
             },
-            edges = edges,
-            snapNodes = snapNodeRule(edges),
-        }
+        })
     end
 end
 
 
-function trackEdge.bridge(c, t, typeName, snapNodeRule)
-    return function(edges)
-        return {
+function trackEdge.bridge(c, t, typeName)
+    return function(p)
+        return func.with(p, {
             type = "TRACK",
             edgeType = "BRIDGE",
             edgeTypeName = typeName,
             params = {
                 type = t,
                 catenary = c,
-            },
-            edges = edges,
-            snapNodes = snapNodeRule(edges),
-        }
+            }
+        })
     end
 end
 
-function trackEdge.tunnel(c, t, snapNodeRule)
-    return function(edges)
-        return {
+function trackEdge.tunnel(c, t)
+    return function(p)
+        return func.with(p, {
             type = "TRACK",
             edgeType = "TUNNEL",
             edgeTypeName = "railroad_old.lua",
             params = {
                 type = t,
                 catenary = c,
-            },
-            edges = edges,
-            snapNodes = snapNodeRule(edges),
-        }
+            }
+        })
     end
 end
 

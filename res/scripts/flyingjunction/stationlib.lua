@@ -202,6 +202,8 @@ stationlib.prepareEdges = function(edges)
     }
 end
 
+stationlib.snapOn = function(s) return pipe.map2(s, function(e, s) return {edge = e, snap = s} end) end
+
 stationlib.basePt = pipe.new * {
     coor.xyz(-0.5, -0.5, 0),
     coor.xyz(0.5, -0.5, 0),

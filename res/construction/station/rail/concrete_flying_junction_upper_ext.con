@@ -1,0 +1,169 @@
+local laneutil = require "laneutil"
+local paramsutil = require "paramsutil"
+local func = require "flyingjunction/func"
+local coor = require "flyingjunction/coor"
+local trackEdge = require "flyingjunction/trackedge"
+local line = require "flyingjunction/coorline"
+local arc = require "flyingjunction/coorarc"
+local station = require "flyingjunction/stationlib"
+local pipe = require "flyingjunction/pipe"
+local junction = require "junction"
+
+local dump = require "datadumper"
+
+local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
+local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
+local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
+local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
+local bridgeType = "z_concrete_flying_junction.lua"
+
+local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
+local rList = {-0.1, -0.3, -0.5, -1, 1e5, 1, 0.5, 0.3, 0.1}
+local rTxtList = {"●", "●", "•", "∙", "0", "∙", "•", "●", "●"}
+
+local slopeList = {10, 20, 25, 30, 35, 40, 50, 60, 70}
+local heightList = {-5, -2.5, -0.5, 0, 0.5, 2.5, 5}
+
+local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
+
+
+local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
+
+local function attach(limits)
+    return function(l, x)
+        return {
+            limits = limits,
+            xOffset = x,
+            guideline = l,
+        }
+    end
+end
+
+local function defaultParams(params)
+    params.trackType = params.trackType or 0
+    params.catenary = params.catenary or 1
+    params.nbUpperTracks = params.nbUpperTracks or 1
+    params.slope = params.slope or 0
+    params.rUpper = params.rUpper or 4
+end
+
+local function params()
+    return {
+        paramsutil.makeTrackTypeParam(),
+        paramsutil.makeTrackCatenaryParam(),
+        {
+            key = "nbUpperTracks",
+            name = _("Number of upper tracks"),
+            values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
+            defaultIndex = 1
+        },
+        {
+            key = "rUpper",
+            name = _("Curvature of upper tracks : Near"),
+            values = rTxtList,
+            defaultIndex = 4
+        },
+        {
+            key = "slope",
+            name = _("Slope(‰)"),
+            values = func.map(slopeList, tostring),
+            defaultIndex = 0
+        }
+    }
+
+end
+
+function data()
+    return {
+        type = "RAIL_STATION",
+        description = {
+            name = _("Concrete Flying Junction"),
+            description = _("An European style flying junction")
+        },
+        availability = {
+            yearFrom = 1892
+        },
+        order = 27218,
+        params = params(),
+        
+        updateFn = function(params)
+            defaultParams(params)
+            
+            local result = pipe.new
+            
+            local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
+            local catenary = params.catenary == 1
+            local fixedHeight = 11
+            local slope = slopeList[params.slope + 1] * 0.001
+            local length = 11 / slope
+            
+            local trackBuilder = trackEdge.builder(catenary, trackType)
+            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
+            
+            local retriveR = function(param) return rList[param + 1] * 1000 end
+            
+            local info = {
+                nbTracks = params.nbUpperTracks + 1,
+                r = retriveR(params.rUpper),
+                rad = length / retriveR(params.rUpper)
+            }
+            
+            local offsets = junction.buildCoors(info.nbTracks, info.nbTracks)
+            
+            local tracks = junction.fArcs(offsets.tracks, 0, info.r)
+            local walls = junction.fArcs(offsets.walls, 0, info.r)
+            
+            local limits =
+                {
+                    L = walls[1],
+                    R = walls[#walls]
+                }
+            
+            
+            local ar = pipe.new
+                * junction.fArcs(offsets.tracks, 0, info.r)
+                * pipe.map(function(t) return
+                    {
+                        limits =
+                        {
+                            inf = (info.r > 0 and math.pi or 0) + info.rad,
+                            mid = (info.r > 0 and math.pi or 0) + 0.5 * info.rad,
+                            sup = (info.r > 0 and math.pi or 0),
+                        },
+                        guideline = t
+                    } end)
+            
+            local tG =
+                pipe.new
+                * func.map(ar, junction.generateArc)
+                * pipe.map(pipe.map(pipe.map(coor.vec2Tuple)))
+                * pipe.map(station.snapOn({{false, false}, {false, false}, {true, false}, {false, true}}))
+                * pipe.flatten()
+                * station.prepareEdges
+            
+            local x =
+                {
+                    edgeLists =
+                    {
+                        TUpperTracks(tG)
+                    },
+                    models = {},
+                    terrainAlignmentLists = {
+                        {
+                            type = "EQUAL",
+                            faces = {}
+                        }
+                    },
+                    groundFaces = {},
+                    terminalGroups = {},
+                    cost = 1000,
+                    maintenanceCost = 1000 / 6
+                }
+            
+            return x
+        
+        
+        end
+    }
+
+end

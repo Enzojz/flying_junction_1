@@ -38,7 +38,7 @@ end
 
 function pipe.forEach(fun)
     return function(ls)
-        for i, e in ipairs(ls) do fun(e) end
+        for _, e in ipairs(ls) do fun(e) end
     end
 end
 
@@ -189,14 +189,6 @@ function pipe.select(name)
     end
 end
 
-function pipe.exec(...)
-    local params = {...}
-    return function(fn)
-        return fn(table.unpack(params))
-    end
-end
-
-
 local pipeMeta = {
     __mul = function(lhs, rhs)
         local result = rhs(lhs)
@@ -250,5 +242,14 @@ pipe.from = function(...)
         })
     return retVal
 end
+
+pipe.exec = {}
+setmetatable(pipe.exec,
+    {
+        __mul = function(_, rhs)
+            return rhs()
+        end
+    }
+)
 
 return pipe

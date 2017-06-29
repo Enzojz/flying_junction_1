@@ -1,11 +1,7 @@
-local laneutil = require "laneutil"
 local paramsutil = require "paramsutil"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
-local line = require "flyingjunction/coorline"
-local arc = require "flyingjunction/coorarc"
-local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
 
@@ -43,12 +39,10 @@ local function part(rad)
                 lower = {
                     tracks = junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r),
                     walls = junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r),
-                    level = line.byRadPt(info.lower.rad, coor.o)
                 },
                 upper = {
                     tracks = junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r),
                     walls = junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r),
-                    level = line.byRadPt(info.upper.rad, coor.o)
                 }
             }
         
@@ -228,8 +222,6 @@ function data()
         
         updateFn = function(params)
             defaultParams(params)
-            
-            local result = {}
             
             local deg = listDegree[params.xDegDec + 1] + params.xDegUni
             local rad = math.rad(deg)

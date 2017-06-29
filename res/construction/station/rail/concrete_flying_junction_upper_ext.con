@@ -1,9 +1,8 @@
-local laneutil = require "laneutil"
 local paramsutil = require "paramsutil"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
-local line = require "flyingjunction/coorline"
+-- local line = require "flyingjunction/coorline"
 local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
@@ -23,11 +22,6 @@ local rTxtList = {"●", "●", "•", "∙", "0", "∙", "•", "●", "●"}
 
 local slopeList = {10, 20, 25, 30, 35, 40, 50, 60, 70}
 local heightList = {-5, -2.5, -0.5, 0, 0.5, 2.5, 5}
-
-local snapRule = function(e) return func.filter(func.seq(0, #e - 1), function(e) return e % 4 == 0 or (e - 3) % 4 == 0 end) end
-
-
-local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
 
 local function attach(limits)
     return function(l, x)
@@ -89,8 +83,6 @@ function data()
         updateFn = function(params)
             defaultParams(params)
             
-            local result = pipe.new
-            
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
             local catenary = params.catenary == 1
             local fixedHeight = 11
@@ -98,30 +90,33 @@ function data()
             local nbTracks = params.nbUpperTracks + 1
             local r = rList[params.rUpper + 1] * 1000
             
-            local slope = slopeList[params.slope + 1] * 0.001
+            local slope = pipe.exec
+                * function()
+                    local slope = slopeList[params.slope + 1] * 0.001
+                    local rad = math.atan(slope)
+                    local rTrans = 300
+                    local trans = {
+                        r = rTrans,
+                        dz = rTrans * (1 - math.cos(rad)),
+                        length = rTrans * math.sin(rad)
+                    }
+                    return {
+                        slope = slope,
+                        rad = rad,
+                        length = (fixedHeight - 2 * trans.dz) / slope + 2 * trans.length,
+                        trans = trans
+                    }
+                end
             
-            local slopeRad = math.atan(slope)
-            local slopeTr = 300
-            
-            local slopeTdz = slopeTr * (1 - math.cos(slopeRad))
-            local slopeTLength = slopeTr * math.sin(slopeRad)
-            local slopeLength = (fixedHeight - 2 * slopeTdz) / slope + 2 * slopeTLength
-            
-            local rad = slopeLength / r
-            local radT = slopeTLength / slopeLength * rad
+            local rad = slope.length / r
+            local radT = slope.trans.length / slope.length * rad
             
             local trackBuilder = trackEdge.builder(catenary, trackType)
-            local TUpperTracks = trackBuilder.nonAligned(station.noSnap)
             
             local offsets = junction.buildCoors(nbTracks, nbTracks)
-            
-            local tracks = junction.fArcs(offsets.tracks, 0, r)
             local walls = junction.fArcs(offsets.walls, 0, r)
             
-            local limits =
-                {
-                    L = walls[1],
-                    R = walls[#walls]
+            local vArc = {
                 }
             
             local ar = pipe.new
@@ -129,8 +124,7 @@ function data()
                 * pipe.map(function(t) return
                     {
                         {
-                            limits =
-                            {
+                            limits = {
                                 inf = (r > 0 and math.pi or 0) + rad,
                                 mid = (r > 0 and math.pi or 0) + rad - radT,
                                 sup = (r > 0 and math.pi or 0) + 0.5 * rad,
@@ -138,8 +132,7 @@ function data()
                             guideline = t,
                         },
                         {
-                            limits =
-                            {
+                            limits = {
                                 inf = (r > 0 and math.pi or 0) + 0.5 * rad,
                                 mid = (r > 0 and math.pi or 0) + radT,
                                 sup = (r > 0 and math.pi or 0),
@@ -148,15 +141,14 @@ function data()
                         }
                     } end)
             
-            local tG =
-                pipe.new
-                * func.map(ar, function(ar) return {junction.generateArc(ar[1]), junction.generateArc(ar[2])} end)
+            local edges = pipe.new
+                * func.map(ar, pipe.map(junction.generateArc))
                 * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
                 * pipe.map(function(ar) return pipe.new
-                    * {-11, -11, -11 + slopeTdz, -5.5, -slopeTdz, 0, 0}
-                    * pipe.zip({0, 0, slope, slope, slope, 0, 0}, {"z", "s"})
-                    * function(lz) return lz
-                        * pipe.range(1, #lz - 1)
+                    * {-11, -11, -11 + slope.trans.dz, -5.5, -slope.trans.dz, 0, 0}
+                    * pipe.zip({0, 0, slope.slope, slope.slope, slope.slope, 0, 0}, {"z", "s"})
+                    * function(lz) return
+                        lz * pipe.range(1, #lz - 1)
                         * pipe.map2(lz * pipe.range(2, #lz), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
                     end
                     * pipe.map2(ar, function(nz, ar) return func.map2(ar, nz, coor.apply) end)
@@ -165,10 +157,11 @@ function data()
                 * pipe.map(pipe.zip({{true, false}, {false, false}, {false, false}, {false, false}, {false, false}, {false, true}}, {"edge", "snap"}))
                 * pipe.flatten()
                 * station.prepareEdges
-            
+                * trackBuilder.nonAligned
+                
             return
                 {
-                    edgeLists = {TUpperTracks(tG)},
+                    edgeLists = edges,
                     models = {},
                     terrainAlignmentLists = {
                         {

@@ -85,6 +85,7 @@ function data()
             
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
             local catenary = params.catenary == 1
+            local trackBuilder = trackEdge.builder(catenary, trackType)
             local fixedHeight = 11
             
             local nbTracks = params.nbUpperTracks + 1
@@ -111,14 +112,13 @@ function data()
             local rad = slope.length / r
             local radT = slope.trans.length / slope.length * rad
             
-            local trackBuilder = trackEdge.builder(catenary, trackType)
-            
+            -- local vArc = {
+            --     arc.new(coor.xy(0, -slope.trans.r), r),
+            --     arc.new(arc.new(coor.xy(0, -slope.trans.r), r + 1e5):pt(math.pi * 0.5 - slope.rad), 1e5),
+            --     arc.new(arc.new(coor.xy(slope.length, slope.trans.r - fixedHeight), r + 1e5):pt(-math.pi * 0.5 - slope.rad), 1e5),
+            --     arc.new(coor.xy(slope.length, slope.trans.r - fixedHeight), r)
+            -- }
             local offsets = junction.buildCoors(nbTracks, nbTracks)
-            local walls = junction.fArcs(offsets.walls, 0, r)
-            
-            local vArc = {
-                }
-            
             local ar = pipe.new
                 * junction.fArcs(offsets.tracks, 0, r)
                 * pipe.map(function(t) return
@@ -141,6 +141,33 @@ function data()
                         }
                     } end)
             
+            
+            local makeWall = junction.makeFn(mSidePillar, coor.scaleY(1.05) * coor.transZ(-fixedHeight))
+            local walls = pipe.new
+                * junction.fArcs(offsets.walls, 0, r)
+                * pipe.map(function(t) return
+                    {
+                        {
+                            limits = {
+                                inf = (r > 0 and math.pi or 0) + rad,
+                                mid = (r > 0 and math.pi or 0) + rad - radT,
+                                sup = (r > 0 and math.pi or 0) + 0.5 * rad,
+                            },
+                            guideline = t,
+                        },
+                        {
+                            limits = {
+                                inf = (r > 0 and math.pi or 0) + 0.5 * rad,
+                                mid = (r > 0 and math.pi or 0) + radT,
+                                sup = (r > 0 and math.pi or 0),
+                            },
+                            guideline = t,
+                        }
+                    } end)
+                * pipe.map(pipe.mapFlatten(makeWall))
+                * pipe.flatten()
+                * pipe.flatten()
+            
             local edges = pipe.new
                 * func.map(ar, pipe.map(junction.generateArc))
                 * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
@@ -157,12 +184,12 @@ function data()
                 * pipe.map(pipe.zip({{true, false}, {false, false}, {false, false}, {false, false}, {false, false}, {false, true}}, {"edge", "snap"}))
                 * pipe.flatten()
                 * station.prepareEdges
-                * trackBuilder.nonAligned
-                
+                * trackBuilder.nonAligned()
+            
             return
                 {
-                    edgeLists = edges,
-                    models = {},
+                    edgeLists = {edges},
+                    models = walls,
                     terrainAlignmentLists = {
                         {
                             type = "EQUAL",

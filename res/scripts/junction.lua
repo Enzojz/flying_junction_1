@@ -23,7 +23,7 @@ end
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
 
-function buildCoors(numTracks, groupSize)
+local function buildCoors(numTracks, groupSize)
     local function builder(xOffsets, uOffsets, baseX, nbTracks)
         local function caller(n)
             return builder(
@@ -270,4 +270,5 @@ return {
     generateStructure = generateStructure,
     generatePolyArcEdge = generatePolyArcEdge,
     generateArc = generateArc,
+    makeFn = makeFn
 }

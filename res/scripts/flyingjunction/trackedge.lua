@@ -1,8 +1,8 @@
 local func = require "flyingjunction/func"
-trackEdge = {}
+local trackEdge = {}
 
 
-function trackEdge.normal(c, t, aligned)
+trackEdge.normal = function(c, t, aligned)
     return function(p)
         return func.with(p, {
             type = "TRACK",
@@ -16,7 +16,7 @@ function trackEdge.normal(c, t, aligned)
 end
 
 
-function trackEdge.bridge(c, t, typeName)
+trackEdge.bridge = function(c, t, typeName)
     return function(p)
         return func.with(p, {
             type = "TRACK",
@@ -30,7 +30,7 @@ function trackEdge.bridge(c, t, typeName)
     end
 end
 
-function trackEdge.tunnel(c, t)
+trackEdge.tunnel = function(c, t)
     return function(p)
         return func.with(p, {
             type = "TRACK",
@@ -44,7 +44,7 @@ function trackEdge.tunnel(c, t)
     end
 end
 
-function trackEdge.builder(c, t)
+trackEdge.builder = function(c, t)
     return {
         normal = func.bind(trackEdge.normal, c, t, true),
         nonAligned = func.bind(trackEdge.normal, c, t, false),

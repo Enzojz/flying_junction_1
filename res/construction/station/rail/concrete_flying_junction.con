@@ -30,79 +30,165 @@ local function attach(limits)
     end
 end
 
-local function part(rad)
-    return function(info, offsets)
-        info.lower.r, info.upper.r = junction.minimalR(offsets, info)
-        
-        local guidelines =
-            {
-                lower = {
-                    tracks = junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r),
-                    walls = junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r),
-                },
-                upper = {
-                    tracks = junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r),
-                    walls = junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r),
-                }
-            }
-        
-        local limits = {
-            lower = {L = guidelines.lower.walls[1], R = guidelines.lower.walls[#guidelines.lower.walls]},
-            upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
-        }
-        
-        local limitRads = {
-            lower = {
-                inf = limits.lower.R:rad(func.min(limits.lower.R - limits.upper.L, ptXSelector)),
-                mid = limits.lower.R:rad(coor.xy(0, 0)),
-                sup = limits.lower.L:rad(func.min(limits.lower.L - limits.upper.R, ptXSelector)),
-            },
-            upper = {
-                sup = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.L, ptXSelector)),
-                mid = limits.upper.R:rad(coor.xy(0, 0)),
-                inf = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.R, ptXSelector)),
-            }
-        }
-        
-        return {
-            lower = {
-                tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
-                    attach(limitRads.lower)),
-                walls = pipe.new
-                * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
-                    return attach(
-                        {
-                            inf = l:rad(func.min(l - limits.upper.L, ptXSelector)),
-                            mid = l:rad(coor.xy(0, 0)),
-                            sup = l:rad(func.min(l - limits.upper.R, ptXSelector)),
-                        }
-                    )(l, o) end)
-                * function(walls)
-                    for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
-                    for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
-                    return walls
-                end
-            },
-            upper = {
-                tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
-                    attach(limitRads.upper)),
-                walls = {
-                    attach({
-                        inf = limitRads.upper.inf,
-                        mid = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.L, ptXSelector)),
-                        sup = limitRads.upper.sup,
-                    })(limits.upper.L, offsets.upper.walls[1]),
-                    attach({
-                        inf = limitRads.upper.inf,
-                        mid = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.R, ptXSelector)),
-                        sup = limitRads.upper.sup,
-                    })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
-                },
-            }
-        }
-    end
+local function mPlace(guideline, rad1, rad2)
+    local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
+    local pt = guideline:pt(rad)
+    return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y)
 end
 
+local function part(info, offsets)
+    info.lower.r, info.upper.r = junction.minimalR(offsets, info)
+    
+    local guidelines =
+        {
+            lower = {
+                tracks = junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r),
+                walls = junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r),
+            },
+            upper = {
+                tracks = junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r),
+                walls = junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r),
+            }
+        }
+    
+    local limits = {
+        lower = {L = guidelines.lower.walls[1], R = guidelines.lower.walls[#guidelines.lower.walls]},
+        upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
+    }
+    
+    local limitRads = {
+        lower = {
+            inf = limits.lower.R:rad(func.min(limits.lower.R - limits.upper.L, ptXSelector)),
+            mid = limits.lower.R:rad(coor.xy(0, 0)),
+            sup = limits.lower.L:rad(func.min(limits.lower.L - limits.upper.R, ptXSelector)),
+        },
+        upper = {
+            sup = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.L, ptXSelector)),
+            mid = limits.upper.R:rad(coor.xy(0, 0)),
+            inf = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.R, ptXSelector)),
+        }
+    }
+    
+    return {
+        lower = {
+            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
+                attach(limitRads.lower)),
+            walls = pipe.new
+            * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
+                return attach(
+                    {
+                        inf = l:rad(func.min(l - limits.upper.L, ptXSelector)),
+                        mid = l:rad(coor.xy(0, 0)),
+                        sup = l:rad(func.min(l - limits.upper.R, ptXSelector)),
+                    }
+                )(l, o) end)
+            * function(walls)
+                for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
+                for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
+                return walls
+            end
+        },
+        upper = {
+            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
+                attach(limitRads.upper)),
+            walls = {
+                attach({
+                    inf = limitRads.upper.inf,
+                    mid = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.L, ptXSelector)),
+                    sup = limitRads.upper.sup,
+                })(limits.upper.L, offsets.upper.walls[1]),
+                attach({
+                    inf = limitRads.upper.inf,
+                    mid = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.R, ptXSelector)),
+                    sup = limitRads.upper.sup,
+                })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
+            },
+        }
+    }
+end
+
+local function generateStructure(lowerGroup, upperGroup)
+    local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
+    local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
+    -- local makeFence = junction.makeFn(mPlace, mRoofFenceF)
+    local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
+    
+    local walls = lowerGroup.walls
+    local trackSets = pipe.new
+        * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
+            function(w1, w2) return pipe.new
+                * lowerGroup.tracks
+                * pipe.filter(function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
+                * pipe.map(function(t)
+                    return func.with(t,
+                        {
+                            limits = {
+                                sup = w2.limits.sup,
+                                mid = t.guideline:rad(coor.xy(0, 0)),
+                                inf = w1.limits.inf,
+                            }
+                        }
+                ) end)
+            end)
+        * func.flatten
+    
+    local upperFences = func.map(upperGroup.tracks, function(t)
+        return {
+            junction.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t.guideline, t.limits.inf)),
+            junction.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t.guideline, t.limits.sup)),
+        }
+    end)
+    
+    local fences = func.map(trackSets, function(t)
+        local m = coor.scaleX(1.091) * coor.transY(0.18) * coor.transZ(-1) * coor.centered(coor.scaleZ, 3.5 / 1.5, coor.xyz(0, 0, 10.75))
+        return {
+            junction.newModel(mRoofFenceF, m, mPlace(t.guideline, t.limits.inf)),
+            junction.newModel(mRoofFenceF, m, coor.flipY(), mPlace(t.guideline, t.limits.sup)),
+        }
+    end)
+    
+    local sideFencesL = func.map(func.range(lowerGroup.walls, 1, #lowerGroup.walls - 1), function(t)
+        return func.with(t, {
+            limits = {
+                sup = t.guideline:rad(func.min(upperGroup.walls[1].guideline - t.guideline, ptXSelector)),
+                mid = t.guideline:rad(func.min(upperGroup.walls[1].guideline - t.guideline, ptXSelector)),
+                inf = t.limits.inf,
+            }
+        })
+    end)
+    
+    local sideFencesR = func.map(func.range(lowerGroup.walls, 2, #lowerGroup.walls), function(t)
+        return func.with(t, {
+            limits = {
+                inf = t.guideline:rad(func.min(upperGroup.walls[2].guideline - t.guideline, ptXSelector)),
+                mid = t.guideline:rad(func.min(upperGroup.walls[2].guideline - t.guideline, ptXSelector)),
+                sup = t.limits.sup,
+            }
+        })
+    end)
+    
+    return {
+        pipe.new
+        + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
+        + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
+        + func.map(fences, function(f) return f[1] end)
+        + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
+        + makeSideFence(upperGroup.walls[2])[1]
+        + makeWall(upperGroup.walls[2])[1]
+        + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
+        + func.map(upperFences, function(f) return f[1] end)
+        ,
+        pipe.new
+        + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
+        + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
+        + func.map(fences, function(f) return f[2] end)
+        + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
+        + makeSideFence(upperGroup.walls[1])[2]
+        + makeWall(upperGroup.walls[1])[2]
+        + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
+        + func.map(upperFences, function(f) return f[2] end)
+    }
+end
 
 
 local function defaultParams(params)
@@ -271,8 +357,8 @@ function data()
                 upper = junction.buildCoors(info1.upper.nbTracks, info1.upper.nbTracks)
             }
             
-            local group1 = part(rad)(info1, offsets)
-            local group2 = part(rad)(info2, offsets)
+            local group1 = part(info1, offsets)
+            local group2 = part(info2, offsets)
             
             local lowerTracks = junction.generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
             local upperTracks = junction.generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
@@ -289,7 +375,7 @@ function data()
                 + junction.generatePolyArcEdge(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid)
                 + junction.generatePolyArcEdge(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
             
-            result = {
+            local result = {
                 edgeLists =
                 {
                     TUpperTracks(upperTracks.normal),
@@ -298,8 +384,8 @@ function data()
                     TUpperExtTracks(upperTracks.ext),
                 },
                 models = func.concat(
-                    junction.generateStructure(group1.lower, group1.upper)[1],
-                    junction.generateStructure(group2.lower, group2.upper)[2]
+                    generateStructure(group1.lower, group1.upper)[1],
+                    generateStructure(group2.lower, group2.upper)[2]
                 ),
                 terrainAlignmentLists = {
                     {

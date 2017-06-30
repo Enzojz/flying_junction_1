@@ -2,7 +2,7 @@ local paramsutil = require "paramsutil"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
--- local line = require "flyingjunction/coorline"
+local line = require "flyingjunction/coorline"
 local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
@@ -112,12 +112,34 @@ function data()
             local rad = slope.length / r
             local radT = slope.trans.length / slope.length * rad
             
-            -- local vArc = {
-            --     arc.new(coor.xy(0, -slope.trans.r), r),
-            --     arc.new(arc.new(coor.xy(0, -slope.trans.r), r + 1e5):pt(math.pi * 0.5 - slope.rad), 1e5),
-            --     arc.new(arc.new(coor.xy(slope.length, slope.trans.r - fixedHeight), r + 1e5):pt(-math.pi * 0.5 - slope.rad), 1e5),
-            --     arc.new(coor.xy(slope.length, slope.trans.r - fixedHeight), r)
-            -- }
+            local slopeProfile = pipe.exec
+                * function()
+                    local arc1 = arc.new(0, -slope.trans.r, slope.trans.r)
+                    local arc2 = arc.new(slope.length, slope.trans.r - fixedHeight, slope.trans.r)
+                    return {
+                        {
+                            arc = arc1,
+                            inf = arc1:pt(math.pi * 0.5),
+                            sup = arc1:pt(math.pi * 0.5 - slope.rad)
+                        },
+                        -- {
+                        --     arc = arc.byOR(arc.byDR(arc1, 1e5):pt(math.pi * 0.5 - slope.rad), 1e5),
+                        --     inf = arc1:pt(math.pi * 0.5 - slope.rad),
+                        --     sup = coor.xy(slope.length * 0.5, -fixedHeight * 0.5)
+                        -- },
+                        {
+                            arc = arc.byOR(arc.byDR(arc2, 1e5):pt(-math.pi * 0.5 - slope.rad), 1e5),
+                            inf = arc1:pt(math.pi * 0.5 - slope.rad),
+                            sup = arc2:pt(-math.pi * 0.5 - slope.rad),
+                        },
+                        {
+                            arc = arc2,
+                            inf = arc2:pt(-math.pi * 0.5 - slope.rad),
+                            sup = arc2:pt(-math.pi * 0.5)
+                        }
+                    }
+                end
+            
             local offsets = junction.buildCoors(nbTracks, nbTracks)
             local ar = pipe.new
                 * junction.fArcs(offsets.tracks, 0, r)
@@ -141,25 +163,41 @@ function data()
                         }
                     } end)
             
+            local radRef = (r > 0 and math.pi or 0)
             
-            local makeWall = junction.makeFn(mSidePillar, coor.scaleY(1.05) * coor.transZ(-fixedHeight))
+            local function mPlace(guideline, rad1, rad2)
+                local radc = (rad1 + rad2) * 0.5
+                local prof = function(radx)
+                    local x = (radx - radRef) / rad * slope.length
+                    local pf = func.filter(slopeProfile, function(s) return (s.inf.x <= x and s.sup.x >= x) or (math.abs(s.inf.x - x) < 1e-5) or (math.abs(s.sup.x - x) < 1e-5) end)[1]
+                    return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length()  end)
+                end
+                local p1 = prof(rad1)
+                local p2 = prof(rad2)
+                local dz = ((p1 + p2) * 0.5).y
+                local tan = (p2.x - p1.x) / (p2.y - p1.y)
+                local pt = guideline:pt(radc)
+                return coor.rotZ(radc) * coor.transX(pt.x) * coor.transY(pt.y) * coor.transZ(dz)
+            end
+            
+            local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05) * coor.transZ(-fixedHeight))
             local walls = pipe.new
                 * junction.fArcs(offsets.walls, 0, r)
                 * pipe.map(function(t) return
                     {
                         {
                             limits = {
-                                inf = (r > 0 and math.pi or 0) + rad,
-                                mid = (r > 0 and math.pi or 0) + rad - radT,
-                                sup = (r > 0 and math.pi or 0) + 0.5 * rad,
+                                inf = radRef + rad,
+                                mid = radRef + rad - radT,
+                                sup = radRef + 0.5 * rad,
                             },
                             guideline = t,
                         },
                         {
                             limits = {
-                                inf = (r > 0 and math.pi or 0) + 0.5 * rad,
-                                mid = (r > 0 and math.pi or 0) + radT,
-                                sup = (r > 0 and math.pi or 0),
+                                inf = radRef + 0.5 * rad,
+                                mid = radRef + radT,
+                                sup = radRef,
                             },
                             guideline = t,
                         }

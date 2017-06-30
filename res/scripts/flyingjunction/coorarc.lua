@@ -20,7 +20,7 @@ function arc.byOR(o, r) return arc.new(o.x, o.y, r) end
 
 function arc.byXYR(x, y, r) return arc.new(x, y, r) end
 
-function arc.byDR(arc, dr) return arc.byOR(arc.o, dr + arc.r) end
+function arc.byDR(ar, dr) return arc.byOR(ar.o, dr + ar.r) end
 
 function arc.ptByRad(arc, rad)
     return

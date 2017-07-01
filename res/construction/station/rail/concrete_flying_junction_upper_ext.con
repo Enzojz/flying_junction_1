@@ -140,29 +140,6 @@ function data()
                     }
                 end
             
-            local offsets = junction.buildCoors(nbTracks, nbTracks)
-            local ar = pipe.new
-                * junction.fArcs(offsets.tracks, 0, r)
-                * pipe.map(function(t) return
-                    {
-                        {
-                            limits = {
-                                inf = (r > 0 and math.pi or 0) + rad,
-                                mid = (r > 0 and math.pi or 0) + rad - radT,
-                                sup = (r > 0 and math.pi or 0) + 0.5 * rad,
-                            },
-                            guideline = t,
-                        },
-                        {
-                            limits = {
-                                inf = (r > 0 and math.pi or 0) + 0.5 * rad,
-                                mid = (r > 0 and math.pi or 0) + radT,
-                                sup = (r > 0 and math.pi or 0),
-                            },
-                            guideline = t,
-                        }
-                    } end)
-            
             local radRef = (r > 0 and math.pi or 0)
             
             local function mPlace(guideline, rad1, rad2)
@@ -170,17 +147,37 @@ function data()
                 local prof = function(radx)
                     local x = (radx - radRef) / rad * slope.length
                     local pf = func.filter(slopeProfile, function(s) return (s.inf.x <= x and s.sup.x >= x) or (math.abs(s.inf.x - x) < 1e-5) or (math.abs(s.sup.x - x) < 1e-5) end)[1]
-                    return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length()  end)
+                    return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length() end)
                 end
-                local p1 = prof(rad1)
-                local p2 = prof(rad2)
-                local dz = ((p1 + p2) * 0.5).y
-                local tan = (p2.x - p1.x) / (p2.y - p1.y)
-                local pt = guideline:pt(radc)
-                return coor.rotZ(radc) * coor.transX(pt.x) * coor.transY(pt.y) * coor.transZ(dz)
+                local p1, p2 = prof(rad1), prof(rad2)
+                return coor.shearZoY((p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y}))
             end
             
+            local offsets = junction.buildCoors(nbTracks, nbTracks)
+            local ar = pipe.new
+                * junction.fArcs(offsets.tracks, 0, r)
+                * pipe.map(function(t) return
+                    {
+                        {
+                            limits = {
+                                inf = radRef + rad,
+                                mid = radRef + rad - radT,
+                                sup = radRef + 0.5 * rad,
+                            },
+                            guideline = t,
+                        },
+                        {
+                            limits = {
+                                inf = radRef + 0.5 * rad,
+                                mid = radRef + radT,
+                                sup = radRef,
+                            },
+                            guideline = t,
+                        }
+                    } end)
+            
             local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05) * coor.transZ(-fixedHeight))
+            local makeFence = junction.makeFn(mRoofFenceS, mPlace, coor.scaleY(1.05) * coor.transZ(-fixedHeight))
             local walls = pipe.new
                 * junction.fArcs(offsets.walls, 0, r)
                 * pipe.map(function(t) return
@@ -202,7 +199,8 @@ function data()
                             guideline = t,
                         }
                     } end)
-                * pipe.map(pipe.mapFlatten(makeWall))
+                * pipe.map(function(x) return {func.mapFlatten(x, makeWall), func.mapFlatten(x, makeFence)} end)
+                * pipe.flatten()
                 * pipe.flatten()
                 * pipe.flatten()
             

@@ -363,14 +363,14 @@ function data()
             local lowerTracks = junction.generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
             local upperTracks = junction.generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
             
-            local upperPolys = pipe.new
-                + junction.generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid)
+            local upperPolys =
+                junction.generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid)
                 + junction.generatePolyArcEdge(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup)
                 + junction.generatePolyArcEdge(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid)
                 + junction.generatePolyArcEdge(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
             
-            local lowerPolys = pipe.new
-                + junction.generatePolyArcEdge(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid)
+            local lowerPolys =
+                junction.generatePolyArcEdge(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid)
                 + junction.generatePolyArcEdge(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup)
                 + junction.generatePolyArcEdge(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid)
                 + junction.generatePolyArcEdge(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
@@ -390,11 +390,15 @@ function data()
                 terrainAlignmentLists = {
                     {
                         type = "GREATER",
-                        faces = {upperPolys}
+                        faces = {upperPolys * pipe.map(coor.vec2Tuple)}
+                    },
+                    {
+                        type = "LESS",
+                        faces = {upperPolys * pipe.map(coor.transZ(11)) * pipe.map(coor.vec2Tuple)}
                     },
                     {
                         type = "EQUAL",
-                        faces = {lowerPolys}
+                        faces = {lowerPolys * pipe.map(coor.vec2Tuple)}
                     }
                 }
             }

@@ -134,15 +134,40 @@ local function mul(m1, m2)
     }
 end
 
+function coor.apply(vec, trans)
+    local applyVal = function(col)
+        return vec.x * trans[0 + col] + vec.y * trans[4 + col] + vec.z * trans[8 + col] + trans[12 + col]
+    end
+    return coor.xyz(applyVal(1), applyVal(2), applyVal(3))
+end
+
+function coor.applyEdge(mpt, mvec)
+    return function(edge)
+        local pt, vec = coor.edge2Vec(edge)
+        local newPt = coor.apply(pt, mpt)
+        local newVec = coor.apply(vec, mvec)
+        return coor.vec2Edge(newPt, newVec)
+    end
+end
+
+function coor.applyEdges(mpt, mvec)
+    return function(edges)
+        return func.map(edges, coor.applyEdge(mpt, mvec))
+    end
+end
+
+local init = {}
 local meta = {
     __mul = function(lhs, rhs)
         local result = mul(lhs, rhs)
         setmetatable(result, getmetatable(lhs))
         return result
+    end,
+    __call = function(lhs, rhs)
+        return coor.apply(rhs, lhs)
     end
 }
 
-local init = {}
 setmetatable(init,
     {
         __mul = function(_, rhs)
@@ -377,28 +402,6 @@ function coor.shearZoY(s)
         0, 0, 1, 0,
         0, 0, 0, 1
     }
-end
-
-function coor.apply(vec, trans)
-    local applyVal = function(col)
-        return vec.x * trans[0 + col] + vec.y * trans[4 + col] + vec.z * trans[8 + col] + trans[12 + col]
-    end
-    return coor.xyz(applyVal(1), applyVal(2), applyVal(3))
-end
-
-function coor.applyEdge(mpt, mvec)
-    return function(edge)
-        local pt, vec = coor.edge2Vec(edge)
-        local newPt = coor.apply(pt, mpt)
-        local newVec = coor.apply(vec, mvec)
-        return coor.vec2Edge(newPt, newVec)
-    end
-end
-
-function coor.applyEdges(mpt, mvec)
-    return function(edges)
-        return func.map(edges, coor.applyEdge(mpt, mvec))
-    end
 end
 
 function coor.rotate(edge, mt0, mtr, mt1)

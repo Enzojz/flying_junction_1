@@ -157,9 +157,9 @@ local function makeFn(model, mPlace, m)
 end
 
 local generatePolyArcEdge = function(guideline, from, to)
-    return func.map(
-        arc.coords(guideline, 5)(normalizeRad(from), normalizeRad(to) - normalizeRad(from)),
-        function(rad) return (function(p) return {p.x, p.y, 0} end)(guideline:pt(rad)) end)
+    return pipe.from(normalizeRad(from), normalizeRad(to) - normalizeRad(from))
+        * arc.coords(guideline, 5)
+        * pipe.map(function(rad) return func.with(guideline:pt(rad), {z = 0, rad = rad}) end)
 end
 
 return {

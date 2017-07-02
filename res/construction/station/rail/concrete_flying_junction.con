@@ -12,11 +12,11 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {-0.1, -0.3, -0.5, -1, 1e5, 1, 0.5, 0.3, 0.1}
-local rTxtList = {"●", "●", "•", "∙", "0", "∙", "•", "●", "●"}
+local rList = {1e5, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
 
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
-local heightList = {-5, -2.5, -0.5, 0, 0.5, 2.5, 5}
+local heightList = {-11, -8.7, -5, -2.5, -0.5, 0, 0.5, 2.5, 5}
+local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
 
@@ -28,12 +28,6 @@ local function attach(limits)
             guideline = l,
         }
     end
-end
-
-local function mPlace(guideline, rad1, rad2)
-    local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
-    local pt = guideline:pt(rad)
-    return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y)
 end
 
 local function part(info, offsets)
@@ -107,7 +101,15 @@ local function part(info, offsets)
     }
 end
 
-local function generateStructure(lowerGroup, upperGroup)
+local function generateStructure(lowerGroup, upperGroup, mZ)
+
+    local function mPlace(guideline, rad1, rad2)
+        local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
+        local pt = guideline:pt(rad)
+        return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y) * mZ * coor.transZ(-11)
+    end
+
+
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
     -- local makeFence = junction.makeFn(mPlace, mRoofFenceF)
@@ -190,25 +192,6 @@ local function generateStructure(lowerGroup, upperGroup)
     }
 end
 
-
-local function defaultParams(params)
-    params.trackType = params.trackType or 0
-    params.catenary = params.catenary or 1
-    params.applyCatenary = params.applyCatenary or 0
-    params.nbUpperTracks = params.nbUpperTracks or 1
-    params.nbLowerTracks = params.nbLowerTracks or 1
-    params.xDegDec = params.xDegDec or 2
-    params.xDegUni = params.xDegUni or 0
-    params.nbPerGroup = params.nbPerGroup or 1
-    params.isMir = params.isMir or 0
-    params.slope = params.slope or 0
-    params.height = params.height or 0
-    params.rLower2 = params.rLower2 or 4
-    params.rLower1 = params.rLower1 or 4
-    params.rUpper2 = params.rUpper2 or 4
-    params.rUpper1 = params.rUpper1 or 4
-end
-
 local function params()
     return {
         paramsutil.makeTrackTypeParam(),
@@ -232,6 +215,12 @@ local function params()
             defaultIndex = 1
         },
         {
+            key = "heightTunnel",
+            name = _("Tunnel Height") .. ("(m)"),
+            values = func.map(tunnelHeightList, tostring),
+            defaultIndex = 0
+        },
+        {
             key = "xDegDec",
             name = _("Crossing angles"),
             values = {_("5"), _("10"), _("20"), _("30"), _("40"), _("50"), _("60"), _("70"), _("80"), },
@@ -243,28 +232,38 @@ local function params()
             values = func.seqMap({0, 9}, tostring),
         },
         {
+            key = "layoutLower",
+            name = "Layout",
+            values = {"-/+", "-/-", "+/+", "+/-"},
+        },
+        {
+            key = "layoutUpper",
+            name = "",
+            values = {"-/+", "-/-", "+/+", "+/-"},
+        },
+        {
             key = "rLower2",
             name = _("Curvature of lower tracks : Far"),
-            values = rTxtList,
-            defaultIndex = 4
+            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+            defaultIndex = 0
         },
         {
             key = "rLower1",
             name = _("Curvature of lower tracks : Near"),
-            values = rTxtList,
-            defaultIndex = 4
+            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+            defaultIndex = 0
         },
         {
             key = "rUpper2",
             name = _("Curvature of upper tracks : Far"),
-            values = rTxtList,
-            defaultIndex = 4
+            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+            defaultIndex = 0
         },
         {
             key = "rUpper1",
             name = _("Curvature of upper tracks : Near"),
-            values = rTxtList,
-            defaultIndex = 4
+            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+            defaultIndex = 0
         },
         {
             key = "nbPerGroup",
@@ -276,6 +275,7 @@ local function params()
             key = "isMir",
             name = _("Mirrored"),
             values = {_("No"), _("Yes")},
+            defaultIndex = 0
         },
         {
             key = "slope",
@@ -287,10 +287,18 @@ local function params()
             key = "height",
             name = _("Altitude Adjustment(m)"),
             values = func.map(heightList, tostring),
-            defaultIndex = 3
+            defaultIndex = 5
         }
     }
 
+end
+
+local function defaultParams(param)
+    local function limiter(d, u)
+        return function(v) return v and v < u and v or d end
+    end
+    
+    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
 end
 
 function data()
@@ -317,12 +325,13 @@ function data()
             local catenaryLower = func.contains({0, 1}, params.applyCatenary) and catenary
             local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
-            
+            local mTunnelZ = coor.transZ(tunnelHeightList[params.heightTunnel + 1])
+
             local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
             local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
-            local TLowerTracks = lowerTrackBuilder.normal()
+            local TLowerTracks = lowerTrackBuilder.nonAligned()
             local TUpperTracks = upperTrackBuilder.nonAligned()
-            local TLowerExtTracks = lowerTrackBuilder.normal()
+            local TLowerExtTracks = lowerTrackBuilder.nonAligned()
             local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
             
             local retriveR = function(param) return rList[param + 1] * 1000 end
@@ -330,24 +339,24 @@ function data()
             local info1 = {
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
-                    r = retriveR(params.rLower1),
+                    r = retriveR(params.rLower1) * (func.contains({0, 2}, params.layoutLower) and -1 or 1),
                     rad = -0.5 * rad
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
-                    r = retriveR(params.rUpper1),
+                    r = retriveR(params.rUpper1) * (func.contains({0, 2}, params.layoutUpper) and -1 or 1),
                     rad = 0.5 * rad
                 }
             }
             local info2 = {
                 lower = {
                     nbTracks = params.nbLowerTracks + 1,
-                    r = retriveR(params.rLower2),
+                    r = retriveR(params.rLower2) * (func.contains({0, 1}, params.layoutLower) and -1 or 1),
                     rad = -0.5 * rad
                 },
                 upper = {
                     nbTracks = params.nbUpperTracks + 1,
-                    r = retriveR(params.rUpper2),
+                    r = retriveR(params.rUpper2) * (func.contains({0, 1}, params.layoutUpper) and -1 or 1),
                     rad = 0.5 * rad
                 }
             }
@@ -361,7 +370,7 @@ function data()
             local group2 = part(info2, offsets)
             
             local lowerTracks = junction.generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
-            local upperTracks = junction.generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = coor.transZ(11), mvec = coor.I()})
+            local upperTracks = junction.generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ, mvec = coor.I()})
             
             local upperPolys =
                 junction.generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid)
@@ -384,8 +393,8 @@ function data()
                     TUpperExtTracks(upperTracks.ext),
                 },
                 models = func.concat(
-                    generateStructure(group1.lower, group1.upper)[1],
-                    generateStructure(group2.lower, group2.upper)[2]
+                    generateStructure(group1.lower, group1.upper, mTunnelZ)[1],
+                    generateStructure(group2.lower, group2.upper, mTunnelZ)[2]
                 ),
                 terrainAlignmentLists = {
                     {
@@ -394,11 +403,16 @@ function data()
                     },
                     {
                         type = "LESS",
-                        faces = {upperPolys * pipe.map(coor.transZ(11)) * pipe.map(coor.vec2Tuple)}
+                        faces = {upperPolys * pipe.map(mTunnelZ) * pipe.map(coor.vec2Tuple)}
                     },
                     {
-                        type = "EQUAL",
-                        faces = {lowerPolys * pipe.map(coor.vec2Tuple)}
+                        type = "LESS",
+                        faces = {lowerPolys * pipe.map(coor.vec2Tuple)},
+                        slopeLow = 0,
+                    },
+                    {
+                        type = "GREATER",
+                        faces = {lowerPolys * pipe.map(coor.vec2Tuple)},
                     }
                 }
             }

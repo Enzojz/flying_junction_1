@@ -238,7 +238,12 @@ pipe.from = function(...)
                 local result = rhs(table.unpack(lhs))
                 setmetatable(result, pipeMeta)
                 return result
-            end
+            end,
+            __add = function(lhs, rhs)
+                local result = pipe.concat(rhs)(lhs)
+                setmetatable(result, pipeMeta)
+                return result
+            end,
         })
     return retVal
 end
@@ -251,5 +256,4 @@ setmetatable(pipe.exec,
         end
     }
 )
-
 return pipe

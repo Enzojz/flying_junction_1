@@ -102,14 +102,14 @@ local function part(info, offsets)
 end
 
 local function generateStructure(lowerGroup, upperGroup, mZ)
-
+    
     local function mPlace(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
         local pt = guideline:pt(rad)
         return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y) * mZ * coor.transZ(-11)
     end
-
-
+    
+    
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
     -- local makeFence = junction.makeFn(mPlace, mRoofFenceF)
@@ -326,7 +326,7 @@ function data()
             local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local mTunnelZ = coor.transZ(tunnelHeightList[params.heightTunnel + 1])
-
+            
             local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
             local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
             local TLowerTracks = lowerTrackBuilder.nonAligned()

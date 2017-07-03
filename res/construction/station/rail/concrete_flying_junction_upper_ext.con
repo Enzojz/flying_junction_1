@@ -199,7 +199,7 @@ function data()
                 * func.map(groups.tracks, pipe.map(junction.generateArc))
                 * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
                 * pipe.map(function(ar) return pipe.new
-                    * {0, 0, slope.trans.dz, 5.5, height - slope.trans.dz, height, height}
+                    * {0, 0, slope.trans.dz, height * 0.5, height - slope.trans.dz, height, height}
                     * pipe.zip({0, 0, slope.slope, slope.slope, slope.slope, 0, 0}, {"z", "s"})
                     * function(lz) return
                         lz * pipe.range(1, #lz - 1)

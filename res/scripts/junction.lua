@@ -37,7 +37,7 @@ local function buildCoors(numTracks, groupSize)
 end
 
 local function normalizeRad(rad)
-    return (rad > math.pi * -0.5) and rad or normalizeRad(rad + math.pi * 2)
+    return (rad < math.pi * -0.5) and normalizeRad(rad + math.pi * 2) or ((rad > math.pi * 1.5) and normalizeRad(rad - math.pi * 2) or rad)
 end
 
 local generateArc = function(arc)

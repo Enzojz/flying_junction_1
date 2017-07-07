@@ -1,6 +1,7 @@
 local paramsutil = require "paramsutil"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
+local arc = require "flyingjunction/coorarc"
 local trackEdge = require "flyingjunction/trackedge"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
@@ -372,18 +373,66 @@ function data()
             local lowerTracks = junction.generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
             local upperTracks = junction.generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ, mvec = coor.I()})
             
+            
+            local generatePolyArcEdge = function(group, from, to, ext)
+                    
+                    return pipe.from(junction.normalizeRad(group.limits[from]), junction.normalizeRad(group.limits[to]) - junction.normalizeRad(group.limits[from]))
+                        * arc.coords(group.guideline, 5)
+                        * pipe.map(function(rad) return func.with(group.guideline:pt(rad), {z = 0, rad = rad}) end)
+            end
+            
+            
+            local function generatePolyArc(group1, group2)
+                
+                local groupExt = function(groups)
+                    local groupL, groupR = table.unpack(groups)
+                    local limitsExtender = function(ext)
+                        return function(group)
+                            local extValue = (junction.normalizeRad(group.limits.mid) > math.pi * 0.5 and -1 or 1) * ext / group.guideline.r
+                            return func.with(group,
+                                {
+                                    limits = {
+                                        inf = group.limits.inf - extValue,
+                                        mid = group.limits.mid,
+                                        sup = group.limits.sup + extValue
+                                    }
+                                }
+                        )
+                        end
+                    end
+                    
+                    local guidelineExtender = function(ext)
+                        return function(groupL, groupR)
+                            local extValue = groupL.guideline.r > groupR.guideline.r and ext or -ext
+                            return {
+                                func.with(groupL, {guideline = groupL.guideline + extValue}),
+                                func.with(groupR, {guideline = groupR.guideline + (-extValue)})
+                            }
+                        end
+                    end
+                    
+                    return pipe.new *
+                        guidelineExtender(1)(groupL, groupR)
+                        * pipe.map(limitsExtender(10))
+                end
+                
+                local gr1 = groupExt(group1)
+                local gr2 = groupExt(group2)
+                
+                return
+                    generatePolyArcEdge(gr1[2], "inf", "mid")
+                    + generatePolyArcEdge(gr2[2], "mid", "sup")
+                    + generatePolyArcEdge(gr2[1], "sup", "mid")
+                    + generatePolyArcEdge(gr1[1], "mid", "inf")
+            end
+            
             local upperPolys =
-                junction.generatePolyArcEdge(group1.upper.walls[2].guideline, group1.upper.tracks[1].limits.inf, group1.upper.tracks[1].limits.mid)
-                + junction.generatePolyArcEdge(group2.upper.walls[2].guideline, group2.upper.tracks[1].limits.mid, group2.upper.tracks[1].limits.sup)
-                + junction.generatePolyArcEdge(group2.upper.walls[1].guideline, group2.upper.tracks[1].limits.sup, group2.upper.tracks[1].limits.mid)
-                + junction.generatePolyArcEdge(group1.upper.walls[1].guideline, group1.upper.tracks[1].limits.mid, group1.upper.tracks[1].limits.inf)
+                  generatePolyArcEdge(group1.upper.walls[2], "inf", "mid")
+                + generatePolyArcEdge(group2.upper.walls[2], "mid", "sup")
+                + generatePolyArcEdge(group2.upper.walls[1], "sup", "mid")
+                + generatePolyArcEdge(group1.upper.walls[1], "mid", "inf")
             
-            local lowerPolys =
-                junction.generatePolyArcEdge(group1.lower.walls[2].guideline, group1.lower.tracks[1].limits.inf, group1.lower.tracks[1].limits.mid)
-                + junction.generatePolyArcEdge(group2.lower.walls[2].guideline, group2.lower.tracks[1].limits.mid, group2.lower.tracks[1].limits.sup)
-                + junction.generatePolyArcEdge(group2.lower.walls[1].guideline, group2.lower.tracks[1].limits.sup, group2.lower.tracks[1].limits.mid)
-                + junction.generatePolyArcEdge(group1.lower.walls[1].guideline, group1.lower.tracks[1].limits.mid, group1.lower.tracks[1].limits.inf)
-            
+            local lowerPolys = generatePolyArc(group1.lower.walls, group2.lower.walls)
             local result = {
                 edgeLists =
                 {

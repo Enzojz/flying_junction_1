@@ -11,7 +11,8 @@ function arc.new(a, b, r)
     setmetatable(result, {
     __sub = arc.intersectionArc,
     __div = arc.intersectionLine,
-    __mul = function(lhs, rhs) return arc.byOR(lhs.o, arc.r * rhs) end
+    __mul = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r * rhs) end,
+    __add = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r + rhs) end
 })
     return result
 end

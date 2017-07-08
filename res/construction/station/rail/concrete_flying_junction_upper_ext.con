@@ -9,7 +9,6 @@ local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
 
 -- local dump = require "datadumper"
-
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -64,7 +63,7 @@ local function defaultParams(param)
         return function(v) return v and v < u and v or d end
     end
     
-    func.forEach(params(), function(i) param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
+    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
 end
 
 function data()
@@ -116,26 +115,33 @@ function data()
                 * function()
                     local arc1 = arc.new(0, -slope.trans.r, slope.trans.r + height)
                     local arc2 = arc.new(slope.length, slope.trans.r, slope.trans.r)
+                    local pTr1 = arc1:pt(math.pi * 0.5 - slope.rad)
+                    local pTr2 = arc2:pt(-math.pi * 0.5 - slope.rad)
+                    local pTrM = coor.xy(slope.length * 0.5, height * 0.5)
                     return {
                         {
                             arc = arc1,
                             inf = arc1:pt(math.pi * 0.5),
-                            sup = arc1:pt(math.pi * 0.5 - slope.rad)
+                            sup = pTr1,
+                            pred = function(x) return x <= pTr1.x end
                         },
                         {
                             arc = arc.byOR(arc.byDR(arc1, 1e5):pt(math.pi * 0.5 - slope.rad), 1e5),
-                            inf = arc1:pt(math.pi * 0.5 - slope.rad),
-                            sup = coor.xy(slope.length * 0.5, height * 0.5)
+                            inf = pTr1,
+                            sup = pTrM,
+                            pred = function(x) return x > pTr1.x and x < pTrM.x end
                         },
                         {
                             arc = arc.byOR(arc.byDR(arc2, 1e5):pt(-math.pi * 0.5 - slope.rad), 1e5),
-                            inf = coor.xy(slope.length * 0.5, height * 0.5),
-                            sup = arc2:pt(-math.pi * 0.5 - slope.rad),
+                            inf = pTrM,
+                            sup = pTr2,
+                            pred = function(x) return x >= pTrM.x and x < pTr2.x end
                         },
                         {
                             arc = arc2,
-                            inf = arc2:pt(-math.pi * 0.5 - slope.rad),
-                            sup = arc2:pt(-math.pi * 0.5)
+                            inf = pTr2,
+                            sup = arc2:pt(-math.pi * 0.5),
+                            pred = function(x) return x >= pTr2.x end
                         }
                     }
                 end
@@ -144,7 +150,7 @@ function data()
             
             local function retriveZ(rx)
                 local x = (rx - radRef) / rad * slope.length
-                local pf = func.filter(slopeProfile, function(s) return (s.inf.x <= x and s.sup.x >= x) or (math.abs(s.inf.x - x) < 1e-5) or (math.abs(s.sup.x - x) < 1e-5) end)[1]
+                local pf = func.filter(slopeProfile, function(s) return s.pred(x) end)[1]
                 return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length() end)
             end
             
@@ -213,10 +219,12 @@ function data()
                 * station.prepareEdges
                 * trackBuilder.nonAligned()
             
-            local polys = junction.generatePolyArcEdge(groups.walls[2][1].guideline, groups.walls[2][1].limits.inf, groups.walls[2][2].limits.sup)
-                + junction.generatePolyArcEdge(groups.walls[1][1].guideline, groups.walls[1][2].limits.sup, groups.walls[1][1].limits.inf)
             
-            local polyTracks = polys * pipe.map(function(c) return coor.transZ(retriveZ(c.rad).y)(c) end)
+            local polys = pipe.new
+                / junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 0)
+                / junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 0)
+            
+            local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(retriveZ(c.rad).y)(c) end))
             
             local result =
                 {
@@ -225,11 +233,11 @@ function data()
                     terrainAlignmentLists = {
                         {
                             type = "GREATER",
-                            faces = {polys * pipe.map(coor.vec2Tuple)}
+                            faces = polys * pipe.map(pipe.map(coor.vec2Tuple))
                         },
                         {
                             type = "LESS",
-                            faces = {polyTracks * pipe.map(coor.vec2Tuple)}
+                            faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple))
                         }
                     }
                 }

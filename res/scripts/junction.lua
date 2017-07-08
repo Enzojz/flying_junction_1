@@ -37,7 +37,7 @@ local function buildCoors(numTracks, groupSize)
 end
 
 local function normalizeRad(rad)
-    return (rad < math.pi * -0.5) and normalizeRad(rad + math.pi * 2) or ((rad > math.pi * 1.5) and normalizeRad(rad - math.pi * 2) or rad)
+    return (rad < math.pi * -0.5) and normalizeRad(rad + math.pi * 2) or rad
 end
 
 local generateArc = function(arc)
@@ -156,10 +156,43 @@ local function makeFn(model, mPlace, m)
     end
 end
 
-local generatePolyArcEdge = function(guideline, from, to)
-    return pipe.from(normalizeRad(from), normalizeRad(to) - normalizeRad(from))
-        * arc.coords(guideline, 5)
-        * pipe.map(function(rad) return func.with(guideline:pt(rad), {z = 0, rad = rad}) end)
+local generatePolyArcEdge = function(group, from, to)
+    return pipe.from(normalizeRad(group.limits[from]), normalizeRad(group.limits[to]) - normalizeRad(group.limits[from]))
+        * arc.coords(group.guideline, 5)
+        * pipe.map(function(rad) return func.with(group.guideline:pt(rad), {z = 0, rad = rad}) end)
+end
+
+local generatePolyArc = function(groups, from, to)
+    return function(extLon, extLat)
+        local groupL, groupR = table.unpack(groups)
+        local limitsExtender = function(ext)
+            return function(group)
+                local extValue = (normalizeRad(group.limits.mid) > math.pi * 0.5 and -1 or 1) * ext / group.guideline.r
+                return func.with(group,
+                    {
+                        limits = {
+                            inf = group.limits.inf - extValue,
+                            mid = group.limits.mid,
+                            sup = group.limits.sup + extValue
+                        }
+                    }
+            )
+            end
+        end
+        
+        local guidelineExtender = function(ext)
+            local extValue = groupL.guideline.r > groupR.guideline.r and ext or -ext
+            return {
+                func.with(groupL, {guideline = groupL.guideline + extValue}),
+                func.with(groupR, {guideline = groupR.guideline + (-extValue)})
+            }
+        end
+        
+        local nG = func.map(guidelineExtender(extLat), limitsExtender(extLon))
+        
+        return generatePolyArcEdge(nG[2], from, to)
+            + generatePolyArcEdge(nG[1], to, from)
+    end
 end
 
 return {
@@ -168,6 +201,7 @@ return {
     minimalR = minimalR,
     generateTrackGroups = generateTrackGroups,
     generatePolyArcEdge = generatePolyArcEdge,
+    generatePolyArc = generatePolyArc,
     generateArc = generateArc,
     makeFn = makeFn,
     normalizeRad = normalizeRad,

@@ -10,10 +10,8 @@ local junction = require "junction"
 
 -- local dump = require "datadumper"
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
-local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
-local bridgeType = "z_concrete_flying_junction.lua"
 
 local rList = {1e5, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 0.1}
 local slopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
@@ -47,6 +45,12 @@ local function params()
             name = _("Slope(‰)"),
             values = func.map(slopeList, tostring),
             defaultIndex = 3
+        },
+        {
+            key = "isDescding",
+            name = _("Direction"),
+            values = {"↗", "↘"},
+            defaultIndex = 0
         },
         {
             key = "dz",
@@ -85,20 +89,23 @@ function data()
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
             local catenary = params.catenary == 1
             local trackBuilder = trackEdge.builder(catenary, trackType)
-            local height = heightList[params.dz + 1]
+            local sFactor = params.isDescding == 1 and 1 or -1
+            local height = sFactor * heightList[params.dz + 1]
+            
+            local function isDesc(a, b) return height > 0 and a or b end
             
             local nbTracks = params.nbTracks + 1
             local r = rList[params.radius + 1] * 1000
             
             local slope = pipe.exec
                 * function()
-                    local slope = slopeList[params.slope + 1] * 0.001
+                    local slope = sFactor * slopeList[params.slope + 1] * 0.001
                     local rad = math.atan(slope)
                     local rTrans = 300
                     local trans = {
                         r = rTrans,
-                        dz = rTrans * (1 - math.cos(rad)),
-                        length = rTrans * math.sin(rad)
+                        dz = sFactor * rTrans * (1 - math.cos(rad)),
+                        length = sFactor * rTrans * math.sin(rad)
                     }
                     return {
                         slope = slope,
@@ -113,26 +120,28 @@ function data()
             
             local slopeProfile = pipe.exec
                 * function()
-                    local arc1 = arc.new(0, -slope.trans.r, slope.trans.r + height)
-                    local arc2 = arc.new(slope.length, slope.trans.r, slope.trans.r)
-                    local pTr1 = arc1:pt(math.pi * 0.5 - slope.rad)
-                    local pTr2 = arc2:pt(-math.pi * 0.5 - slope.rad)
+                    local ref1 = sFactor * math.pi * 0.5
+                    local ref2 = -ref1
+                    local arc1 = arc.byOR(coor.xy(0, -sFactor * slope.trans.r + height), slope.trans.r)
+                    local arc2 = arc.byOR(coor.xy(slope.length, sFactor * slope.trans.r), slope.trans.r)
+                    local pTr1 = arc1:pt(ref1 - slope.rad)
+                    local pTr2 = arc2:pt(ref2 - slope.rad)
                     local pTrM = coor.xy(slope.length * 0.5, height * 0.5)
                     return {
                         {
                             arc = arc1,
-                            inf = arc1:pt(math.pi * 0.5),
+                            inf = arc1:pt(ref1),
                             sup = pTr1,
                             pred = function(x) return x <= pTr1.x end
                         },
                         {
-                            arc = arc.byOR(arc.byDR(arc1, 1e5):pt(math.pi * 0.5 - slope.rad), 1e5),
+                            arc = arc.byOR(arc.byDR(arc1, 1e5):pt(ref1 - slope.rad), 1e5),
                             inf = pTr1,
                             sup = pTrM,
                             pred = function(x) return x > pTr1.x and x < pTrM.x end
                         },
                         {
-                            arc = arc.byOR(arc.byDR(arc2, 1e5):pt(-math.pi * 0.5 - slope.rad), 1e5),
+                            arc = arc.byOR(arc.byDR(arc2, 1e5):pt(ref2 - slope.rad), 1e5),
                             inf = pTrM,
                             sup = pTr2,
                             pred = function(x) return x >= pTrM.x and x < pTr2.x end
@@ -140,7 +149,7 @@ function data()
                         {
                             arc = arc2,
                             inf = pTr2,
-                            sup = arc2:pt(-math.pi * 0.5),
+                            sup = arc2:pt(ref2),
                             pred = function(x) return x >= pTr2.x end
                         }
                     }
@@ -154,10 +163,15 @@ function data()
                 return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length() end)
             end
             
-            local function mPlace(guideline, rad1, rad2)
+            local function mPlaceA(guideline, rad1, rad2)
                 local radc = (rad1 + rad2) * 0.5
                 local p1, p2 = retriveZ(rad1), retriveZ(rad2)
                 return coor.shearZoY((p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+            end
+            
+            local function mPlaceD(guideline, rad1, rad2)
+                local radc = (rad1 + rad2) * 0.5
+                return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
             end
             
             local offsets = junction.buildCoors(nbTracks, nbTracks)
@@ -197,9 +211,9 @@ function data()
                     * pipe.flatten()
             end
             local walls =
-                makeStructure(groups.walls, junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05)))
-                + makeStructure(groups.walls, junction.makeFn(mRoofFenceS, mPlace, coor.scaleY(1.05)))
-                + makeStructure(groups.tracks, junction.makeFn(mRoof, mPlace, coor.scaleY(1.05)))
+                makeStructure(groups.walls, junction.makeFn(mSidePillar, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
+                + makeStructure(groups.walls, junction.makeFn(mRoofFenceS, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
+                + makeStructure(groups.tracks, junction.makeFn(mRoof, mPlaceA, coor.scaleY(1.05)))
             
             local edges = pipe.new
                 * func.map(groups.tracks, pipe.map(junction.generateArc))
@@ -221,8 +235,8 @@ function data()
             
             
             local polys = pipe.new
-                / junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 0)
-                / junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 0)
+                / junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
+                / junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 1)
             
             local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(retriveZ(c.rad).y)(c) end))
             
@@ -232,12 +246,22 @@ function data()
                     models = walls,
                     terrainAlignmentLists = {
                         {
-                            type = "GREATER",
-                            faces = polys * pipe.map(pipe.map(coor.vec2Tuple))
+                            type = isDesc("GREATER", "LESS"),
+                            faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
+                            slopeLow = 0.75,
+                            slopeHigh = 0.75,
                         },
                         {
                             type = "LESS",
-                            faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple))
+                            faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
+                            slopeLow = isDesc(0.75, 0),
+                            slopeHigh = isDesc(0.75, 0),
+                        },
+                        {
+                            type = "GREATER",
+                            faces = isDesc({}, polyTracks * pipe.map(pipe.map(coor.vec2Tuple))),
+                            slopeLow = 0.75,
+                            slopeHigh = 0.75,
                         }
                     }
                 }

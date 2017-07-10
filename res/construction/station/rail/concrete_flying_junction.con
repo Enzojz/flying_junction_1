@@ -4,6 +4,7 @@ local coor = require "flyingjunction/coor"
 local arc = require "flyingjunction/coorarc"
 local trackEdge = require "flyingjunction/trackedge"
 local pipe = require "flyingjunction/pipe"
+local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
@@ -374,12 +375,12 @@ function data()
             local upperTracks = junction.generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ, mvec = coor.I()})
                        
             local upperPolys = pipe.new
-                / junction.generatePolyArc(group1.upper.walls, "inf", "mid")(0, 0)
-                / junction.generatePolyArc(group2.upper.walls, "mid", "sup")(0, 0)
+                + junction.generatePolyArc(group1.upper.walls, "inf", "mid")(0, 0)
+                + junction.generatePolyArc(group2.upper.walls, "mid", "sup")(0, 0)
             
             local lowerPolys = pipe.new
-                / junction.generatePolyArc(group1.lower.walls, "inf", "mid")(10, 1)
-                / junction.generatePolyArc(group2.lower.walls, "mid", "sup")(10, 1)
+                + junction.generatePolyArc(group1.lower.walls, "inf", "mid")(10, 1)
+                + junction.generatePolyArc(group2.lower.walls, "mid", "sup")(10, 1)
             
             local result = {
                 edgeLists =
@@ -414,40 +415,13 @@ function data()
                 }
             }
             
-            
             -- End of generation
             -- Slope, Height, Mirror treatment
-            local slope = slopeList[params.slope + 1]
-            local ha = heightList[params.height + 1]
-            local mirrored = params.isMir == 1
-            local mz = coor.transZ(ha)
-            local mr = coor.rotX(math.atan(slope * 0.001))
-            local mf = mirrored and coor.flipX() or coor.I()
-            local mpt = mf * mr * mz
-            local mvec = mf * mr
-            
-            local mapEdgeList = function(edgeList)
-                return func.with(edgeList, {edges = func.map(edgeList.edges, coor.applyEdge(mpt, mvec))})
-            end
-            
-            local mapModel = function(model) return func.with(model, {transf = model.transf * mpt}) end
-            
-            local mapTerrainList = function(ta)
-                local mapTerrain = function(t) return (coor.tuple2Vec(t) .. mpt):toTuple() end
-                local mapFaces = function(faces) return (mirrored and func.rev or func.nop)(func.map(faces, mapTerrain)) end
-                return func.with(ta, {faces = func.map(ta.faces, mapFaces)})
-            end
-            
-            return func.with(result,
-                {
-                    edgeLists = func.map(result.edgeLists, mapEdgeList),
-                    models = func.map(result.models, mapModel),
-                    terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList),
-                    groundFaces = {},
-                    terminalGroups = {},
-                    cost = 1000,
-                    maintenanceCost = 1000 / 6
-                })
+            return pipe.new
+                * result
+                * station.setMirror(params.isMir == 1)
+                * station.setSlope(slopeList[params.slope + 1])
+                * station.setHeight(heightList[params.height + 1])
         end
     }
 

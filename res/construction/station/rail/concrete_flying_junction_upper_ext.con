@@ -8,7 +8,6 @@ local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
 
--- local dump = require "datadumper"
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
@@ -44,7 +43,7 @@ local function params()
             key = "slope",
             name = _("Slope(‰)"),
             values = func.map(slopeList, tostring),
-            defaultIndex = 3
+            defaultIndex = #slopeList - 1
         },
         {
             key = "isDescding",
@@ -129,36 +128,48 @@ function data()
                     local pTrM = coor.xy(slope.length * 0.5, height * 0.5)
                     return {
                         {
+                            arc = arc.byOR(coor.xy(0, -sFactor * 1e5 + height), 1e5),
+                            inf = arc1:pt(ref1),
+                            sup = arc1:pt(ref1),
+                            pred = function(x) return x < 0 end,
+                        },
+                        {
                             arc = arc1,
                             inf = arc1:pt(ref1),
                             sup = pTr1,
-                            pred = function(x) return x <= pTr1.x end
+                            pred = function(x) return x >= 0 and x <= pTr1.x end,
                         },
                         {
                             arc = arc.byOR(arc.byDR(arc1, 1e5):pt(ref1 - slope.rad), 1e5),
                             inf = pTr1,
                             sup = pTrM,
-                            pred = function(x) return x > pTr1.x and x < pTrM.x end
+                            pred = function(x) return x > pTr1.x and x < pTrM.x end,
                         },
                         {
                             arc = arc.byOR(arc.byDR(arc2, 1e5):pt(ref2 - slope.rad), 1e5),
                             inf = pTrM,
                             sup = pTr2,
-                            pred = function(x) return x >= pTrM.x and x < pTr2.x end
+                            pred = function(x) return x >= pTrM.x and x < pTr2.x end,
                         },
                         {
                             arc = arc2,
                             inf = pTr2,
                             sup = arc2:pt(ref2),
-                            pred = function(x) return x >= pTr2.x end
-                        }
+                            pred = function(x) return x >= pTr2.x and x<= slope.length end,
+                        },
+                        {
+                            arc = arc.byOR(coor.xy(slope.length, sFactor * 1e5), 1e5),
+                            inf = arc2:pt(ref2),
+                            sup = arc2:pt(ref2),
+                            pred = function(x) return x > slope.length end,
+                        },
                     }
                 end
             
-            local radRef = (r > 0 and math.pi or 0)
+            local radRef = math.pi
             
             local function retriveZ(rx)
-                local x = (rx - radRef) / rad * slope.length
+                local x = slope.length * (rx - radRef) / rad
                 local pf = func.filter(slopeProfile, function(s) return s.pred(x) end)[1]
                 return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length() end)
             end
@@ -213,7 +224,7 @@ function data()
             local walls =
                 makeStructure(groups.walls, junction.makeFn(mSidePillar, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
                 + makeStructure(groups.walls, junction.makeFn(mRoofFenceS, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
-                + makeStructure(groups.tracks, junction.makeFn(mRoof, mPlaceA, coor.scaleY(1.05)))
+                + (height < 0 and {} or makeStructure(groups.tracks, junction.makeFn(mRoof, mPlaceA, coor.scaleY(1.05))))
             
             local edges = pipe.new
                 * func.map(groups.tracks, pipe.map(junction.generateArc))
@@ -235,11 +246,11 @@ function data()
             
             
             local polys = pipe.new
-                / junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
-                / junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 1)
+                + junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
+                + junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 1)
             
             local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(retriveZ(c.rad).y)(c) end))
-            
+
             local result =
                 {
                     edgeLists = {edges},
@@ -269,32 +280,10 @@ function data()
             
             -- End of generation
             -- Slope, Height, Mirror treatment
-            local mirrored = params.isMir == 1
-            local mf = mirrored and coor.flipX() or coor.I()
-            local mpt, mvec = mf, mf
+            return pipe.new
+                * result
+                * station.setMirror(params.isMir == 1)
             
-            local mapEdgeList = function(edgeList)
-                return func.with(edgeList, {edges = func.map(edgeList.edges, coor.applyEdge(mpt, mvec))})
-            end
-            
-            local mapModel = function(model) return func.with(model, {transf = model.transf * mpt}) end
-            
-            local mapTerrainList = function(ta)
-                local mapTerrain = function(t) return (coor.tuple2Vec(t) .. mpt):toTuple() end
-                local mapFaces = function(faces) return (mirrored and func.rev or func.nop)(func.map(faces, mapTerrain)) end
-                return func.with(ta, {faces = func.map(ta.faces, mapFaces)})
-            end
-            
-            return func.with(result,
-                {
-                    edgeLists = func.map(result.edgeLists, mapEdgeList),
-                    models = func.map(result.models, mapModel),
-                    terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList),
-                    groundFaces = {},
-                    terminalGroups = {},
-                    cost = 1000,
-                    maintenanceCost = 1000 / 6
-                })
         end
     }
 

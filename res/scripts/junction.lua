@@ -163,8 +163,8 @@ local generatePolyArcEdge = function(group, from, to)
 end
 
 local generatePolyArc = function(groups, from, to)
+    local groupL, groupR = table.unpack(groups)
     return function(extLon, extLat)
-        local groupL, groupR = table.unpack(groups)
         local limitsExtender = function(ext)
             return function(group)
                 local extValue = (normalizeRad(group.limits.mid) > math.pi * 0.5 and -1 or 1) * ext / group.guideline.r
@@ -191,7 +191,16 @@ local generatePolyArc = function(groups, from, to)
         local nG = func.map(guidelineExtender(extLat), limitsExtender(extLon))
         
         return generatePolyArcEdge(nG[2], from, to)
-            + generatePolyArcEdge(nG[1], to, from)
+            * function(ls) return ls * pipe.range(1, #ls - 1)
+                * pipe.map2(ls * pipe.range(2, #ls),
+                    function(f, t) return
+                        {
+                            f, t,
+                            func.with(nG[1].guideline:pt(t.rad), {z = 0, rad = t.rad}),
+                            func.with(nG[1].guideline:pt(f.rad), {z = 0, rad = f.rad}),
+                        }
+                    end)
+            end
     end
 end
 
@@ -200,7 +209,6 @@ return {
     buildCoors = buildCoors,
     minimalR = minimalR,
     generateTrackGroups = generateTrackGroups,
-    generatePolyArcEdge = generatePolyArcEdge,
     generatePolyArc = generatePolyArc,
     generateArc = generateArc,
     makeFn = makeFn,

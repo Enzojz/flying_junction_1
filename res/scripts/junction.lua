@@ -163,7 +163,7 @@ local generatePolyArcEdge = function(group, from, to)
 end
 
 local generatePolyArc = function(groups, from, to)
-    local groupL, groupR = table.unpack(groups)
+    local groupI, groupO = table.unpack(func.sort(groups, function(p, q) return p.guideline.r < q.guideline.r end))
     return function(extLon, extLat)
         local limitsExtender = function(ext)
             return function(group)
@@ -179,25 +179,22 @@ local generatePolyArc = function(groups, from, to)
             )
             end
         end
-        
-        local guidelineExtender = function(ext)
-            local extValue = groupL.guideline.r > groupR.guideline.r and ext or -ext
-            return {
-                func.with(groupL, {guideline = groupL.guideline + extValue}),
-                func.with(groupR, {guideline = groupR.guideline + (-extValue)})
-            }
-        end
-        
-        local nG = func.map(guidelineExtender(extLat), limitsExtender(extLon))
-        
-        return generatePolyArcEdge(nG[2], from, to)
+
+        local groupL, groupR = table.unpack(
+            pipe.new
+            / func.with(groupO, {guideline = groupO.guideline + extLat})
+            / func.with(groupI, {guideline = groupI.guideline + (-extLat)})
+            * pipe.map(limitsExtender(extLon))
+            * pipe.sort(function(p, q) return p.guideline.o.x < q.guideline.o.y end)
+        )
+        return generatePolyArcEdge(groupR, from, to)
             * function(ls) return ls * pipe.range(1, #ls - 1)
                 * pipe.map2(ls * pipe.range(2, #ls),
                     function(f, t) return
                         {
                             f, t,
-                            func.with(nG[1].guideline:pt(t.rad), {z = 0, rad = t.rad}),
-                            func.with(nG[1].guideline:pt(f.rad), {z = 0, rad = f.rad}),
+                            func.with(groupL.guideline:pt(t.rad), {z = 0, rad = t.rad}),
+                            func.with(groupL.guideline:pt(f.rad), {z = 0, rad = f.rad}),
                         }
                     end)
             end

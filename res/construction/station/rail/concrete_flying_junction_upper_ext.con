@@ -94,7 +94,7 @@ function data()
             local function isDesc(a, b) return height > 0 and a or b end
             
             local nbTracks = params.nbTracks + 1
-            local r = rList[params.radius + 1] * 1000
+            local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
             
             local slope = pipe.exec
                 * function()
@@ -129,55 +129,49 @@ function data()
                     return {
                         {
                             arc = arc.byOR(coor.xy(0, -sFactor * 1e5 + height), 1e5),
-                            inf = arc1:pt(ref1),
-                            sup = arc1:pt(ref1),
+                            ref = height > 0 and func.max or func.min,
                             pred = function(x) return x < 0 end,
                         },
                         {
                             arc = arc1,
-                            inf = arc1:pt(ref1),
-                            sup = pTr1,
+                            ref = height > 0 and func.max or func.min,
                             pred = function(x) return x >= 0 and x <= pTr1.x end,
                         },
                         {
                             arc = arc.byOR(arc.byDR(arc1, 1e5):pt(ref1 - slope.rad), 1e5),
-                            inf = pTr1,
-                            sup = pTrM,
+                            ref = height < 0 and func.max or func.min,
                             pred = function(x) return x > pTr1.x and x < pTrM.x end,
                         },
                         {
                             arc = arc.byOR(arc.byDR(arc2, 1e5):pt(ref2 - slope.rad), 1e5),
-                            inf = pTrM,
-                            sup = pTr2,
+                            ref = height > 0 and func.max or func.min,
                             pred = function(x) return x >= pTrM.x and x < pTr2.x end,
                         },
                         {
                             arc = arc2,
-                            inf = pTr2,
-                            sup = arc2:pt(ref2),
-                            pred = function(x) return x >= pTr2.x and x<= slope.length end,
+                            ref = height < 0 and func.max or func.min,
+                            pred = function(x) return x >= pTr2.x and x <= slope.length end,
                         },
                         {
                             arc = arc.byOR(coor.xy(slope.length, sFactor * 1e5), 1e5),
-                            inf = arc2:pt(ref2),
-                            sup = arc2:pt(ref2),
+                            ref = height < 0 and func.max or func.min,
                             pred = function(x) return x > slope.length end,
                         },
                     }
                 end
             
-            local radRef = math.pi
+            local radRef = r > 0 and math.pi or 0
             
             local function retriveZ(rx)
                 local x = slope.length * (rx - radRef) / rad
                 local pf = func.filter(slopeProfile, function(s) return s.pred(x) end)[1]
-                return func.min(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return (p - (pf.inf + pf.sup) * 0.5):length() < (q - (pf.inf + pf.sup) * 0.5):length() end)
+                return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
             end
             
             local function mPlaceA(guideline, rad1, rad2)
                 local radc = (rad1 + rad2) * 0.5
                 local p1, p2 = retriveZ(rad1), retriveZ(rad2)
-                return coor.shearZoY((p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+                return coor.shearZoY((r > 0 and 1 or -1) * (p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
             end
             
             local function mPlaceD(guideline, rad1, rad2)
@@ -250,8 +244,8 @@ function data()
                 + junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 1)
             
             local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(retriveZ(c.rad).y)(c) end))
-
-            local result =
+            
+            return
                 {
                     edgeLists = {edges},
                     models = walls,
@@ -276,14 +270,13 @@ function data()
                         }
                     }
                 }
-            
-            
-            -- End of generation
-            -- Slope, Height, Mirror treatment
-            return pipe.new
-                * result
-                * station.setMirror(params.isMir == 1)
-            
+        
+        
+        -- -- End of generation
+        -- -- Slope, Height, Mirror treatment
+        -- return pipe.new
+        --     * result
+        --     * station.setMirror(params.isMir == 1)
         end
     }
 

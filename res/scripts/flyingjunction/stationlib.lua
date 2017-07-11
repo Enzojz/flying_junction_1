@@ -3,19 +3,19 @@ local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
 
-local newModel = function(m, ...)
-    return {
-        id = m,
-        transf = coor.mul(...)
-    }
-end
-
 
 local stationlib = {
     platformWidth = 5,
     trackWidth = 5,
     segmentLength = 20
 }
+
+stationlib.newModel = function(m, ...)
+    return {
+        id = m,
+        transf = coor.mul(...)
+    }
+end
 
 
 stationlib.generateTrackGroups = function(xOffsets, length, extra)
@@ -131,7 +131,7 @@ stationlib.makePlatforms = function(uOffsets, platforms, m)
     return func.mapFlatten(uOffsets,
         function(uOffset)
             return func.map2(func.seq(1, #platforms), platforms, function(i, p)
-                return newModel(p, coor.transY(i * stationlib.segmentLength - 0.5 * (stationlib.segmentLength + length)), uOffset.mpt, m) end
+                return stationlib.newModel(p, coor.transY(i * stationlib.segmentLength - 0.5 * (stationlib.segmentLength + length)), uOffset.mpt, m) end
         )
         end)
 end

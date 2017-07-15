@@ -96,7 +96,7 @@ local generatePolyArcEdge = function(group, from, to)
 end
 
 junction.generatePolyArc = function(groups, from, to)
-    local groupI, groupO = table.unpack(func.sort(groups, function(p, q) return p.guideline.r < q.guideline.r end))
+    local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.guideline.r < q.guideline.r end))
     return function(extLon, extLat)
         local limitsExtender = function(ext)
             return function(group)

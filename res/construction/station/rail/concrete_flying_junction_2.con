@@ -1,4 +1,4 @@
-local jAssoc = require "junction_assoc"
+local jMain = require "junction_main"
 
 function data()
     return {
@@ -10,10 +10,15 @@ function data()
         availability = {
             yearFrom = 1892
         },
-        order = 27218,
-        params = jAssoc.params(),
+        order = 27220,
+        params = jMain.params(),
         
-        updateFn = jAssoc.updateFn
+        updateFn = jMain.updateFn(function(params)
+            params.fRLower1 = 1
+            params.fRLower2 = -1
+            params.fRUpper1 = -1
+            params.fRUpper2 = 1
+        end
+    )
     }
-
 end

@@ -6,6 +6,8 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 
+local dump = require "datadumper"
+
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -410,8 +412,8 @@ local updateFn = function(fParams)
             + junction.generatePolyArc(group2.upper.walls, "mid", "sup")(0, 0)
         
         local lowerPolys = pipe.new
-            + junction.generatePolyArc(group1.lower.walls, "inf", "mid")(10, 1)
-            + junction.generatePolyArc(group2.lower.walls, "mid", "sup")(0, 0)
+            + junction.generatePolyArc(group1.lower.tracks, "inf", "mid")(10, 3.5)
+            + junction.generatePolyArc(group2.lower.tracks, "mid", "sup")(10, 3.5)
         
         local result = {
             edgeLists =

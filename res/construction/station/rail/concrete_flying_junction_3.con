@@ -11,7 +11,7 @@ function data()
             yearFrom = 1892
         },
         order = 27221,
-        params = jMain.params(),
+        params = jMain.params({"params.curvedLevel"}),
         
         updateFn = jMain.updateFn(function(params)
             params.fRLower1 = -1

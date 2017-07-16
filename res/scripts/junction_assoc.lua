@@ -61,6 +61,122 @@ local function params()
 
 end
 
+local retriveRadXY = function(initPt, initRad, r, slope)
+    local rad = slope.length / r
+    local radT = slope.trans.length / slope.length * rad
+    local radRef = initRad + (r > 0 and math.pi or 0)
+    local limits = {
+        {
+            inf = radRef + rad,
+            mid = radRef + rad - radT,
+            sup = radRef + 0.5 * rad,
+        },
+        {
+            inf = radRef + 0.5 * rad,
+            mid = radRef + radT,
+            sup = radRef,
+        },
+    }
+    local guideline = arc.byOR(
+        coor.xyz(r, 0, 0) .. coor.rotZ(initRad) * coor.trans(initPt),
+        math.abs(r)
+    )
+    return
+        function(offsets) return pipe.new
+            * offsets
+            * pipe.map(function(o) return
+                func.map(limits,
+                    function(l) return
+                        {
+                            limits = l,
+                            guideline = guideline + o
+                        }
+                    end)
+            end)
+        end,
+        function(profile)
+            return function(rx)
+                local x = slope.length * (rx - radRef) / rad
+                local pf = func.filter(profile, function(s) return s.pred(x) end)[1]
+                return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
+            end
+        end
+end
+
+local function gmPlaceA(fz, r)
+    return function(guideline, rad1, rad2)
+        local radc = (rad1 + rad2) * 0.5
+        local p1, p2 = fz(rad1), fz(rad2)
+        return coor.shearZoY((r > 0 and 1 or -1) * (p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+    end
+end
+
+local function mPlaceD(guideline, rad1, rad2)
+    local radc = (rad1 + rad2) * 0.5
+    return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
+end
+
+local generateSlope = function(slope, height)
+    local sFactor = slope > 0 and 1 or -1
+    local rad = math.atan(slope)
+    local rTrans = 300
+    local trans = {
+        r = rTrans,
+        dz = sFactor * rTrans * (1 - math.cos(rad)),
+        length = sFactor * rTrans * math.sin(rad)
+    }
+    return {
+        slope = slope,
+        rad = rad,
+        factor = sFactor,
+        length = (height - 2 * trans.dz) / slope + 2 * trans.length,
+        trans = trans,
+        height = height
+    }
+end
+
+local slopeProfile = function(slope)
+    local ref1 = slope.factor * math.pi * 0.5
+    local ref2 = -ref1
+    local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + slope.height), slope.trans.r)
+    local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r), slope.trans.r)
+    local pTr1 = arc1:pt(ref1 - slope.rad)
+    local pTr2 = arc2:pt(ref2 - slope.rad)
+    local pTrM = coor.xy(slope.length * 0.5, slope.height * 0.5)
+    return {
+        {
+            arc = arc.byOR(coor.xy(0, -slope.factor * 1e5 + slope.height), 1e5),
+            ref = slope.height > 0 and func.max or func.min,
+            pred = function(x) return x < 0 end,
+        },
+        {
+            arc = arc1,
+            ref = slope.height > 0 and func.max or func.min,
+            pred = function(x) return x >= 0 and x <= pTr1.x end,
+        },
+        {
+            arc = arc.byOR(arc.byDR(arc1, 1e5):pt(ref1 - slope.rad), 1e5),
+            ref = slope.height < 0 and func.max or func.min,
+            pred = function(x) return x > pTr1.x and x < pTrM.x end,
+        },
+        {
+            arc = arc.byOR(arc.byDR(arc2, 1e5):pt(ref2 - slope.rad), 1e5),
+            ref = slope.height > 0 and func.max or func.min,
+            pred = function(x) return x >= pTrM.x and x < pTr2.x end,
+        },
+        {
+            arc = arc2,
+            ref = slope.height < 0 and func.max or func.min,
+            pred = function(x) return x >= pTr2.x and x <= slope.length end,
+        },
+        {
+            arc = arc.byOR(coor.xy(slope.length, slope.factor * 1e5), 1e5),
+            ref = slope.height < 0 and func.max or func.min,
+            pred = function(x) return x > slope.length end,
+        },
+    }
+end
+
 local function defaultParams(param)
     local function limiter(d, u)
         return function(v) return v and v < u and v or d end
@@ -82,112 +198,14 @@ local updateFn = function(params)
     local nbTracks = params.nbTracks + 1
     local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
     
-    local slope = pipe.exec
-        * function()
-            local slope = sFactor * slopeList[params.slope + 1] * 0.001
-            local rad = math.atan(slope)
-            local rTrans = 300
-            local trans = {
-                r = rTrans,
-                dz = sFactor * rTrans * (1 - math.cos(rad)),
-                length = sFactor * rTrans * math.sin(rad)
-            }
-            return {
-                slope = slope,
-                rad = rad,
-                length = (height - 2 * trans.dz) / slope + 2 * trans.length,
-                trans = trans
-            }
-        end
+    local slope = generateSlope(sFactor * slopeList[params.slope + 1] * 0.001, height)
+    local profile = slopeProfile(slope)
     
-    local rad = slope.length / r
-    local radT = slope.trans.length / slope.length * rad
-    
-    local slopeProfile = pipe.exec
-        * function()
-            local ref1 = sFactor * math.pi * 0.5
-            local ref2 = -ref1
-            local arc1 = arc.byOR(coor.xy(0, -sFactor * slope.trans.r + height), slope.trans.r)
-            local arc2 = arc.byOR(coor.xy(slope.length, sFactor * slope.trans.r), slope.trans.r)
-            local pTr1 = arc1:pt(ref1 - slope.rad)
-            local pTr2 = arc2:pt(ref2 - slope.rad)
-            local pTrM = coor.xy(slope.length * 0.5, height * 0.5)
-            return {
-                {
-                    arc = arc.byOR(coor.xy(0, -sFactor * 1e5 + height), 1e5),
-                    ref = height > 0 and func.max or func.min,
-                    pred = function(x) return x < 0 end,
-                },
-                {
-                    arc = arc1,
-                    ref = height > 0 and func.max or func.min,
-                    pred = function(x) return x >= 0 and x <= pTr1.x end,
-                },
-                {
-                    arc = arc.byOR(arc.byDR(arc1, 1e5):pt(ref1 - slope.rad), 1e5),
-                    ref = height < 0 and func.max or func.min,
-                    pred = function(x) return x > pTr1.x and x < pTrM.x end,
-                },
-                {
-                    arc = arc.byOR(arc.byDR(arc2, 1e5):pt(ref2 - slope.rad), 1e5),
-                    ref = height > 0 and func.max or func.min,
-                    pred = function(x) return x >= pTrM.x and x < pTr2.x end,
-                },
-                {
-                    arc = arc2,
-                    ref = height < 0 and func.max or func.min,
-                    pred = function(x) return x >= pTr2.x and x <= slope.length end,
-                },
-                {
-                    arc = arc.byOR(coor.xy(slope.length, sFactor * 1e5), 1e5),
-                    ref = height < 0 and func.max or func.min,
-                    pred = function(x) return x > slope.length end,
-                },
-            }
-        end
-    
-    local radRef = r > 0 and math.pi or 0
-    
-    local function retriveZ(rx)
-        local x = slope.length * (rx - radRef) / rad
-        local pf = func.filter(slopeProfile, function(s) return s.pred(x) end)[1]
-        return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
-    end
-    
-    local function mPlaceA(guideline, rad1, rad2)
-        local radc = (rad1 + rad2) * 0.5
-        local p1, p2 = retriveZ(rad1), retriveZ(rad2)
-        return coor.shearZoY((r > 0 and 1 or -1) * (p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
-    end
-    
-    local function mPlaceD(guideline, rad1, rad2)
-        local radc = (rad1 + rad2) * 0.5
-        return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
-    end
     
     local offsets = junction.buildCoors(nbTracks, nbTracks)
-    local generateGroup = function(o) return pipe.new
-        * junction.fArcs(o, 0, r)
-        * pipe.map(function(t) return
-            {
-                {
-                    limits = {
-                        inf = radRef + rad,
-                        mid = radRef + rad - radT,
-                        sup = radRef + 0.5 * rad,
-                    },
-                    guideline = t,
-                },
-                {
-                    limits = {
-                        inf = radRef + 0.5 * rad,
-                        mid = radRef + radT,
-                        sup = radRef,
-                    },
-                    guideline = t,
-                }
-            } end)
-    end
+    local generateGroup, retrivefZ = retriveRadXY(coor.xyz(30, 40, 0), math.pi / 12, r, slope)
+    local fz = retrivefZ(profile)
+    local mPlaceA = gmPlaceA(fz, r)
     
     local groups = {
         tracks = generateGroup(offsets.tracks),
@@ -229,7 +247,7 @@ local updateFn = function(params)
         + junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
         + junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 1)
     
-    local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(retriveZ(c.rad).y)(c) end))
+    local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(fz(c.rad).y)(c) end))
     
     return
         {

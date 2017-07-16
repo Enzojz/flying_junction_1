@@ -38,19 +38,15 @@ end
 junction.generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
-    local radSup = junction.normalizeRad(arc.limits.sup)
-    local radMid = junction.normalizeRad(arc.limits.mid)
-    local radInf = junction.normalizeRad(arc.limits.inf)
-    
-    local sup = toXyz(arc.guideline:pt(radSup))
-    local inf = toXyz(arc.guideline:pt(radInf))
-    local mid = toXyz(arc.guideline:pt(radMid))
+    local sup = toXyz(arc.guideline:pt(arc.limits.sup))
+    local inf = toXyz(arc.guideline:pt(arc.limits.inf))
+    local mid = toXyz(arc.guideline:pt(arc.limits.mid))
     
     local toVector = function(rad) return coor.xyz(0, (arc.limits.mid > math.pi * 0.5 or arc.limits.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad) end
     
-    local vecSup = toVector(radSup)
-    local vecInf = toVector(radInf)
-    local vecMid = toVector(radMid)
+    local vecSup = toVector(arc.limits.sup)
+    local vecInf = toVector(arc.limits.inf)
+    local vecMid = toVector(arc.limits.mid)
     
     local supExt = sup + vecSup * 5
     local infExt = inf - vecInf * 5

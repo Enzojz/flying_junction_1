@@ -17,6 +17,7 @@ local bridgeType = "z_concrete_flying_junction.lua"
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
 local rList = {1e5, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
 
+local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
 local heightList = {-11, -8.7, -5, -2.5, -0.5, 0, 0.5, 2.5, 5}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
@@ -259,8 +260,9 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     }
 end
 
-local function params()
-    return {
+local function params(paramFilter)
+    return pipe.new * 
+    {
         paramsutil.makeTrackTypeParam(),
         paramsutil.makeTrackCatenaryParam(),
         {
@@ -282,6 +284,12 @@ local function params()
             defaultIndex = 1
         },
         {
+            key = "nbPerGroup",
+            name = _("Tracks per group"),
+            values = {_("1"), _("2"), _("All")},
+            defaultIndex = 1
+        },
+        {
             key = "heightTunnel",
             name = _("Tunnel Height") .. ("(m)"),
             values = func.map(tunnelHeightList, tostring),
@@ -299,6 +307,12 @@ local function params()
             values = func.seqMap({0, 9}, tostring),
         },
         {
+            key = "curvedLevel",
+            name = _("Curved levels"),
+            values = {_("Both"), _("Lower"), _("Upper")},
+            defaultIndex = 0
+        },
+        {
             key = "rLower",
             name = _("Radius of lower tracks"),
             values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
@@ -311,10 +325,16 @@ local function params()
             defaultIndex = 0
         },
         {
-            key = "nbPerGroup",
-            name = _("Tracks per group"),
-            values = {_("1"), _("2"), _("All")},
-            defaultIndex = 1
+            key = "transitionA",
+            name = _("Transition A"),
+            values = {_("Both"), _("Lower"), _("Upper")},
+            defaultIndex = 0
+        },
+        {
+            key = "trSlopeA",
+            name = _("Transition A Slope").."(‰)",
+            values = func.map(trSlopeList, tostring),
+            defaultIndex = 0
         },
         {
             key = "isMir",
@@ -335,6 +355,7 @@ local function params()
             defaultIndex = 5
         }
     }
+    * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
 
 end
 
@@ -343,7 +364,7 @@ local function defaultParams(param, fParams)
         return function(v) return v and v < u and v or d end
     end
     
-    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
+    func.forEach(params({}), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
 
     fParams(param)
 end
@@ -460,5 +481,6 @@ end
 
 return {
     updateFn = updateFn,
-    params = params
+    params = params,
+    rList = rList
 }

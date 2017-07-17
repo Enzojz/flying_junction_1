@@ -61,7 +61,14 @@ local function params()
 
 end
 
-local retriveRadXY = function(initPt, initRad, r, slope)
+local baseGuideline = function(initPt, initRad, r)
+    return arc.byOR(
+        coor.xyz(r, 0, 0) .. coor.rotZ(initRad) * coor.trans(initPt),
+        math.abs(r)
+)
+end
+
+local retriveGeometry = function(initRad, r, slope)
     local rad = slope.length / r
     local radT = slope.trans.length / slope.length * rad
     local radRef = initRad + (r > 0 and math.pi or 0)
@@ -77,30 +84,27 @@ local retriveRadXY = function(initPt, initRad, r, slope)
             sup = radRef,
         },
     }
-    local guideline = arc.byOR(
-        coor.xyz(r, 0, 0) .. coor.rotZ(initRad) * coor.trans(initPt),
-        math.abs(r)
-    )
-    return
-        function(offsets) return pipe.new
-            * offsets
-            * pipe.map(function(o) return
+    local resembleGroup = function(groups)
+        return pipe.new
+            * groups
+            * pipe.map(function(g) return
                 func.map(limits,
                     function(l) return
                         {
                             limits = l,
-                            guideline = guideline + o
+                            guideline = g.guideline
                         }
                     end)
             end)
-        end,
-        function(profile)
-            return function(rx)
-                local x = slope.length * (rx - radRef) / rad
-                local pf = func.filter(profile, function(s) return s.pred(x) end)[1]
-                return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
-            end
+    end
+    local retrivefZ = function(profile)
+        return function(rx)
+            local x = slope.length * (rx - radRef) / rad
+            local pf = func.filter(profile, function(s) return s.pred(x) end)[1]
+            return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
         end
+    end
+    return resembleGroup, retrivefZ
 end
 
 local function gmPlaceA(fz, r)
@@ -177,58 +181,37 @@ local slopeProfile = function(slope)
     }
 end
 
-local function defaultParams(param)
-    local function limiter(d, u)
-        return function(v) return v and v < u and v or d end
-    end
-    
-    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
+local makeStructure = function(group, fMake)
+    return group
+        * pipe.map(pipe.map(fMake))
+        * pipe.flatten()
+        * pipe.flatten()
+        * pipe.flatten()
 end
-local updateFn = function(params)
-    defaultParams(params)
+
+local comp = function(group, config)
+    local function isDesc(a, b) return config.height > 0 and a or b end
+    local slope = generateSlope(config.slope, config.height)
     
-    local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
-    local catenary = params.catenary == 1
-    local trackBuilder = trackEdge.builder(catenary, trackType)
-    local sFactor = params.isDescding == 1 and 1 or -1
-    local height = sFactor * heightList[params.dz + 1]
-    
-    local function isDesc(a, b) return height > 0 and a or b end
-    
-    local nbTracks = params.nbTracks + 1
-    local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
-    
-    local slope = generateSlope(sFactor * slopeList[params.slope + 1] * 0.001, height)
-    local profile = slopeProfile(slope)
-    
-    
-    local offsets = junction.buildCoors(nbTracks, nbTracks)
-    local generateGroup, retrivefZ = retriveRadXY(coor.xyz(30, 40, 0), math.pi / 12, r, slope)
-    local fz = retrivefZ(profile)
-    local mPlaceA = gmPlaceA(fz, r)
+    local resembleGroup, retrivefZ = retriveGeometry(config.initRad, config.r, slope)
+    local fz = retrivefZ(slopeProfile(slope))
+    local mPlaceA = gmPlaceA(fz, config.r)
     
     local groups = {
-        tracks = generateGroup(offsets.tracks),
-        walls = generateGroup(offsets.walls)
+        tracks = resembleGroup(group.tracks),
+        walls = resembleGroup(group.walls)
     }
     
-    local makeStructure = function(group, fMake)
-        return group
-            * pipe.map(pipe.map(fMake))
-            * pipe.flatten()
-            * pipe.flatten()
-            * pipe.flatten()
-    end
     local walls =
         makeStructure(groups.walls, junction.makeFn(mSidePillar, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
         + makeStructure(groups.walls, junction.makeFn(mRoofFenceS, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
-        + (height < 0 and {} or makeStructure(groups.tracks, junction.makeFn(mRoof, mPlaceA, coor.scaleY(1.05))))
+        + (slope.height < 0 and {} or makeStructure(groups.tracks, junction.makeFn(mRoof, mPlaceA, coor.scaleY(1.05))))
     
     local edges = pipe.new
         * func.map(groups.tracks, pipe.map(junction.generateArc))
         * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
         * pipe.map(function(ar) return pipe.new
-            * {0, 0, slope.trans.dz, height * 0.5, height - slope.trans.dz, height, height}
+            * {0, 0, slope.trans.dz, slope.height * 0.5, slope.height - slope.trans.dz, slope.height, slope.height}
             * pipe.zip({0, 0, slope.slope, slope.slope, slope.slope, 0, 0}, {"z", "s"})
             * function(lz) return
                 lz * pipe.range(1, #lz - 1)
@@ -239,9 +222,6 @@ local updateFn = function(params)
         * pipe.map(pipe.map(pipe.map(coor.vec2Tuple)))
         * pipe.map(pipe.zip({{true, false}, {false, false}, {false, false}, {false, false}, {false, false}, {false, true}}, {"edge", "snap"}))
         * pipe.flatten()
-        * station.prepareEdges
-        * trackBuilder.nonAligned()
-    
     
     local polys = pipe.new
         + junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
@@ -249,30 +229,78 @@ local updateFn = function(params)
     
     local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(fz(c.rad).y)(c) end))
     
+    return {
+        edges = edges,
+        models = walls,
+        terrainAlignmentLists = {
+            {
+                type = isDesc("GREATER", "LESS"),
+                faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
+                slopeLow = 0.75,
+                slopeHigh = 0.75,
+            },
+            {
+                type = "LESS",
+                faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
+                slopeLow = isDesc(0.75, 0),
+                slopeHigh = isDesc(0.75, 0),
+            },
+            {
+                type = "GREATER",
+                faces = isDesc({}, polyTracks * pipe.map(pipe.map(coor.vec2Tuple))),
+                slopeLow = 0.75,
+                slopeHigh = 0.75,
+            }
+        }
+    }
+end
+
+local composite = function(config)
+    local offsets = junction.buildCoors(config.nbTracks, config.nbTracks)
+    local guideline = baseGuideline(config.initPt, config.initRad, config.r)
+    
+    local groups = {
+        tracks = offsets.tracks * pipe.map(function(o) return {guideline = guideline + o} end),
+        walls = offsets.walls * pipe.map(function(o) return {guideline = guideline + o} end)
+    }
+    
+    return comp(groups, config)
+end
+
+local function defaultParams(param)
+    local function limiter(d, u)
+        return function(v) return v and v < u and v or d end
+    end
+    
+    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
+end
+
+local updateFn = function(params)
+    defaultParams(params)
+    
+    local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
+    local catenary = params.catenary == 1
+    local trackBuilder = trackEdge.builder(catenary, trackType)
+    local sFactor = params.isDescding == 1 and 1 or -1
+    local height = sFactor * heightList[params.dz + 1]
+    
+    local nbTracks = params.nbTracks + 1
+    local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
+    
+    local c = composite({
+        initPt = coor.xyz(30, 40, 0),
+        initRad = math.pi / 12,
+        slope = sFactor * slopeList[params.slope + 1] * 0.001,
+        height = height,
+        r = r,
+        nbTracks = nbTracks
+    })
+    
     return
         {
-            edgeLists = {edges},
-            models = walls,
-            terrainAlignmentLists = {
-                {
-                    type = isDesc("GREATER", "LESS"),
-                    faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
-                    slopeLow = 0.75,
-                    slopeHigh = 0.75,
-                },
-                {
-                    type = "LESS",
-                    faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
-                    slopeLow = isDesc(0.75, 0),
-                    slopeHigh = isDesc(0.75, 0),
-                },
-                {
-                    type = "GREATER",
-                    faces = isDesc({}, polyTracks * pipe.map(pipe.map(coor.vec2Tuple))),
-                    slopeLow = 0.75,
-                    slopeHigh = 0.75,
-                }
-            }
+            edgeLists = {c.edges * station.prepareEdges * trackBuilder.nonAligned()},
+            models = c.models,
+            terrainAlignmentLists = c.terrainAlignmentLists
         }
 end
 

@@ -10,8 +10,8 @@ junction.buildCoors = function(numTracks, groupSize)
     local function builder(xOffsets, uOffsets, baseX, nbTracks)
         local function caller(n)
             return builder(
-                func.concat(xOffsets, func.seqMap({1, n}, function(n) return baseX - 0.5 * station.trackWidth + n * station.trackWidth end)),
-                func.concat(uOffsets, {baseX + n * station.trackWidth + 0.25}),
+                xOffsets + func.seqMap({1, n}, function(n) return baseX - 0.5 * station.trackWidth + n * station.trackWidth end),
+                uOffsets + {baseX + n * station.trackWidth + 0.25},
                 baseX + n * station.trackWidth + 0.5,
                 nbTracks - n)
         end
@@ -19,8 +19,8 @@ junction.buildCoors = function(numTracks, groupSize)
             local offset = function(o) return o - baseX * 0.5 end
             return
                 {
-                    tracks = func.map(xOffsets, offset),
-                    walls = func.map(uOffsets, offset)
+                    tracks = xOffsets * pipe.map(offset),
+                    walls = uOffsets * pipe.map(offset)
                 }
         elseif (nbTracks < groupSize) then
             return caller(nbTracks)
@@ -28,7 +28,7 @@ junction.buildCoors = function(numTracks, groupSize)
             return caller(groupSize)
         end
     end
-    return builder({}, {0.25}, 0.5, numTracks)
+    return builder(pipe.new, pipe.new * {0.25}, 0.5, numTracks)
 end
 
 junction.normalizeRad = function(rad)

@@ -174,6 +174,18 @@ function pipe.rev()
     end
 end
 
+function pipe.plus(n)
+    return function(e)
+        return e + n
+    end
+end
+
+function pipe.neg()
+    return function(e)
+        return -e
+    end
+end
+
 function pipe.zip(ls2, name)
     name = name or {1, 2}
     return function(ls1)
@@ -187,6 +199,10 @@ function pipe.select(name)
     return function(el)
         return el[name]
     end
+end
+
+function pipe.noop(x)
+    return x
 end
 
 local pipeMeta = {

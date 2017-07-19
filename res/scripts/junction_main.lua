@@ -372,135 +372,163 @@ end
 
 local updateFn = function(fParams)
     return function(params)
-        defaultParams(params, fParams)
-        
-        local deg = listDegree[params.xDegDec + 1] + params.xDegUni
-        local rad = math.rad(deg)
-        
-        local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
-        local catenary = params.catenary == 1
-        local catenaryLower = func.contains({0, 1}, params.applyCatenary) and catenary
-        local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
-        local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
-        local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
-        local mTunnelZ = coor.transZ(tunnelHeight)
-        
-        local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
-        local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
-        local TLowerTracks = lowerTrackBuilder.nonAligned()
-        local TUpperTracks = upperTrackBuilder.nonAligned()
-        local TLowerExtTracks = lowerTrackBuilder.nonAligned()
-        local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
-        
-        local retriveR = function(param) return rList[param + 1] * 1000 end
-        
-        local info1 = {
-            lower = {
-                nbTracks = params.nbLowerTracks + 1,
-                r = retriveR(params.rLower) * params.fRLower1,
-                rad = -0.5 * rad
-            },
-            upper = {
-                nbTracks = params.nbUpperTracks + 1,
-                r = retriveR(params.rUpper) * params.fRUpper1,
-                rad = 0.5 * rad
-            }
-        }
-        local info2 = {
-            lower = {
-                nbTracks = params.nbLowerTracks + 1,
-                r = retriveR(params.rLower) * params.fRLower2,
-                rad = -0.5 * rad
-            },
-            upper = {
-                nbTracks = params.nbUpperTracks + 1,
-                r = retriveR(params.rUpper) * params.fRUpper2,
-                rad = 0.5 * rad
-            }
-        }
-        
-        local offsets = {
-            lower = junction.buildCoors(info1.lower.nbTracks, nbPerGroup),
-            upper = junction.buildCoors(info1.upper.nbTracks, info1.upper.nbTracks)
-        }
-        
-        local group1 = part(info1, offsets)
-        local group2 = part(info2, offsets)
-        
-        local rg1 = jA.comp(group1.upper,
-            {
-                initRad = group1.upper.tracks[1].limits.inf,
-                slope = trSlopeList[params.trSlopeA + 1] * 0.001,
-                height = tunnelHeight,
-                r = params.fRUpper1 * group1.upper.tracks[1].guideline.r,
-            })
-        
-        local rg2 = jA.comp(group2.upper,
-            {
-                initRad = group2.upper.tracks[1].limits.sup,
-                slope = trSlopeList[params.trSlopeA + 1] * 0.001,
-                height = tunnelHeight,
-                r = params.fRUpper2 * group2.upper.tracks[1].guideline.r,
-            })
-        
-        local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
-        local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ, mvec = coor.I()})
-        
-        local upperPolys = pipe.new
-            + junction.generatePolyArc(group1.upper.walls, "inf", "mid")(0, 0)
-            + junction.generatePolyArc(group2.upper.walls, "mid", "sup")(0, 0)
-        
-        local lowerPolys = pipe.new
-            + junction.generatePolyArc(group1.lower.tracks, "inf", "mid")(10, 3.5)
-            + junction.generatePolyArc(group2.lower.tracks, "mid", "sup")(10, 3.5)
-        
-        local result = {
-            edgeLists =
-            {
-                TUpperTracks(upperTracks.normal),
-                TLowerTracks(lowerTracks.normal),
-                rg1.edges * station.prepareEdges * TUpperTracks
-            -- rg2.edges * station.prepareEdges * TUpperTracks,
-            -- TLowerExtTracks(lowerTracks.ext),
-            -- TUpperExtTracks(upperTracks.ext),
-            },
-            models = pipe.new
-            + generateStructure(group1.lower, group1.upper, mTunnelZ)[1]
-            + generateStructure(group2.lower, group2.upper, mTunnelZ)[2]
-            + rg1.models
-            -- + rg2.models
-            ,
-            terrainAlignmentLists = pipe.new
-            + rg1.terrainAlignmentLists
-            -- + rg2.terrainAlignmentLists
-            + {
-                {
-                    type = "GREATER",
-                    faces = upperPolys * pipe.map(pipe.map(coor.vec2Tuple)),
+            
+            dump.dump(params)
+            defaultParams(params, fParams)
+            
+            local deg = listDegree[params.xDegDec + 1] + params.xDegUni
+            local rad = math.rad(deg)
+            
+            local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
+            local catenary = params.catenary == 1
+            local catenaryLower = func.contains({0, 1}, params.applyCatenary) and catenary
+            local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
+            local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
+            local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
+            local height = heightList[params.height + 1]
+            local mZ = coor.transZ(height)
+            local mTunnelZ = coor.transZ(tunnelHeight)
+            
+            local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
+            local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
+            local TLowerTracks = lowerTrackBuilder.nonAligned()
+            local TUpperTracks = upperTrackBuilder.nonAligned()
+            local TLowerExtTracks = lowerTrackBuilder.nonAligned()
+            local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
+            
+            local retriveR = function(param) return rList[param + 1] * 1000 end
+            
+            local info1 = {
+                lower = {
+                    nbTracks = params.nbLowerTracks + 1,
+                    r = retriveR(params.rLower) * params.fRLower1,
+                    rad = -0.5 * rad
                 },
-                {
-                    type = "LESS",
-                    faces = upperPolys * pipe.map(pipe.map(mTunnelZ)) * pipe.map(pipe.map(coor.vec2Tuple))
-                },
-                {
-                    type = "LESS",
-                    faces = lowerPolys * pipe.map(pipe.map(coor.vec2Tuple)),
-                    slopeLow = 0,
-                },
-                {
-                    type = "GREATER",
-                    faces = lowerPolys * pipe.map(pipe.map(coor.vec2Tuple)),
+                upper = {
+                    nbTracks = params.nbUpperTracks + 1,
+                    r = retriveR(params.rUpper) * params.fRUpper1,
+                    rad = 0.5 * rad
                 }
             }
-        }
-        
-        -- End of generation
-        -- Slope, Height, Mirror treatment
-        return pipe.new
-            * result
-            * station.setMirror(params.isMir == 1)
-            * station.setSlope(slopeList[params.slope + 1])
-            * station.setHeight(heightList[params.height + 1])
+            local info2 = {
+                lower = {
+                    nbTracks = params.nbLowerTracks + 1,
+                    r = retriveR(params.rLower) * params.fRLower2,
+                    rad = -0.5 * rad
+                },
+                upper = {
+                    nbTracks = params.nbUpperTracks + 1,
+                    r = retriveR(params.rUpper) * params.fRUpper2,
+                    rad = 0.5 * rad
+                }
+            }
+            
+            local offsets = {
+                lower = junction.buildCoors(info1.lower.nbTracks, nbPerGroup),
+                upper = junction.buildCoors(info1.upper.nbTracks, info1.upper.nbTracks)
+            }
+            
+            local group1 = part(info1, offsets)
+            local group2 = part(info2, offsets)
+            
+            local ext = {
+                upper = {
+                    jA.comp(group1.upper,
+                        {
+                            initRad = group1.upper.tracks[1].limits.inf,
+                            slope = trSlopeList[params.trSlopeA + 1] * 0.001,
+                            height = tunnelHeight + height,
+                            r = params.fRUpper1 * group1.upper.tracks[1].guideline.r,
+                            radFactor = 1
+                        }),
+                    jA.comp(group2.upper,
+                        {
+                            initRad = group2.upper.tracks[1].limits.sup,
+                            slope = trSlopeList[params.trSlopeA + 1] * 0.001,
+                            height = tunnelHeight + height,
+                            r = params.fRUpper2 * group2.upper.tracks[1].guideline.r,
+                            radFactor = -1
+                        })
+                },
+                lower = {
+                    jA.comp(group1.lower,
+                        {
+                            initRad = group1.lower.tracks[1].limits.inf,
+                            slope = -trSlopeList[params.trSlopeA + 1] * 0.001,
+                            height = height,
+                            r = params.fRLower1 * group1.lower.tracks[1].guideline.r,
+                            radFactor = 1
+                        }),
+                    jA.comp(group2.lower,
+                        {
+                            initRad = group2.lower.tracks[1].limits.sup,
+                            slope = -trSlopeList[params.trSlopeA + 1] * 0.001,
+                            height = height,
+                            r = params.fRLower2 * group2.lower.tracks[1].guideline.r,
+                            radFactor = -1
+                        })
+                }
+            }
+            
+            
+            
+            local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks, {mpt = mZ, mvec = coor.I()})
+            local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
+            
+            local upperPolys = pipe.new
+                + junction.generatePolyArc(group1.upper.walls, "inf", "mid")(0, 0)
+                + junction.generatePolyArc(group2.upper.walls, "mid", "sup")(0, 0)
+            
+            local lowerPolys = pipe.new
+                + junction.generatePolyArc(group1.lower.tracks, "inf", "mid")(10, 3.5)
+                + junction.generatePolyArc(group2.lower.tracks, "mid", "sup")(10, 3.5)
+            
+            local result = {
+                edgeLists =
+                {
+                    TUpperTracks(upperTracks.normal),
+                    TLowerTracks(lowerTracks.normal),
+                    pipe.new * ext.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
+                    pipe.new * ext.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks
+                -- TLowerExtTracks(lowerTracks.ext),
+                -- TUpperExtTracks(upperTracks.ext),
+                },
+                models = pipe.new
+                + generateStructure(group1.lower, group1.upper, mTunnelZ * mZ)[1]
+                + generateStructure(group2.lower, group2.upper, mTunnelZ * mZ)[2]
+                + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("models"))
+                + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("models"))
+                ,
+                terrainAlignmentLists = pipe.new
+                + {
+                    {
+                        type = "GREATER",
+                        faces = upperPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                    },
+                    {
+                        type = "LESS",
+                        faces = upperPolys * pipe.map(pipe.map(mTunnelZ * mZ)) * pipe.map(pipe.map(coor.vec2Tuple))
+                    },
+                    {
+                        type = "LESS",
+                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                        slopeLow = 0,
+                    },
+                    {
+                        type = "GREATER",
+                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                    }
+                }
+                + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("terrainAlignmentLists"))
+                + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("terrainAlignmentLists"))
+            }
+            
+            -- End of generation
+            -- Slope, Height, Mirror treatment
+            return pipe.new
+                * result
+                * station.setMirror(params.isMir == 1)
+                * station.setSlope(slopeList[params.slope + 1])
     end
 end
 

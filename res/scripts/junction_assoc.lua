@@ -68,22 +68,18 @@ local baseGuideline = function(initPt, initRad, r)
 )
 end
 
-local retriveGeometry = function(initRad, r, slope)
-    local rad = slope.length / r
+local retriveGeometry = function(config, slope)
+    local rad = config.radFactor * slope.length / config.r
     local radT = slope.trans.length / slope.length * rad
-    local radRef = junction.normalizeRad(initRad)
-    local limits = {
-        {
-            inf = radRef + rad,
-            mid = radRef + rad - radT,
-            sup = radRef + 0.5 * rad,
-        },
-        {
-            inf = radRef + 0.5 * rad,
-            mid = radRef + radT,
-            sup = radRef,
-        },
-    }
+    local radRef = junction.normalizeRad(config.initRad)
+    local limits = pipe.new * {{0, radT, 0.5 * rad}, {0.5 * rad, rad - radT, rad}}
+        * function(ls) return config.radFactor < 0 and ls or ls * pipe.map(pipe.rev()) * pipe.rev() end
+        * pipe.map(pipe.map(pipe.plus(radRef)))
+        * pipe.map(function(s) local rs = {}
+            rs.inf, rs.mid, rs.sup = table.unpack(s)
+            return rs
+        end)
+    
     local resembleGroup = function(groups)
         return pipe.new
             * groups
@@ -99,7 +95,7 @@ local retriveGeometry = function(initRad, r, slope)
     end
     local retrivefZ = function(profile)
         return function(rx)
-            local x = slope.length * (rx - radRef) / rad
+            local x = slope.length * math.abs((rx - radRef) / rad)
             local pf = func.filter(profile, function(s) return s.pred(x) end)[1]
             return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
         end
@@ -111,7 +107,7 @@ local function gmPlaceA(fz, r)
     return function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
         local p1, p2 = fz(rad1), fz(rad2)
-        return coor.shearZoY((r > 0 and 1 or -1) * (p2.y - p1.y) / (p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+        return coor.shearZoY((r > 0 and -1 or 1) * (p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
     end
 end
 
@@ -193,7 +189,7 @@ local comp = function(group, config)
     local function isDesc(a, b) return config.height > 0 and a or b end
     local slope = generateSlope(config.slope, config.height)
     
-    local resembleGroup, retrivefZ = retriveGeometry(config.initRad, config.r, slope)
+    local resembleGroup, retrivefZ = retriveGeometry(config, slope)
     local fz = retrivefZ(slopeProfile(slope))
     local mPlaceA = gmPlaceA(fz, config.r)
     
@@ -204,8 +200,8 @@ local comp = function(group, config)
     
     local zsList = pipe.new
         * func.zip(
-            {0, 0, slope.trans.dz, slope.height * 0.5, slope.height - slope.trans.dz, slope.height, slope.height},
-            {0, 0, slope.slope, slope.slope, slope.slope, 0, 0},
+            pipe.new * {0, 0, slope.trans.dz, slope.height * 0.5, slope.height - slope.trans.dz, slope.height, slope.height} * function(ls) return config.radFactor > 0 and ls or func.rev(ls) end,
+            pipe.new * {0, 0, slope.slope, slope.slope, slope.slope, 0, 0} * function(ls) return config.radFactor > 0 and ls or func.rev(ls * pipe.map(pipe.neg())) end,
             {"z", "s"})
         * function(hsList) return hsList
             * pipe.range(1, #hsList - 1)
@@ -299,7 +295,8 @@ local updateFn = function(params)
         slope = sFactor * slopeList[params.slope + 1] * 0.001,
         height = height,
         r = r,
-        nbTracks = nbTracks
+        nbTracks = nbTracks,
+        radFactor = 1
     })
     
     return

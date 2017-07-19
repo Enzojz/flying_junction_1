@@ -5,6 +5,7 @@ local trackEdge = require "flyingjunction/trackedge"
 local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
+local jA = require "junction_assoc"
 
 local dump = require "datadumper"
 
@@ -261,101 +262,101 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
 end
 
 local function params(paramFilter)
-    return pipe.new * 
-    {
-        paramsutil.makeTrackTypeParam(),
-        paramsutil.makeTrackCatenaryParam(),
+    return pipe.new *
         {
-            key = "applyCatenary",
-            name = _("Catenary applied for"),
-            values = {_("Both"), _("Lower"), _("Upper")},
-            defaultIndex = 0
-        },
-        {
-            key = "nbLowerTracks",
-            name = _("Number of lower tracks"),
-            values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
-            defaultIndex = 1
-        },
-        {
-            key = "nbUpperTracks",
-            name = _("Number of upper tracks"),
-            values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
-            defaultIndex = 1
-        },
-        {
-            key = "nbPerGroup",
-            name = _("Tracks per group"),
-            values = {_("1"), _("2"), _("All")},
-            defaultIndex = 1
-        },
-        {
-            key = "heightTunnel",
-            name = _("Tunnel Height") .. ("(m)"),
-            values = func.map(tunnelHeightList, tostring),
-            defaultIndex = 0
-        },
-        {
-            key = "xDegDec",
-            name = _("Crossing angles"),
-            values = {_("5"), _("10"), _("20"), _("30"), _("40"), _("50"), _("60"), _("70"), _("80"), },
-            defaultIndex = 2
-        },
-        {
-            key = "xDegUni",
-            name = "+",
-            values = func.seqMap({0, 9}, tostring),
-        },
-        {
-            key = "curvedLevel",
-            name = _("Curved levels"),
-            values = {_("Both"), _("Lower"), _("Upper")},
-            defaultIndex = 0
-        },
-        {
-            key = "rLower",
-            name = _("Radius of lower tracks"),
-            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
-            defaultIndex = 0
-        },
-        {
-            key = "rUpper",
-            name = _("Radius of upper tracks"),
-            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
-            defaultIndex = 0
-        },
-        {
-            key = "transitionA",
-            name = _("Transition A"),
-            values = {_("Both"), _("Lower"), _("Upper")},
-            defaultIndex = 0
-        },
-        {
-            key = "trSlopeA",
-            name = _("Transition A Slope").."(‰)",
-            values = func.map(trSlopeList, tostring),
-            defaultIndex = 0
-        },
-        {
-            key = "isMir",
-            name = _("Mirrored"),
-            values = {_("No"), _("Yes")},
-            defaultIndex = 0
-        },
-        {
-            key = "slope",
-            name = _("Slope(‰)"),
-            values = func.map(slopeList, tostring),
-            defaultIndex = 0
-        },
-        {
-            key = "height",
-            name = _("Altitude Adjustment(m)"),
-            values = func.map(heightList, tostring),
-            defaultIndex = 5
+            paramsutil.makeTrackTypeParam(),
+            paramsutil.makeTrackCatenaryParam(),
+            {
+                key = "applyCatenary",
+                name = _("Catenary applied for"),
+                values = {_("Both"), _("Lower"), _("Upper")},
+                defaultIndex = 0
+            },
+            {
+                key = "nbLowerTracks",
+                name = _("Number of lower tracks"),
+                values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
+                defaultIndex = 1
+            },
+            {
+                key = "nbUpperTracks",
+                name = _("Number of upper tracks"),
+                values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
+                defaultIndex = 1
+            },
+            {
+                key = "nbPerGroup",
+                name = _("Tracks per group"),
+                values = {_("1"), _("2"), _("All")},
+                defaultIndex = 1
+            },
+            {
+                key = "heightTunnel",
+                name = _("Tunnel Height") .. ("(m)"),
+                values = func.map(tunnelHeightList, tostring),
+                defaultIndex = 0
+            },
+            {
+                key = "xDegDec",
+                name = _("Crossing angles"),
+                values = {_("5"), _("10"), _("20"), _("30"), _("40"), _("50"), _("60"), _("70"), _("80"), },
+                defaultIndex = 2
+            },
+            {
+                key = "xDegUni",
+                name = "+",
+                values = func.seqMap({0, 9}, tostring),
+            },
+            {
+                key = "curvedLevel",
+                name = _("Curved levels"),
+                values = {_("Both"), _("Lower"), _("Upper")},
+                defaultIndex = 0
+            },
+            {
+                key = "rLower",
+                name = _("Radius of lower tracks"),
+                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+                defaultIndex = 0
+            },
+            {
+                key = "rUpper",
+                name = _("Radius of upper tracks"),
+                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+                defaultIndex = 0
+            },
+            {
+                key = "transitionA",
+                name = _("Transition A"),
+                values = {_("Both"), _("Lower"), _("Upper")},
+                defaultIndex = 0
+            },
+            {
+                key = "trSlopeA",
+                name = _("Transition A Slope") .. "(‰)",
+                values = func.map(trSlopeList, tostring),
+                defaultIndex = 0
+            },
+            {
+                key = "isMir",
+                name = _("Mirrored"),
+                values = {_("No"), _("Yes")},
+                defaultIndex = 0
+            },
+            {
+                key = "slope",
+                name = _("Slope(‰)"),
+                values = func.map(slopeList, tostring),
+                defaultIndex = 0
+            },
+            {
+                key = "height",
+                name = _("Altitude Adjustment(m)"),
+                values = func.map(heightList, tostring),
+                defaultIndex = 5
+            }
         }
-    }
-    * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
+        * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
 
 end
 
@@ -365,7 +366,7 @@ local function defaultParams(param, fParams)
     end
     
     func.forEach(params({}), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
-
+    
     fParams(param)
 end
 
@@ -381,7 +382,8 @@ local updateFn = function(fParams)
         local catenaryLower = func.contains({0, 1}, params.applyCatenary) and catenary
         local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
         local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
-        local mTunnelZ = coor.transZ(tunnelHeightList[params.heightTunnel + 1])
+        local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
+        local mTunnelZ = coor.transZ(tunnelHeight)
         
         local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
         local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
@@ -425,6 +427,22 @@ local updateFn = function(fParams)
         local group1 = part(info1, offsets)
         local group2 = part(info2, offsets)
         
+        local rg1 = jA.comp(group1.upper,
+            {
+                initRad = group1.upper.tracks[1].limits.inf,
+                slope = trSlopeList[params.trSlopeA + 1] * 0.001,
+                height = tunnelHeight,
+                r = params.fRUpper1 * group1.upper.tracks[1].guideline.r,
+            })
+        
+        local rg2 = jA.comp(group2.upper,
+            {
+                initRad = group2.upper.tracks[1].limits.sup,
+                slope = trSlopeList[params.trSlopeA + 1] * 0.001,
+                height = tunnelHeight,
+                r = params.fRUpper2 * group2.upper.tracks[1].guideline.r,
+            })
+        
         local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks)
         local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ, mvec = coor.I()})
         
@@ -441,14 +459,21 @@ local updateFn = function(fParams)
             {
                 TUpperTracks(upperTracks.normal),
                 TLowerTracks(lowerTracks.normal),
-                TLowerExtTracks(lowerTracks.ext),
-                TUpperExtTracks(upperTracks.ext),
+                rg1.edges * station.prepareEdges * TUpperTracks
+            -- rg2.edges * station.prepareEdges * TUpperTracks,
+            -- TLowerExtTracks(lowerTracks.ext),
+            -- TUpperExtTracks(upperTracks.ext),
             },
-            models = func.concat(
-                generateStructure(group1.lower, group1.upper, mTunnelZ)[1],
-                generateStructure(group2.lower, group2.upper, mTunnelZ)[2]
-            ),
-            terrainAlignmentLists = {
+            models = pipe.new
+            + generateStructure(group1.lower, group1.upper, mTunnelZ)[1]
+            + generateStructure(group2.lower, group2.upper, mTunnelZ)[2]
+            + rg1.models
+            -- + rg2.models
+            ,
+            terrainAlignmentLists = pipe.new
+            + rg1.terrainAlignmentLists
+            -- + rg2.terrainAlignmentLists
+            + {
                 {
                     type = "GREATER",
                     faces = upperPolys * pipe.map(pipe.map(coor.vec2Tuple)),

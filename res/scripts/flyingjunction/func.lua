@@ -105,6 +105,9 @@ function func.seq(from, to)
     return result
 end
 
+function func.zip(ls1, ls2, name)
+    return func.pi.zip(ls2, name)(ls1)
+end
 function func.seqValue(n, value)
     return func.seqMap({1, n}, function(_) return value end)
 end

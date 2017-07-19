@@ -71,7 +71,7 @@ end
 local retriveGeometry = function(initRad, r, slope)
     local rad = slope.length / r
     local radT = slope.trans.length / slope.length * rad
-    local radRef = initRad + (r > 0 and math.pi or 0)
+    local radRef = junction.normalizeRad(initRad)
     local limits = {
         {
             inf = radRef + rad,
@@ -202,6 +202,16 @@ local comp = function(group, config)
         walls = resembleGroup(group.walls)
     }
     
+    local zsList = pipe.new
+        * func.zip(
+            {0, 0, slope.trans.dz, slope.height * 0.5, slope.height - slope.trans.dz, slope.height, slope.height},
+            {0, 0, slope.slope, slope.slope, slope.slope, 0, 0},
+            {"z", "s"})
+        * function(hsList) return hsList
+            * pipe.range(1, #hsList - 1)
+            * pipe.map2(hsList * pipe.range(2, #hsList), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
+        end
+    
     local walls =
         makeStructure(groups.walls, junction.makeFn(mSidePillar, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
         + makeStructure(groups.walls, junction.makeFn(mRoofFenceS, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
@@ -210,18 +220,13 @@ local comp = function(group, config)
     local edges = pipe.new
         * func.map(groups.tracks, pipe.map(junction.generateArc))
         * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
-        * pipe.map(function(ar) return pipe.new
-            * {0, 0, slope.trans.dz, slope.height * 0.5, slope.height - slope.trans.dz, slope.height, slope.height}
-            * pipe.zip({0, 0, slope.slope, slope.slope, slope.slope, 0, 0}, {"z", "s"})
-            * function(lz) return
-                lz * pipe.range(1, #lz - 1)
-                * pipe.map2(lz * pipe.range(2, #lz), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
-            end
-            * pipe.map2(ar, function(nz, ar) return func.map2(ar, nz, coor.apply) end)
-        end)
+        * pipe.map(pipe.map2(zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end))
         * pipe.map(pipe.map(pipe.map(coor.vec2Tuple)))
-        * pipe.map(pipe.zip({{true, false}, {false, false}, {false, false}, {false, false}, {false, false}, {false, true}}, {"edge", "snap"}))
-        * pipe.flatten()
+        * pipe.map(function(edge) return
+            {
+                a = pipe.new * func.range(edge, 2, #edge - 1) * pipe.zip(func.seqMap({1, 4}, function(_) return {false, false} end), {"edge", "snap"}),
+                b = pipe.new * {edge[1], edge[#edge]} * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"}),
+            } end)
     
     local polys = pipe.new
         + junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
@@ -230,7 +235,8 @@ local comp = function(group, config)
     local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(fz(c.rad).y)(c) end))
     
     return {
-        edges = edges,
+        edges = edges * pipe.mapFlatten(pipe.select("a")),
+        extEdges = edges * pipe.mapFlatten(pipe.select("b")),
         models = walls,
         terrainAlignmentLists = {
             {
@@ -298,7 +304,7 @@ local updateFn = function(params)
     
     return
         {
-            edgeLists = {c.edges * station.prepareEdges * trackBuilder.nonAligned()},
+            edgeLists = {(c.edges + c.extEdges) * station.prepareEdges * trackBuilder.nonAligned()},
             models = c.models,
             terrainAlignmentLists = c.terrainAlignmentLists
         }
@@ -307,5 +313,6 @@ end
 
 return {
     updateFn = updateFn,
-    params = params
+    params = params,
+    comp = comp
 }

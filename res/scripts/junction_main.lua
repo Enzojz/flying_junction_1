@@ -1,6 +1,7 @@
 local paramsutil = require "paramsutil"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
+local arc = require "flyingjunction/coorarc"
 local trackEdge = require "flyingjunction/trackedge"
 local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
@@ -132,6 +133,14 @@ local function part(info, offsets)
         }
     }
     
+    local inferExt = function(proto, pos)
+        return func.map(guidelines[proto].tracks,
+            function(g)
+                local p = g:pt(limitRads[proto][pos])
+                return arc.byOR(p + (g.o - p):normalized() * 1e5, 1e5)
+            end)
+    end
+    
     return {
         lower = {
             tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
@@ -166,7 +175,18 @@ local function part(info, offsets)
                     sup = limitRads.upper.sup,
                 })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
             },
+        },
+        ext = {
+            lower = {
+                inf = inferExt("lower", "inf"),
+                sup = inferExt("lower", "sup")
+            },
+            upper = {
+                inf = inferExt("upper", "inf"),
+                sup = inferExt("upper", "sup")
+            }
         }
+    
     }
 end
 
@@ -338,6 +358,18 @@ local function params(paramFilter)
                 defaultIndex = 0
             },
             {
+                key = "transitionB",
+                name = _("Transition B"),
+                values = {_("Both"), _("Lower"), _("Upper")},
+                defaultIndex = 0
+            },
+            {
+                key = "trSlopeB",
+                name = _("Transition B Slope") .. "(‰)",
+                values = func.map(trSlopeList, tostring),
+                defaultIndex = 0
+            },
+            {
                 key = "isMir",
                 name = _("Mirrored"),
                 values = {_("No"), _("Yes")},
@@ -353,7 +385,7 @@ local function params(paramFilter)
                 key = "height",
                 name = _("Altitude Adjustment(m)"),
                 values = func.map(heightList, tostring),
-                defaultIndex = 5
+                defaultIndex = 2
             }
         }
         * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
@@ -512,7 +544,7 @@ local updateFn = function(fParams)
                     {
                         type = "LESS",
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
-                        slopeLow = 0,
+                        slopeLow = 1e5,
                     },
                     {
                         type = "GREATER",

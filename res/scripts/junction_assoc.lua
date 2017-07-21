@@ -111,10 +111,6 @@ local function gmPlaceA(fz, r)
     end
 end
 
-local function mPlaceD(guideline, rad1, rad2)
-    local radc = (rad1 + rad2) * 0.5
-    return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
-end
 
 local generateSlope = function(slope, height)
     local sFactor = slope > 0 and 1 or -1
@@ -185,18 +181,12 @@ local makeStructure = function(group, fMake)
         * pipe.flatten()
 end
 
-local comp = function(group, config)
-    local function isDesc(a, b) return config.height > 0 and a or b end
+local retriveFn = function(config)
     local slope = generateSlope(config.slope, config.height)
     
     local resembleGroup, retrivefZ = retriveGeometry(config, slope)
     local fz = retrivefZ(slopeProfile(slope))
     local mPlaceA = gmPlaceA(fz, config.r)
-    
-    local groups = {
-        tracks = resembleGroup(group.tracks),
-        walls = resembleGroup(group.walls)
-    }
     
     local zsList = pipe.new
         * func.zip(
@@ -208,15 +198,27 @@ local comp = function(group, config)
             * pipe.map2(hsList * pipe.range(2, #hsList), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
         end
     
-    local walls =
-        makeStructure(groups.walls, junction.makeFn(mSidePillar, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
-        + makeStructure(groups.walls, junction.makeFn(mRoofFenceS, isDesc(mPlaceA, mPlaceD), coor.scaleY(1.05)))
-        + (slope.height < 0 and {} or makeStructure(groups.tracks, junction.makeFn(mRoof, mPlaceA, coor.scaleY(1.05))))
+    return {
+        resembleGroup = resembleGroup,
+        fz = fz,
+        slope = slope,
+        zsList = zsList,
+        mPlaceA = mPlaceA,
+        mPlaceD = function(guideline, rad1, rad2)
+            local radc = (rad1 + rad2) * 0.5
+            return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
+        end
+    }
+end
+
+local retriveTracks = function(group, fn, config)
+    local function isDesc(a, b) return config.height > 0 and a or b end
+    local tracks = fn.resembleGroup(group)
     
     local edges = pipe.new
-        * func.map(groups.tracks, pipe.map(junction.generateArc))
+        * func.map(tracks, pipe.map(junction.generateArc))
         * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
-        * pipe.map(pipe.map2(zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end))
+        * pipe.map(pipe.map2(fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end))
         * pipe.map(pipe.map(pipe.map(coor.vec2Tuple)))
         * pipe.map(function(edge) return
             {
@@ -225,15 +227,14 @@ local comp = function(group, config)
             } end)
     
     local polys = pipe.new
-        + junction.generatePolyArc({groups.walls[1][1], groups.walls[2][1]}, "inf", "sup")(10, 1)
-        + junction.generatePolyArc({groups.walls[1][2], groups.walls[2][2]}, "inf", "sup")(10, 1)
+        + junction.generatePolyArc({tracks[1][1], tracks[#tracks][1]}, "inf", "sup")(10, 3.5)
+        + junction.generatePolyArc({tracks[1][2], tracks[#tracks][2]}, "inf", "sup")(10, 3.5)
     
-    local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(fz(c.rad).y)(c) end))
+    local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(fn.fz(c.rad).y)(c) end))
     
     return {
         edges = edges * pipe.mapFlatten(pipe.select("a")),
         extEdges = edges * pipe.mapFlatten(pipe.select("b")),
-        models = walls,
         terrainAlignmentLists = {
             {
                 type = isDesc("GREATER", "LESS"),
@@ -244,8 +245,8 @@ local comp = function(group, config)
             {
                 type = "LESS",
                 faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
-                slopeLow = isDesc(0.75, 0),
-                slopeHigh = isDesc(0.75, 0),
+                slopeLow = isDesc(0.75, 1e5),
+                slopeHigh = isDesc(0.75, 1e5),
             },
             {
                 type = "GREATER",
@@ -255,6 +256,25 @@ local comp = function(group, config)
             }
         }
     }
+end
+
+local retriveWalls = function(group, fn, config)
+    local function isDesc(a, b) return config.height > 0 and a or b end
+    local walls = fn.resembleGroup(group)
+    
+    return {
+        models = makeStructure(walls, junction.makeFn(mSidePillar, isDesc(fn.mPlaceA, fn.mPlaceD), coor.scaleY(1.05)))
+        + makeStructure(walls, junction.makeFn(mRoofFenceS, isDesc(fn.mPlaceA, fn.mPlaceD), coor.scaleY(1.05)))
+    -- + (slope.height < 0 and {} or makeStructure(groups.tracks, junction.makeFn(mRoof, fn.mPlaceA, coor.scaleY(1.05))))
+    }
+end
+
+local comp = function(group, config)
+    local fn = retriveFn(config)
+    
+    return func.with(
+        retriveTracks(group.tracks, fn, config),
+        retriveWalls(group.walls, fn, config))
 end
 
 local composite = function(config)

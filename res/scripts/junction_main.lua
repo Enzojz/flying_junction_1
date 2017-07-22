@@ -133,15 +133,8 @@ local function part(info, offsets)
         }
     }
     
-    local inferExt = function(proto, pos)
-        return func.map(guidelines[proto].tracks,
-            function(g)
-                local p = g:pt(limitRads[proto][pos])
-                return arc.byOR(p + (g.o - p):normalized() * 1e5, 1e5)
-            end)
-    end
     
-    return {
+    local result = {
         lower = {
             tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
                 attach(limitRads.lower)),
@@ -175,19 +168,46 @@ local function part(info, offsets)
                     sup = limitRads.upper.sup,
                 })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
             },
-        },
-        ext = {
-            lower = {
-                inf = inferExt("lower", "inf"),
-                sup = inferExt("lower", "sup")
+        }
+    }
+    
+    local inferExt = function(level, type, pos)
+        return func.map(result[level][type],
+            function(g)
+                local p = g.guideline:pt(g.limits[pos])
+                local guideline = arc.byOR(p + (g.guideline.o - p):normalized() * 1e5, 1e5)
+                return {
+                    guideline = guideline,
+                    rad = guideline:rad(p),
+                    pt = p
+                }
+            end)
+    end
+    
+    local ext = {
+        lower = {
+            tracks = {
+                inf = inferExt("lower", "tracks", "inf"),
+                sup = inferExt("lower", "tracks", "sup")
             },
-            upper = {
-                inf = inferExt("upper", "inf"),
-                sup = inferExt("upper", "sup")
+            walls = {
+                inf = inferExt("lower", "walls", "inf"),
+                sup = inferExt("lower", "walls", "sup")
+            }
+        },
+        upper = {
+            tracks = {
+                inf = inferExt("upper", "tracks", "inf"),
+                sup = inferExt("upper", "tracks", "sup")
+            },
+            walls = {
+                inf = inferExt("upper", "walls", "inf"),
+                sup = inferExt("upper", "walls", "sup")
             }
         }
-    
     }
+
+    return func.with(result, {ext = ext})
 end
 
 local function generateStructure(lowerGroup, upperGroup, mZ)
@@ -355,7 +375,7 @@ local function params(paramFilter)
                 key = "trSlopeA",
                 name = _("Transition A Slope") .. "(‰)",
                 values = func.map(trSlopeList, tostring),
-                defaultIndex = 0
+                defaultIndex = #trSlopeList - 1
             },
             {
                 key = "transitionB",
@@ -367,7 +387,7 @@ local function params(paramFilter)
                 key = "trSlopeB",
                 name = _("Transition B Slope") .. "(‰)",
                 values = func.map(trSlopeList, tostring),
-                defaultIndex = 0
+                defaultIndex = #trSlopeList - 1
             },
             {
                 key = "isMir",
@@ -405,7 +425,6 @@ end
 local updateFn = function(fParams)
     return function(params)
             
-            dump.dump(params)
             defaultParams(params, fParams)
             
             local deg = listDegree[params.xDegDec + 1] + params.xDegUni
@@ -463,46 +482,46 @@ local updateFn = function(fParams)
             local group1 = part(info1, offsets)
             local group2 = part(info2, offsets)
             
+            
+
             local ext = {
                 upper = {
-                    jA.comp(group1.upper,
+                    jA.comp(group1.ext.upper.tracks.inf, group1.ext.upper.walls.inf,
                         {
-                            initRad = group1.upper.tracks[1].limits.inf,
+                            initRad = group1.ext.upper.tracks.inf[1].rad,
                             slope = trSlopeList[params.trSlopeA + 1] * 0.001,
                             height = tunnelHeight + height,
-                            r = params.fRUpper1 * group1.upper.tracks[1].guideline.r,
+                            r = params.fRUpper1 * 1e5,
                             radFactor = 1
                         }),
-                    jA.comp(group2.upper,
+                    jA.comp(group2.ext.upper.tracks.sup, group2.ext.upper.walls.sup,
                         {
-                            initRad = group2.upper.tracks[1].limits.sup,
-                            slope = trSlopeList[params.trSlopeA + 1] * 0.001,
+                            initRad = group2.ext.upper.tracks.sup[1].rad,
+                            slope = trSlopeList[params.trSlopeB + 1] * 0.001,
                             height = tunnelHeight + height,
-                            r = params.fRUpper2 * group2.upper.tracks[1].guideline.r,
+                            r = params.fRUpper2 * 1e5,
                             radFactor = -1
                         })
                 },
                 lower = {
-                    jA.comp(group1.lower,
+                    jA.comp(group1.ext.lower.tracks.inf, group1.ext.lower.walls.inf,
                         {
-                            initRad = group1.lower.tracks[1].limits.inf,
+                            initRad = group1.ext.lower.tracks.inf[1].rad,
                             slope = -trSlopeList[params.trSlopeA + 1] * 0.001,
                             height = height,
-                            r = params.fRLower1 * group1.lower.tracks[1].guideline.r,
+                            r = params.fRLower1 * 1e5,
                             radFactor = 1
                         }),
-                    jA.comp(group2.lower,
+                    jA.comp(group2.ext.lower.tracks.sup, group2.ext.lower.walls.sup,
                         {
-                            initRad = group2.lower.tracks[1].limits.sup,
-                            slope = -trSlopeList[params.trSlopeA + 1] * 0.001,
+                            initRad = group2.ext.lower.tracks.sup[1].rad,
+                            slope = -trSlopeList[params.trSlopeB + 1] * 0.001,
                             height = height,
-                            r = params.fRLower2 * group2.lower.tracks[1].guideline.r,
+                            r = params.fRLower2 * 1e5,
                             radFactor = -1
                         })
                 }
             }
-            
-            
             
             local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks, {mpt = mZ, mvec = coor.I()})
             local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})

@@ -7,6 +7,7 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
+local dump = require "datadumper"
 
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -214,7 +215,6 @@ end
 local retriveTracks = function(group, fn, config)
     local function isDesc(a, b) return config.height > 0 and a or b end
     local tracks = fn.resembleGroup(group)
-    
     local edges = pipe.new
         * func.map(tracks, pipe.map(junction.generateArc))
         * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
@@ -258,23 +258,24 @@ local retriveTracks = function(group, fn, config)
     }
 end
 
-local retriveWalls = function(group, fn, config)
+local retriveWalls = function(groupTr, groupWa, fn, config)
     local function isDesc(a, b) return config.height > 0 and a or b end
-    local walls = fn.resembleGroup(group)
+    local tracks = fn.resembleGroup(groupTr)
+    local walls = fn.resembleGroup(groupWa)
     
     return {
         models = makeStructure(walls, junction.makeFn(mSidePillar, isDesc(fn.mPlaceA, fn.mPlaceD), coor.scaleY(1.05)))
         + makeStructure(walls, junction.makeFn(mRoofFenceS, isDesc(fn.mPlaceA, fn.mPlaceD), coor.scaleY(1.05)))
-    -- + (slope.height < 0 and {} or makeStructure(groups.tracks, junction.makeFn(mRoof, fn.mPlaceA, coor.scaleY(1.05))))
+        + (fn.slope.height < 0 and {} or makeStructure(tracks, junction.makeFn(mRoof, fn.mPlaceA, coor.scaleY(1.05))))
     }
 end
 
-local comp = function(group, config)
+local comp = function(tracks, walls, config)
     local fn = retriveFn(config)
     
     return func.with(
-        retriveTracks(group.tracks, fn, config),
-        retriveWalls(group.walls, fn, config))
+        retriveTracks(tracks, fn, config),
+        retriveWalls(tracks, walls, fn, config))
 end
 
 local composite = function(config)

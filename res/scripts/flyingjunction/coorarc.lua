@@ -5,15 +5,22 @@ local arc = {}
 
 -- The circle in form of (x - a)² + (y - b)² = r²
 function arc.new(a, b, r)
-    local result = {o = coor.xy(a, b), r = r}
-    result.rad = arc.radByPt
-    result.pt = arc.ptByRad
+    local result = {
+        o = coor.xy(a, b),
+        r = r,
+        inf = -0.5 * math.pi,
+        mid = 0.5 * math.pi,
+        sup = 1.5 * math.pi,
+        rad = arc.radByPt,
+        pt = arc.ptByRad,
+        setLimits = arc.setLimits
+    }
     setmetatable(result, {
-    __sub = arc.intersectionArc,
-    __div = arc.intersectionLine,
-    __mul = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r * rhs) end,
-    __add = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r + rhs) end
-})
+        __sub = arc.intersectionArc,
+        __div = arc.intersectionLine,
+        __mul = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r * rhs) end,
+        __add = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r + rhs) end
+    })
     return result
 end
 
@@ -22,6 +29,14 @@ function arc.byOR(o, r) return arc.new(o.x, o.y, r) end
 function arc.byXYR(x, y, r) return arc.new(x, y, r) end
 
 function arc.byDR(ar, dr) return arc.byOR(ar.o, dr + ar.r) end
+
+function arc.setLimits(a, limits)
+    local newArc = arc.byOR(a.o, a.r)
+    newArc.inf = limits.inf
+    newArc.sup = limits.sup
+    newArc.mid = limits.mid
+    return newArc
+end
 
 function arc.ptByRad(arc, rad)
     return
@@ -102,7 +117,7 @@ function arc.commonChord(arc1, arc2)
         arc1.o.x * arc1.o.x + arc1.o.y * arc1.o.y -
         arc2.o.x * arc2.o.x - arc2.o.y * arc2.o.y -
         arc1.r * arc1.r + arc2.r * arc2.r
-    )
+)
 end
 
 function arc.intersectionArc(arc1, arc2)

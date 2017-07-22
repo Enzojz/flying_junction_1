@@ -38,15 +38,15 @@ end
 junction.generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
-    local sup = toXyz(arc.guideline:pt(arc.limits.sup))
-    local inf = toXyz(arc.guideline:pt(arc.limits.inf))
-    local mid = toXyz(arc.guideline:pt(arc.limits.mid))
+    local sup = toXyz(arc:pt(arc.sup))
+    local inf = toXyz(arc:pt(arc.inf))
+    local mid = toXyz(arc:pt(arc.mid))
     
-    local toVector = function(rad) return coor.xyz(0, (arc.limits.mid > math.pi * 0.5 or arc.limits.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad) end
+    local toVector = function(rad) return coor.xyz(0, (arc.mid > math.pi * 0.5 or arc.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad) end
     
-    local vecSup = toVector(arc.limits.sup)
-    local vecInf = toVector(arc.limits.inf)
-    local vecMid = toVector(arc.limits.mid)
+    local vecSup = toVector(arc.sup)
+    local vecInf = toVector(arc.inf)
+    local vecMid = toVector(arc.mid)
     
     local supExt = sup + vecSup * 5
     local infExt = inf - vecInf * 5
@@ -72,38 +72,36 @@ end
 junction.makeFn = function(model, mPlace, m)
     m = m or coor.I()
     return function(obj)
-        local coordsGen = arc.coords(obj.guideline, 5)
+        local coordsGen = arc.coords(obj, 5)
         local function makeModel(seq, scale)
             return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
-                return station.newModel(model, m, coor.scaleY(0.5 * scale), mPlace(obj.guideline, rad1, rad2))
+                return station.newModel(model, m, coor.scaleY(0.5 * scale), mPlace(obj, rad1, rad2))
             end)
         end
         return {
-            makeModel(coordsGen(junction.normalizeRad(obj.limits.inf), junction.normalizeRad(obj.limits.mid) - junction.normalizeRad(obj.limits.inf))),
-            makeModel(coordsGen(junction.normalizeRad(obj.limits.mid), junction.normalizeRad(obj.limits.sup) - junction.normalizeRad(obj.limits.mid)))
+            makeModel(coordsGen(junction.normalizeRad(obj.inf), junction.normalizeRad(obj.mid) - junction.normalizeRad(obj.inf))),
+            makeModel(coordsGen(junction.normalizeRad(obj.mid), junction.normalizeRad(obj.sup) - junction.normalizeRad(obj.mid)))
         }
     end
 end
 
 local generatePolyArcEdge = function(group, from, to)
-    return pipe.from(junction.normalizeRad(group.limits[from]), junction.normalizeRad(group.limits[to]) - junction.normalizeRad(group.limits[from]))
-        * arc.coords(group.guideline, 5)
-        * pipe.map(function(rad) return func.with(group.guideline:pt(rad), {z = 0, rad = rad}) end)
+    return pipe.from(junction.normalizeRad(group[from]), junction.normalizeRad(group[to]) - junction.normalizeRad(group[from]))
+        * arc.coords(group, 5)
+        * pipe.map(function(rad) return func.with(group:pt(rad), {z = 0, rad = rad}) end)
 end
 
 junction.generatePolyArc = function(groups, from, to)
-    local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.guideline.r < q.guideline.r end))
+    local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.r < q.r end))
     return function(extLon, extLat)
         local limitsExtender = function(ext)
             return function(group)
-                local extValue = (junction.normalizeRad(group.limits.mid) > math.pi * 0.5 and -1 or 1) * ext / group.guideline.r
-                return func.with(group,
+                local extValue = (junction.normalizeRad(group.mid) > math.pi * 0.5 and -1 or 1) * ext / group.r
+                return group:setLimits(
                     {
-                        limits = {
-                            inf = group.limits.inf - extValue,
-                            mid = group.limits.mid,
-                            sup = group.limits.sup + extValue
-                        }
+                        inf = group.inf - extValue,
+                        mid = group.mid,
+                        sup = group.sup + extValue
                     }
             )
             end
@@ -111,10 +109,10 @@ junction.generatePolyArc = function(groups, from, to)
         
         local groupL, groupR = table.unpack(
             pipe.new
-            / func.with(groupO, {guideline = groupO.guideline + extLat})
-            / func.with(groupI, {guideline = groupI.guideline + (-extLat)})
+            / func.with(groupO, {guideline = groupO + extLat})
+            / func.with(groupI, {guideline = groupI + (-extLat)})
             * pipe.map(limitsExtender(extLon))
-            * pipe.sort(function(p, q) return p.guideline.o.x < q.guideline.o.y end)
+            * pipe.sort(function(p, q) return p.o.x < q.o.y end)
         )
         return generatePolyArcEdge(groupR, from, to)
             * function(ls) return ls * pipe.range(1, #ls - 1)
@@ -122,8 +120,8 @@ junction.generatePolyArc = function(groups, from, to)
                     function(f, t) return
                         {
                             f, t,
-                            func.with(groupL.guideline:pt(t.rad), {z = 0, rad = t.rad}),
-                            func.with(groupL.guideline:pt(f.rad), {z = 0, rad = f.rad}),
+                            func.with(groupL:pt(t.rad), {z = 0, rad = t.rad}),
+                            func.with(groupL:pt(f.rad), {z = 0, rad = f.rad}),
                         }
                     end)
             end

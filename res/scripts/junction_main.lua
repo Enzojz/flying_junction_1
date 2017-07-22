@@ -28,11 +28,9 @@ local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
 
 local function attach(limits)
     return function(l, x)
-        return {
-            limits = limits,
-            xOffset = x,
-            guideline = l,
-        }
+        local result = l:setLimits(limits)
+        result.xOffset = x
+        return result
     end
 end
 
@@ -148,8 +146,8 @@ local function part(info, offsets)
                     }
                 )(l, o) end)
             * function(walls)
-                for i = 1, #walls - 1 do walls[i].limits.inf = walls[i + 1].limits.inf end
-                for i = #walls, 2, -1 do walls[i].limits.sup = walls[i - 1].limits.sup end
+                for i = 1, #walls - 1 do walls[i].inf = walls[i + 1].inf end
+                for i = #walls, 2, -1 do walls[i].sup = walls[i - 1].sup end
                 return walls
             end
         },
@@ -174,8 +172,8 @@ local function part(info, offsets)
     local inferExt = function(level, type, pos)
         return func.map(result[level][type],
             function(g)
-                local p = g.guideline:pt(g.limits[pos])
-                local guideline = arc.byOR(p + (g.guideline.o - p):normalized() * 1e5, 1e5)
+                local p = g:pt(g[pos])
+                local guideline = arc.byOR(p + (g.o - p):normalized() * 1e5, 1e5)
                 return {
                     guideline = guideline,
                     rad = guideline:rad(p),
@@ -234,9 +232,9 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
                     return func.with(t,
                         {
                             limits = {
-                                sup = w2.limits.sup,
-                                mid = t.guideline:rad(coor.xy(0, 0)),
-                                inf = w1.limits.inf,
+                                sup = w2.sup,
+                                mid = t:rad(coor.xy(0, 0)),
+                                inf = w1.inf,
                             }
                         }
                 ) end)
@@ -245,25 +243,25 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     
     local upperFences = func.map(upperGroup.tracks, function(t)
         return {
-            station.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t.guideline, t.limits.inf)),
-            station.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t.guideline, t.limits.sup)),
+            station.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t, t.inf)),
+            station.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t, t.sup)),
         }
     end)
     
     local fences = func.map(trackSets, function(t)
         local m = coor.scaleX(1.091) * coor.transY(0.18) * coor.transZ(-1) * coor.centered(coor.scaleZ, 3.5 / 1.5, coor.xyz(0, 0, 10.75))
         return {
-            station.newModel(mRoofFenceF, m, mPlace(t.guideline, t.limits.inf)),
-            station.newModel(mRoofFenceF, m, coor.flipY(), mPlace(t.guideline, t.limits.sup)),
+            station.newModel(mRoofFenceF, m, mPlace(t, t.inf)),
+            station.newModel(mRoofFenceF, m, coor.flipY(), mPlace(t, t.sup)),
         }
     end)
     
     local sideFencesL = func.map(func.range(lowerGroup.walls, 1, #lowerGroup.walls - 1), function(t)
         return func.with(t, {
             limits = {
-                sup = t.guideline:rad(func.min(upperGroup.walls[1].guideline - t.guideline, ptXSelector)),
-                mid = t.guideline:rad(func.min(upperGroup.walls[1].guideline - t.guideline, ptXSelector)),
-                inf = t.limits.inf,
+                sup = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
+                mid = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
+                inf = t.inf,
             }
         })
     end)
@@ -271,9 +269,9 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     local sideFencesR = func.map(func.range(lowerGroup.walls, 2, #lowerGroup.walls), function(t)
         return func.with(t, {
             limits = {
-                inf = t.guideline:rad(func.min(upperGroup.walls[2].guideline - t.guideline, ptXSelector)),
-                mid = t.guideline:rad(func.min(upperGroup.walls[2].guideline - t.guideline, ptXSelector)),
-                sup = t.limits.sup,
+                inf = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
+                mid = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
+                sup = t.sup,
             }
         })
     end)

@@ -86,12 +86,7 @@ local retriveGeometry = function(config, slope)
             * groups
             * pipe.map(function(g) return
                 func.map(limits,
-                    function(l) return
-                        {
-                            limits = l,
-                            guideline = g.guideline
-                        }
-                    end)
+                    function(l) return g.guideline:setLimits(l) end)
             end)
     end
     local retrivefZ = function(profile)

@@ -17,7 +17,7 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {1e5, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
+local rList = {junction.infi, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
@@ -25,14 +25,6 @@ local heightList = {-11, -8.7, -5, -2.5, -0.5, 0, 0.5, 2.5, 5}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
-
-local function attach(limits)
-    return function(l, x)
-        local result = l:setLimits(limits)
-        result.xOffset = x
-        return result
-    end
-end
 
 local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
 
@@ -101,50 +93,49 @@ end
 local function part(info, offsets)
     info.lower.r, info.upper.r = minimalR(offsets, info)
     
-    local guidelines =
-        {
-            lower = {
-                tracks = junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r),
-                walls = junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r),
-            },
-            upper = {
-                tracks = junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r),
-                walls = junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r),
-            }
-        }
+    local sort = pipe.sort(function(l, r) return l:pt(l:rad(coor.xy(0, 0))).x < r:pt(l:rad(coor.xy(0, 0))).x end)
     
-    local limits = {
-        lower = {L = guidelines.lower.walls[1], R = guidelines.lower.walls[#guidelines.lower.walls]},
-        upper = {L = guidelines.upper.walls[1], R = guidelines.upper.walls[#guidelines.upper.walls]}
+    local gRef = {
+        lower = {
+            tracks = sort(junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r)),
+            walls = sort(junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r)),
+        },
+        upper = {
+            tracks = sort(junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r)),
+            walls = sort(junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r)),
+        }
     }
+    
+    local wallExt = {
+        lower = {L = gRef.lower.walls[1], R = gRef.lower.walls[#gRef.lower.walls]},
+        upper = {L = gRef.upper.walls[1], R = gRef.upper.walls[#gRef.upper.walls]}
+    }
+    
     
     local limitRads = {
         lower = {
-            inf = limits.lower.R:rad(func.min(limits.lower.R - limits.upper.L, ptXSelector)),
-            mid = limits.lower.R:rad(coor.xy(0, 0)),
-            sup = limits.lower.L:rad(func.min(limits.lower.L - limits.upper.R, ptXSelector)),
+            inf = wallExt.lower.R:rad(func.min(wallExt.lower.R - wallExt.upper.L, ptXSelector)),
+            mid = wallExt.lower.R:rad(coor.xy(0, 0)),
+            sup = wallExt.lower.L:rad(func.min(wallExt.lower.L - wallExt.upper.R, ptXSelector)),
         },
         upper = {
-            sup = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.L, ptXSelector)),
-            mid = limits.upper.R:rad(coor.xy(0, 0)),
-            inf = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.R, ptXSelector)),
+            sup = wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.L, ptXSelector)),
+            mid = wallExt.upper.R:rad(coor.xy(0, 0)),
+            inf = wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.R, ptXSelector)),
         }
     }
     
-    
     local result = {
         lower = {
-            tracks = func.map2(guidelines.lower.tracks, offsets.lower.tracks,
-                attach(limitRads.lower)),
+            tracks = func.map(gRef.lower.tracks, function(l) return l:withLimits(limitRads.lower) end),
             walls = pipe.new
-            * func.map2(guidelines.lower.walls, offsets.lower.walls, function(l, o)
-                return attach(
+            * func.map(gRef.lower.walls, function(l)
+                return l:withLimits(
                     {
-                        inf = l:rad(func.min(l - limits.upper.L, ptXSelector)),
+                        inf = l:rad(func.min(l - wallExt.upper.L, ptXSelector)),
                         mid = l:rad(coor.xy(0, 0)),
-                        sup = l:rad(func.min(l - limits.upper.R, ptXSelector)),
-                    }
-                )(l, o) end)
+                        sup = l:rad(func.min(l - wallExt.upper.R, ptXSelector)),
+                    }) end)
             * function(walls)
                 for i = 1, #walls - 1 do walls[i].inf = walls[i + 1].inf end
                 for i = #walls, 2, -1 do walls[i].sup = walls[i - 1].sup end
@@ -152,19 +143,18 @@ local function part(info, offsets)
             end
         },
         upper = {
-            tracks = func.map2(guidelines.upper.tracks, offsets.upper.tracks,
-                attach(limitRads.upper)),
+            tracks = func.map(gRef.upper.tracks, function(l) return l:withLimits(limitRads.upper) end),
             walls = {
-                attach({
+                wallExt.upper.L:withLimits({
                     inf = limitRads.upper.inf,
-                    mid = limits.upper.L:rad(func.min(limits.upper.L - limits.lower.L, ptXSelector)),
+                    mid = wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector)),
                     sup = limitRads.upper.sup,
-                })(limits.upper.L, offsets.upper.walls[1]),
-                attach({
+                }),
+                wallExt.upper.R:withLimits({
                     inf = limitRads.upper.inf,
-                    mid = limits.upper.R:rad(func.min(limits.upper.R - limits.lower.R, ptXSelector)),
+                    mid = wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector)),
                     sup = limitRads.upper.sup,
-                })(limits.upper.R, offsets.upper.walls[#offsets.upper.walls]),
+                })
             },
         }
     }
@@ -173,7 +163,8 @@ local function part(info, offsets)
         return func.map(result[level][type],
             function(g)
                 local p = g:pt(g[pos])
-                local guideline = arc.byOR(p + (g.o - p):normalized() * 1e5, 1e5)
+                local guideline = arc.byOR(p + (g.o - p):normalized() * (junction.infi - g.xOffset), (junction.infi - g.xOffset))
+                
                 return {
                     guideline = guideline,
                     rad = guideline:rad(p),
@@ -204,7 +195,7 @@ local function part(info, offsets)
             }
         }
     }
-
+    
     return func.with(result, {ext = ext})
 end
 
@@ -223,21 +214,18 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
     
     local walls = lowerGroup.walls
+    
     local trackSets = pipe.new
         * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
             function(w1, w2) return pipe.new
                 * lowerGroup.tracks
-                * pipe.filter(function(t) return t.xOffset < w2.xOffset and t.xOffset > w1.xOffset end)
+                * pipe.filter(function(t) return (t.xOffset < w2.xOffset and t.xOffset > w1.xOffset) or (t.xOffset < w1.xOffset and t.xOffset > w2.xOffset) end)
                 * pipe.map(function(t)
-                    return func.with(t,
-                        {
-                            limits = {
-                                sup = w2.sup,
-                                mid = t:rad(coor.xy(0, 0)),
-                                inf = w1.inf,
-                            }
-                        }
-                ) end)
+                    return t:withLimits({
+                        sup = w2.sup,
+                        mid = t:rad(coor.xy(0, 0)),
+                        inf = w1.inf,
+                    }) end)
             end)
         * func.flatten
     
@@ -257,22 +245,18 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     end)
     
     local sideFencesL = func.map(func.range(lowerGroup.walls, 1, #lowerGroup.walls - 1), function(t)
-        return func.with(t, {
-            limits = {
-                sup = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
-                mid = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
-                inf = t.inf,
-            }
+        return t:withLimits({
+            sup = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
+            mid = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
+            inf = t.inf,
         })
     end)
     
     local sideFencesR = func.map(func.range(lowerGroup.walls, 2, #lowerGroup.walls), function(t)
-        return func.with(t, {
-            limits = {
-                inf = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
-                mid = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
-                sup = t.sup,
-            }
+        return t:withLimits({
+            inf = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
+            mid = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
+            sup = t.sup,
         })
     end)
     
@@ -480,8 +464,6 @@ local updateFn = function(fParams)
             local group1 = part(info1, offsets)
             local group2 = part(info2, offsets)
             
-            
-
             local ext = {
                 upper = {
                     jA.comp(group1.ext.upper.tracks.inf, group1.ext.upper.walls.inf,
@@ -489,7 +471,7 @@ local updateFn = function(fParams)
                             initRad = group1.ext.upper.tracks.inf[1].rad,
                             slope = trSlopeList[params.trSlopeA + 1] * 0.001,
                             height = tunnelHeight + height,
-                            r = params.fRUpper1 * 1e5,
+                            r = params.fRUpper1 * junction.infi,
                             radFactor = 1
                         }),
                     jA.comp(group2.ext.upper.tracks.sup, group2.ext.upper.walls.sup,
@@ -497,7 +479,7 @@ local updateFn = function(fParams)
                             initRad = group2.ext.upper.tracks.sup[1].rad,
                             slope = trSlopeList[params.trSlopeB + 1] * 0.001,
                             height = tunnelHeight + height,
-                            r = params.fRUpper2 * 1e5,
+                            r = params.fRUpper2 * junction.infi,
                             radFactor = -1
                         })
                 },
@@ -507,7 +489,7 @@ local updateFn = function(fParams)
                             initRad = group1.ext.lower.tracks.inf[1].rad,
                             slope = -trSlopeList[params.trSlopeA + 1] * 0.001,
                             height = height,
-                            r = params.fRLower1 * 1e5,
+                            r = params.fRLower1 * junction.infi,
                             radFactor = 1
                         }),
                     jA.comp(group2.ext.lower.tracks.sup, group2.ext.lower.walls.sup,
@@ -515,7 +497,7 @@ local updateFn = function(fParams)
                             initRad = group2.ext.lower.tracks.sup[1].rad,
                             slope = -trSlopeList[params.trSlopeB + 1] * 0.001,
                             height = height,
-                            r = params.fRLower2 * 1e5,
+                            r = params.fRLower2 * junction.infi,
                             radFactor = -1
                         })
                 }
@@ -561,7 +543,7 @@ local updateFn = function(fParams)
                     {
                         type = "LESS",
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
-                        slopeLow = 1e5,
+                        slopeLow = junction.infi,
                     },
                     {
                         type = "GREATER",

@@ -4,38 +4,43 @@ local func = require "flyingjunction/func"
 local arc = {}
 
 -- The circle in form of (x - a)² + (y - b)² = r²
-function arc.new(a, b, r)
+function arc.new(a, b, r, limits)
     local result = {
         o = coor.xy(a, b),
         r = r,
-        inf = -0.5 * math.pi,
-        mid = 0.5 * math.pi,
-        sup = 1.5 * math.pi,
+        inf = limits and limits.inf or -0.5 * math.pi,
+        mid = limits and limits.mid or 0.5 * math.pi,
+        sup = limits and limits.sup or 1.5 * math.pi,
         rad = arc.radByPt,
         pt = arc.ptByRad,
-        setLimits = arc.setLimits
+        limits = arc.limits,
+        withLimits = arc.withLimits,
     }
     setmetatable(result, {
         __sub = arc.intersectionArc,
         __div = arc.intersectionLine,
-        __mul = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r * rhs) end,
-        __add = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r + rhs) end
+        __mul = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r * rhs, lhs:limits()) end,
+        __add = function(lhs, rhs) return arc.byOR(lhs.o, lhs.r + rhs, lhs:limits()) end
     })
     return result
 end
 
-function arc.byOR(o, r) return arc.new(o.x, o.y, r) end
+function arc.byOR(o, r, limits) return arc.new(o.x, o.y, r, limits) end
 
-function arc.byXYR(x, y, r) return arc.new(x, y, r) end
+function arc.byXYR(x, y, r, limits) return arc.new(x, y, r, limits) end
 
-function arc.byDR(ar, dr) return arc.byOR(ar.o, dr + ar.r) end
+function arc.byDR(ar, dr, limits) return arc.byOR(ar.o, dr + ar.r, limits) end
 
-function arc.setLimits(a, limits)
-    local newArc = arc.byOR(a.o, a.r)
-    newArc.inf = limits.inf
-    newArc.sup = limits.sup
-    newArc.mid = limits.mid
-    return newArc
+function arc.withLimits(a, limits)
+    return func.with(a, limits)
+end
+
+function arc.limits(a)
+    return {
+        inf = a.inf,
+        mid = a.mid,
+        sup = a.sup
+    }
 end
 
 function arc.ptByRad(arc, rad)

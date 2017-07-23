@@ -3,9 +3,10 @@ local coor = require "flyingjunction/coor"
 local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
-
+local dump = require "datadumper"
 local junction = {}
 
+junction.infi = 1e8
 junction.buildCoors = function(numTracks, groupSize)
     local function builder(xOffsets, uOffsets, baseX, nbTracks)
         local function caller(n)
@@ -62,10 +63,13 @@ end
 
 junction.fArcs = function(offsets, rad, r)
     return func.map(offsets, function(x)
-        return arc.byOR(
+        local newArc = arc.byOR(
             coor.xyz(r, 0, 0) .. coor.rotZ(rad),
-            math.abs(r - x)
-    ) end
+            math.abs(r) - x
+        )
+        newArc.xOffset = x
+        return newArc
+    end
 )
 end
 
@@ -97,7 +101,7 @@ junction.generatePolyArc = function(groups, from, to)
         local limitsExtender = function(ext)
             return function(group)
                 local extValue = (junction.normalizeRad(group.mid) > math.pi * 0.5 and -1 or 1) * ext / group.r
-                return group:setLimits(
+                return group:withLimits(
                     {
                         inf = group.inf - extValue,
                         mid = group.mid,
@@ -109,11 +113,12 @@ junction.generatePolyArc = function(groups, from, to)
         
         local groupL, groupR = table.unpack(
             pipe.new
-            / func.with(groupO, {guideline = groupO + extLat})
-            / func.with(groupI, {guideline = groupI + (-extLat)})
+            / (groupO + extLat)
+            / (groupI + (-extLat))
             * pipe.map(limitsExtender(extLon))
-            * pipe.sort(function(p, q) return p.o.x < q.o.y end)
+            * pipe.sort(function(p, q) return p:pt(p.mid).x < q:pt(p.mid).x end)
         )
+        
         return generatePolyArcEdge(groupR, from, to)
             * function(ls) return ls * pipe.range(1, #ls - 1)
                 * pipe.map2(ls * pipe.range(2, #ls),

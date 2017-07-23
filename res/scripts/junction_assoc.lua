@@ -13,7 +13,7 @@ local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 
-local rList = {1e5, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 0.1}
+local rList = {junction.infi, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 0.1}
 local slopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local heightList = {11, 10, 9, 8, 7, 6, 5, 4, 3}
 local wallHeight = 11
@@ -85,8 +85,7 @@ local retriveGeometry = function(config, slope)
         return pipe.new
             * groups
             * pipe.map(function(g) return
-                func.map(limits,
-                    function(l) return g.guideline:setLimits(l) end)
+                func.map(limits, function(l) return g.guideline:withLimits(l) end)
             end)
     end
     local retrivefZ = function(profile)
@@ -137,7 +136,7 @@ local slopeProfile = function(slope)
     local pTrM = coor.xy(slope.length * 0.5, slope.height * 0.5)
     return {
         {
-            arc = arc.byOR(coor.xy(0, -slope.factor * 1e5 + slope.height), 1e5),
+            arc = arc.byOR(coor.xy(0, -slope.factor * junction.infi + slope.height), junction.infi),
             ref = slope.height > 0 and func.max or func.min,
             pred = function(x) return x < 0 end,
         },
@@ -147,12 +146,12 @@ local slopeProfile = function(slope)
             pred = function(x) return x >= 0 and x <= pTr1.x end,
         },
         {
-            arc = arc.byOR(arc.byDR(arc1, 1e5):pt(ref1 - slope.rad), 1e5),
+            arc = arc.byOR(arc.byDR(arc1, junction.infi):pt(ref1 - slope.rad), junction.infi),
             ref = slope.height < 0 and func.max or func.min,
             pred = function(x) return x > pTr1.x and x < pTrM.x end,
         },
         {
-            arc = arc.byOR(arc.byDR(arc2, 1e5):pt(ref2 - slope.rad), 1e5),
+            arc = arc.byOR(arc.byDR(arc2, junction.infi):pt(ref2 - slope.rad), junction.infi),
             ref = slope.height > 0 and func.max or func.min,
             pred = function(x) return x >= pTrM.x and x < pTr2.x end,
         },
@@ -162,7 +161,7 @@ local slopeProfile = function(slope)
             pred = function(x) return x >= pTr2.x and x <= slope.length end,
         },
         {
-            arc = arc.byOR(coor.xy(slope.length, slope.factor * 1e5), 1e5),
+            arc = arc.byOR(coor.xy(slope.length, slope.factor * junction.infi), junction.infi),
             ref = slope.height < 0 and func.max or func.min,
             pred = function(x) return x > slope.length end,
         },
@@ -240,8 +239,8 @@ local retriveTracks = function(group, fn, config)
             {
                 type = "LESS",
                 faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
-                slopeLow = isDesc(0.75, 1e5),
-                slopeHigh = isDesc(0.75, 1e5),
+                slopeLow = isDesc(0.75, junction.infi),
+                slopeHigh = isDesc(0.75, junction.infi),
             },
             {
                 type = "GREATER",

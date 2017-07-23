@@ -82,7 +82,9 @@ function func.min(ls, less)
 end
 
 function func.with(ls, newValues)
-    return func.pi.with(newValues)(ls)
+    local newValue = func.pi.with(newValues)(ls)
+    setmetatable(newValue, getmetatable(ls) or nil)
+    return newValue
 end
 
 function func.sort(ls, fn)

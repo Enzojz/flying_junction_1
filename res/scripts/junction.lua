@@ -118,7 +118,7 @@ junction.generatePolyArc = function(groups, from, to)
             * pipe.map(limitsExtender(extLon))
             * pipe.sort(function(p, q) return p:pt(p.mid).x < q:pt(p.mid).x end)
         )
-        
+
         return generatePolyArcEdge(groupR, from, to)
             * function(ls) return ls * pipe.range(1, #ls - 1)
                 * pipe.map2(ls * pipe.range(2, #ls),

@@ -13,7 +13,7 @@ local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 
-local rList = {junction.infi, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 0.1}
+local rList = {junction.infi * 0.001, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 0.1}
 local slopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local heightList = {11, 10, 9, 8, 7, 6, 5, 4, 3}
 local wallHeight = 11

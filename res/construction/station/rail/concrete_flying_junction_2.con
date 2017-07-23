@@ -17,10 +17,10 @@ function data()
         updateFn = jMain.updateFn(function(params)
             params.rLower = func.contains({0, 1}, params.curvedLevel) and #jMain.rList - 1 or 0
             params.rUpper = func.contains({0, 2}, params.curvedLevel) and #jMain.rList - 1 or 0
-            params.fRLower1 = 1
-            params.fRLower2 = -1
-            params.fRUpper1 = -1
-            params.fRUpper2 = 1
+            params.fRLowerA = 1
+            params.fRLowerB = -1
+            params.fRUpperA = -1
+            params.fRUpperB = 1
         end
     )
     }

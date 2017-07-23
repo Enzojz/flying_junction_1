@@ -17,7 +17,7 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {junction.infi, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
+local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
@@ -111,6 +111,11 @@ local function part(info, offsets)
         upper = {L = gRef.upper.walls[1], R = gRef.upper.walls[#gRef.upper.walls]}
     }
     
+    dump.dump({
+        func.min(wallExt.upper.R - wallExt.lower.L, ptXSelector),
+        wallExt.upper.R,
+        wallExt.lower.L,
+    })
     
     local limitRads = {
         lower = {
@@ -207,10 +212,8 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
         return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y) * mZ * coor.transZ(-11)
     end
     
-    
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
-    -- local makeFence = junction.makeFn(mPlace, mRoofFenceF)
     local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
     
     local walls = lowerGroup.walls
@@ -431,88 +434,88 @@ local updateFn = function(fParams)
             
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
-            local info1 = {
-                lower = {
-                    nbTracks = params.nbLowerTracks + 1,
-                    r = retriveR(params.rLower) * params.fRLower1,
-                    rad = -0.5 * rad
+            local info = {
+                A = {
+                    lower = {
+                        nbTracks = params.nbLowerTracks + 1,
+                        r = retriveR(params.rLower) * params.fRLowerA,
+                        rFactor = params.fRLowerA,
+                        rad = -0.5 * rad,
+                    },
+                    upper = {
+                        nbTracks = params.nbUpperTracks + 1,
+                        r = retriveR(params.rUpper) * params.fRUpperA,
+                        rFactor = params.fRUpperA,
+                        rad = 0.5 * rad,
+                    }
                 },
-                upper = {
-                    nbTracks = params.nbUpperTracks + 1,
-                    r = retriveR(params.rUpper) * params.fRUpper1,
-                    rad = 0.5 * rad
-                }
-            }
-            local info2 = {
-                lower = {
-                    nbTracks = params.nbLowerTracks + 1,
-                    r = retriveR(params.rLower) * params.fRLower2,
-                    rad = -0.5 * rad
-                },
-                upper = {
-                    nbTracks = params.nbUpperTracks + 1,
-                    r = retriveR(params.rUpper) * params.fRUpper2,
-                    rad = 0.5 * rad
+                B = {
+                    lower = {
+                        nbTracks = params.nbLowerTracks + 1,
+                        r = retriveR(params.rLower) * params.fRLowerB,
+                        rFactor = params.fRLowerB,
+                        rad = -0.5 * rad,
+                    },
+                    upper = {
+                        nbTracks = params.nbUpperTracks + 1,
+                        r = retriveR(params.rUpper) * params.fRUpperB,
+                        rFactor = params.fRUpperB,
+                        rad = 0.5 * rad,
+                    }
                 }
             }
             
             local offsets = {
-                lower = junction.buildCoors(info1.lower.nbTracks, nbPerGroup),
-                upper = junction.buildCoors(info1.upper.nbTracks, info1.upper.nbTracks)
+                lower = junction.buildCoors(info.A.lower.nbTracks, nbPerGroup),
+                upper = junction.buildCoors(info.A.upper.nbTracks, info.A.upper.nbTracks)
             }
             
-            local group1 = part(info1, offsets)
-            local group2 = part(info2, offsets)
+            local group = {
+                A = part(info.A, offsets),
+                B = part(info.B, offsets)
+            }
             
+            local radFactorList = {A = 1, B = -1}
+            local extHeightList = { upper = tunnelHeight + height, lower = height }
+            local extSlopeList = {upper = 1, lower = -1, A = trSlopeList[params.trSlopeA + 1] * 0.001, B = trSlopeList[params.trSlopeB + 1] * 0.001}
+            local extEndList = { A = "inf", B = "sup" }
+
+            local q = function(part, level)
+                local g = group[part].ext[level].tracks[extEndList[part]]
+                return {
+                    initRad = g[1].rad,
+                    slope = extSlopeList[level] * extSlopeList[part],
+                    height = extHeightList[level],
+                    radFactor = radFactorList[part],
+                    r = info[part][level].rFactor * g[1].guideline.r
+                }
+            end
+
             local ext = {
                 upper = {
-                    jA.comp(group1.ext.upper.tracks.inf, group1.ext.upper.walls.inf,
-                        {
-                            initRad = group1.ext.upper.tracks.inf[1].rad,
-                            slope = trSlopeList[params.trSlopeA + 1] * 0.001,
-                            height = tunnelHeight + height,
-                            r = params.fRUpper1 * junction.infi,
-                            radFactor = 1
-                        }),
-                    jA.comp(group2.ext.upper.tracks.sup, group2.ext.upper.walls.sup,
-                        {
-                            initRad = group2.ext.upper.tracks.sup[1].rad,
-                            slope = trSlopeList[params.trSlopeB + 1] * 0.001,
-                            height = tunnelHeight + height,
-                            r = params.fRUpper2 * junction.infi,
-                            radFactor = -1
-                        })
+                    jA.comp(group.A.ext.upper.tracks.inf, group.A.ext.upper.walls.inf,
+                    q("A", "upper")),
+                    jA.comp(group.B.ext.upper.tracks.sup, group.B.ext.upper.walls.sup,
+                    q("B", "upper")),
                 },
                 lower = {
-                    jA.comp(group1.ext.lower.tracks.inf, group1.ext.lower.walls.inf,
-                        {
-                            initRad = group1.ext.lower.tracks.inf[1].rad,
-                            slope = -trSlopeList[params.trSlopeA + 1] * 0.001,
-                            height = height,
-                            r = params.fRLower1 * junction.infi,
-                            radFactor = 1
-                        }),
-                    jA.comp(group2.ext.lower.tracks.sup, group2.ext.lower.walls.sup,
-                        {
-                            initRad = group2.ext.lower.tracks.sup[1].rad,
-                            slope = -trSlopeList[params.trSlopeB + 1] * 0.001,
-                            height = height,
-                            r = params.fRLower2 * junction.infi,
-                            radFactor = -1
-                        })
+                    jA.comp(group.A.ext.lower.tracks.inf, group.A.ext.lower.walls.inf,
+                    q("A", "lower")),
+                    jA.comp(group.B.ext.lower.tracks.sup, group.B.ext.lower.walls.sup,
+                    q("B", "lower")),
                 }
             }
             
-            local lowerTracks = generateTrackGroups(group1.lower.tracks, group2.lower.tracks, {mpt = mZ, mvec = coor.I()})
-            local upperTracks = generateTrackGroups(group1.upper.tracks, group2.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
+            local lowerTracks = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()})
+            local upperTracks = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
             
             local upperPolys = pipe.new
-                + junction.generatePolyArc(group1.upper.walls, "inf", "mid")(0, 0)
-                + junction.generatePolyArc(group2.upper.walls, "mid", "sup")(0, 0)
+                + junction.generatePolyArc(group.A.upper.walls, "inf", "mid")(0, 0)
+                + junction.generatePolyArc(group.B.upper.walls, "mid", "sup")(0, 0)
             
             local lowerPolys = pipe.new
-                + junction.generatePolyArc(group1.lower.tracks, "inf", "mid")(10, 3.5)
-                + junction.generatePolyArc(group2.lower.tracks, "mid", "sup")(10, 3.5)
+                + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
+                + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
             
             local result = {
                 edgeLists =
@@ -525,8 +528,8 @@ local updateFn = function(fParams)
                 -- TUpperExtTracks(upperTracks.ext),
                 },
                 models = pipe.new
-                + generateStructure(group1.lower, group1.upper, mTunnelZ * mZ)[1]
-                + generateStructure(group2.lower, group2.upper, mTunnelZ * mZ)[2]
+                + generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1]
+                + generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
                 + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("models"))
                 + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("models"))
                 ,

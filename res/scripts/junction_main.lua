@@ -527,12 +527,12 @@ local updateFn = function(fParams)
                 
                 local extProtos = function(type) return {
                     upper = {
-                        A = params.type == 3 and extConfig.curve("A", "upper", type) or extConfig.straight("A", "upper", type),
-                        B = extConfig.straight("B", "upper", type)
+                        A = pipe.from("A", "upper", type) * (func.contains({3, 1}, params.type) and extConfig.curve or extConfig.straight),
+                        B = pipe.from("B", "upper", type) * (func.contains({1}, params.type) and extConfig.curve or extConfig.straight)
                     },
                     lower = {
-                        A = params.type == 3 and extConfig.curve("A", "lower", type) or extConfig.straight("A", "lower", type),
-                        B = extConfig.straight("B", "lower", type)
+                        A = pipe.from("A", "lower", type) * (func.contains({3, 1}, params.type) and extConfig.curve or extConfig.straight),
+                        B = pipe.from("B", "lower", type) * (func.contains({1}, params.type) and extConfig.curve or extConfig.straight)
                     },
                     info = {
                         height = height,

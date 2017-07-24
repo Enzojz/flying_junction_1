@@ -8,11 +8,20 @@ function data()
             description = _("An European style flying junction")
         },
         availability = {
-            yearFrom = 1892
+            yearFrom = 1800,
+            yearTo = 1800
         },
-        order = 27218,
-        params = jMain.params,
+        order = 27219,
+        params = jMain.params({"rLower", "rUpper", "params.curvedLevel"}),
         
-        updateFn = jMain.updateFn
+        updateFn = jMain.updateFn(function(params)
+            params.rLower = 0
+            params.rUpper = 0
+            params.fRLowerA = 1
+            params.fRLowerB = -1
+            params.fRUpperA = -1
+            params.fRUpperB = 1
+            params.type = 1
+        end)
     }
 end

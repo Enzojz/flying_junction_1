@@ -81,13 +81,8 @@ local retriveGeometry = function(config, slope)
             return rs
         end)
     
-    local resembleGroup = function(groups)
-        return pipe.new
-            * groups
-            * pipe.map(function(g) return
-                func.map(limits, function(l) return g.guideline:withLimits(l) end)
-            end)
-    end
+    local retriveArc = function(guideline) return func.map(limits, function(l) return guideline:withLimits(l) end)
+        end
     local retrivefZ = function(profile)
         return function(rx)
             local x = slope.length * math.abs((rx - radRef) / rad)
@@ -95,7 +90,7 @@ local retriveGeometry = function(config, slope)
             return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
         end
     end
-    return resembleGroup, retrivefZ
+    return retriveArc, retrivefZ
 end
 
 local function gmPlaceA(fz, r)
@@ -179,7 +174,7 @@ end
 local retriveFn = function(config)
     local slope = generateSlope(config.slope, config.height)
     
-    local resembleGroup, retrivefZ = retriveGeometry(config, slope)
+    local retriveArc, retrivefZ = retriveGeometry(config, slope)
     local fz = retrivefZ(slopeProfile(slope))
     local mPlaceA = gmPlaceA(fz, config.r)
     
@@ -194,7 +189,7 @@ local retriveFn = function(config)
         end
     
     return {
-        resembleGroup = resembleGroup,
+        retriveArc = retriveArc,
         fz = fz,
         slope = slope,
         zsList = zsList,
@@ -206,30 +201,27 @@ local retriveFn = function(config)
     }
 end
 
-local retriveTracks = function(group, fn, config)
-    local function isDesc(a, b) return config.height > 0 and a or b end
-    local tracks = fn.resembleGroup(group)
-    local edges = pipe.new
-        * func.map(tracks, pipe.map(junction.generateArc))
-        * pipe.map(function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end)
-        * pipe.map(pipe.map2(fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end))
-        * pipe.map(pipe.map(pipe.map(coor.vec2Tuple)))
-        * pipe.map(function(edge) return
+local retriveTracks = function(tracks)
+    local edges = pipe.new * func.map(tracks, function(tr) return pipe.new
+        * tr.guidelines
+        * pipe.map(junction.generateArc)
+        * function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end
+        * pipe.map2(tr.fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end)
+        * pipe.map(pipe.map(coor.vec2Tuple))
+        * function(edge) return
             {
                 a = pipe.new * func.range(edge, 2, #edge - 1) * pipe.zip(func.seqMap({1, 4}, function(_) return {false, false} end), {"edge", "snap"}),
                 b = pipe.new * {edge[1], edge[#edge]} * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"}),
-            } end)
+            } end
+    end)
     
-    local polys = pipe.new
-        + junction.generatePolyArc({tracks[1][1], tracks[#tracks][1]}, "inf", "sup")(10, 3.5)
-        + junction.generatePolyArc({tracks[1][2], tracks[#tracks][2]}, "inf", "sup")(10, 3.5)
-    
-    local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(fn.fz(c.rad).y)(c) end))
-    
-    return {
-        edges = edges * pipe.mapFlatten(pipe.select("a")),
-        extEdges = edges * pipe.mapFlatten(pipe.select("b")),
-        terrainAlignmentLists = {
+    local polys = func.mapFlatten(tracks, function(tr)
+        local function isDesc(a, b) return tr.config.height > 0 and a or b end
+        local polys = pipe.new
+            + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(10, 3.5)
+            + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(10, 3.5)
+        local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
+        return {
             {
                 type = isDesc("GREATER", "LESS"),
                 faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
@@ -249,6 +241,12 @@ local retriveTracks = function(group, fn, config)
                 slopeHigh = 0.75,
             }
         }
+    end)
+    
+    return {
+        edges = edges * pipe.mapFlatten(pipe.select("a")),
+        extEdges = edges * pipe.mapFlatten(pipe.select("b")),
+        terrainAlignmentLists = polys
     }
 end
 
@@ -325,6 +323,8 @@ end
 
 return {
     updateFn = updateFn,
+    retriveFn = retriveFn,
+    retriveTracks = retriveTracks,
     params = params,
     comp = comp
 }

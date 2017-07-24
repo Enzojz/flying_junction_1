@@ -476,33 +476,42 @@ local updateFn = function(fParams)
             }
             
             local radFactorList = {A = 1, B = -1}
-            local extHeightList = { upper = tunnelHeight + height, lower = height }
+            local extHeightList = {upper = tunnelHeight + height, lower = height}
             local extSlopeList = {upper = 1, lower = -1, A = trSlopeList[params.trSlopeA + 1] * 0.001, B = trSlopeList[params.trSlopeB + 1] * 0.001}
-            local extEndList = { A = "inf", B = "sup" }
-
-            local q = function(part, level)
-                local g = group[part].ext[level].tracks[extEndList[part]]
-                return {
-                    initRad = g[1].rad,
-                    slope = extSlopeList[level] * extSlopeList[part],
-                    height = extHeightList[level],
-                    radFactor = radFactorList[part],
-                    r = info[part][level].rFactor * g[1].guideline.r
-                }
+            local extEndList = {A = "inf", B = "sup"}
+            
+            local prepareArc = function(part, level)
+                return function(g)
+                    local config = {
+                        initRad = g.rad,
+                        slope = extSlopeList[level] * extSlopeList[part],
+                        height = extHeightList[level],
+                        radFactor = radFactorList[part],
+                        r = info[part][level].rFactor * g.guideline.r
+                    }
+                    local fn = jA.retriveFn(config)
+                    return {
+                        guidelines = fn.retriveArc(g.guideline),
+                        fn = fn,
+                        config = config,
+                    }
+                end
             end
-
+            
+            local prepareArcs = function(part, level)
+                return pipe.new
+                    * group[part].ext[level].tracks[extEndList[part]]
+                    * pipe.map(prepareArc(part, level))
+            end
+            
             local ext = {
                 upper = {
-                    jA.comp(group.A.ext.upper.tracks.inf, group.A.ext.upper.walls.inf,
-                    q("A", "upper")),
-                    jA.comp(group.B.ext.upper.tracks.sup, group.B.ext.upper.walls.sup,
-                    q("B", "upper")),
+                    jA.retriveTracks(prepareArcs("A", "upper")),
+                    jA.retriveTracks(prepareArcs("B", "upper")),
                 },
                 lower = {
-                    jA.comp(group.A.ext.lower.tracks.inf, group.A.ext.lower.walls.inf,
-                    q("A", "lower")),
-                    jA.comp(group.B.ext.lower.tracks.sup, group.B.ext.lower.walls.sup,
-                    q("B", "lower")),
+                    jA.retriveTracks(prepareArcs("A", "lower")),
+                    jA.retriveTracks(prepareArcs("B", "lower")),
                 }
             }
             
@@ -530,8 +539,8 @@ local updateFn = function(fParams)
                 models = pipe.new
                 + generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1]
                 + generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
-                + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("models"))
-                + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("models"))
+                -- + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("models"))
+                -- + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("models"))
                 ,
                 terrainAlignmentLists = pipe.new
                 + {

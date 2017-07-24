@@ -221,32 +221,37 @@ end
 
 
 local retrivePolys = function(tracks)
-    return func.mapFlatten(tracks, function(tr)
-        local polys = pipe.new
-            + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(10, 3.5)
-            + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(10, 3.5)
-        local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
-        return {
-            {
-                type = tr.fn.isDesc("GREATER", "LESS"),
-                faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
-                slopeLow = 0.75,
-                slopeHigh = 0.75,
-            },
-            {
-                type = "LESS",
-                faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
-                slopeLow = tr.fn.isDesc(0.75, junction.infi),
-                slopeHigh = tr.fn.isDesc(0.75, junction.infi),
-            },
-            {
-                type = "GREATER",
-                faces = tr.fn.isDesc({}, polyTracks * pipe.map(pipe.map(coor.vec2Tuple))),
-                slopeLow = 0.75,
-                slopeHigh = 0.75,
+    return tracks
+        * pipe.mapFlatten(function(tr)
+            local polys = pipe.new
+                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(10, 3.5)
+                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(10, 3.5)
+            local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
+            return {
+                {
+                    type = tr.fn.isDesc("GREATER", "LESS"),
+                    faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
+                    slopeLow = 0.75,
+                    slopeHigh = 0.75,
+                    pos = 1
+                },
+                {
+                    type = "LESS",
+                    faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
+                    slopeLow = tr.fn.isDesc(0.75, junction.infi),
+                    slopeHigh = tr.fn.isDesc(0.75, junction.infi),
+                    pos = 2
+                },
+                {
+                    type = "GREATER",
+                    faces = tr.fn.isDesc({}, polyTracks * pipe.map(pipe.map(coor.vec2Tuple))),
+                    slopeLow = 0.75,
+                    slopeHigh = 0.75,
+                    pos = 3
+                }
             }
-        }
-    end)
+        end)
+    * pipe.sort(function(l, r) return l.pos < r.pos end)
 end
 
 local retriveTrackSurfaces = function(tracks)

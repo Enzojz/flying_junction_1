@@ -211,9 +211,11 @@ local retriveTracks = function(tracks)
         end)
     
     return {
-        edges = edges * pipe.mapFlatten(pipe.select("a")),
-        extInf = edges * pipe.mapFlatten(pipe.select("inf")),
-        extSup = edges * pipe.mapFlatten(pipe.select("sup")),
+        {
+            edges = edges * pipe.mapFlatten(pipe.select("a")),
+            extInf = edges * pipe.mapFlatten(pipe.select("inf")),
+            extSup = edges * pipe.mapFlatten(pipe.select("sup")),
+        }
     }
 end
 
@@ -325,5 +327,4 @@ return {
     retrivePolys = retrivePolys,
     retriveWalls = retriveWalls,
     params = params,
-    comp = comp
 }

@@ -21,6 +21,7 @@ function data()
             params.fRLowerB = -1
             params.fRUpperA = -1
             params.fRUpperB = 1
+            params.type = 2
         end
     )
     }

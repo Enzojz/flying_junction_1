@@ -31,7 +31,7 @@ local function params()
             key = "radius",
             name = _("Radius") .. ("(m)"),
             values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
-            defaultIndex = 0
+            defaultIndex = #rList - 1
         },
         {
             key = "isMir",
@@ -63,7 +63,7 @@ end
 
 local baseGuideline = function(initPt, initRad, r)
     return arc.byOR(
-        coor.xyz(r, 0, 0) .. coor.rotZ(initRad) * coor.trans(initPt),
+        coor.xyz(r, 0, 0),
         math.abs(r)
 )
 end
@@ -249,7 +249,7 @@ local retrivePolys = function(tracks)
                 }
             }
         end)
-    * pipe.sort(function(l, r) return l.pos < r.pos end)
+        * pipe.sort(function(l, r) return l.pos < r.pos end)
 end
 
 local retriveTrackSurfaces = function(tracks)
@@ -273,14 +273,34 @@ end
 
 local composite = function(config)
     local offsets = junction.buildCoors(config.nbTracks, config.nbTracks)
-    local guideline = baseGuideline(config.initPt, config.initRad, config.r)
+    local guideline = arc.byOR(coor.xyz(config.r, 0, 0), math.abs(config.r))
     
-    local groups = {
-        tracks = offsets.tracks * pipe.map(function(o) return {guideline = guideline + o} end),
-        walls = offsets.walls * pipe.map(function(o) return {guideline = guideline + o} end)
+    local tracks = offsets.tracks * pipe.map(function(o) return guideline + o end)
+        * pipe.map(function(tr)
+            local fn = retriveFn(config)
+            return {
+                guidelines = fn.retriveArc(tr),
+                fn = fn,
+                config = config,
+            }
+        end)
+    
+    local walls = offsets.walls * pipe.map(function(o) return guideline + o end)
+        * pipe.map(function(wa)
+            local fn = retriveFn(config)
+            return {
+                guidelines = fn.retriveArc(wa),
+                fn = fn,
+                config = config,
+            }
+        end)
+    
+    return {
+        edges = table.unpack(retriveTracks(tracks)),
+        polys = retrivePolys(tracks),
+        surface = retriveTrackSurfaces(tracks),
+        walls = retriveWalls(walls)
     }
-    
-    return comp(groups, config)
 end
 
 local function defaultParams(param)
@@ -304,20 +324,19 @@ local updateFn = function(params)
     local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
     
     local c = composite({
-        initPt = coor.xyz(30, 40, 0),
-        initRad = math.pi / 12,
+        initRad = r > 0 and math.pi or 0,
         slope = sFactor * slopeList[params.slope + 1] * 0.001,
         height = height,
         r = r,
         nbTracks = nbTracks,
         radFactor = 1
     })
-    
+
     return
         {
-            edgeLists = {(c.edges + c.extEdges) * station.prepareEdges * trackBuilder.nonAligned()},
-            models = c.models,
-            terrainAlignmentLists = c.terrainAlignmentLists
+            edgeLists = {(c.edges.edges + c.edges.extInf + c.edges.extSup) * station.prepareEdges * trackBuilder.nonAligned()},
+            models = c.walls + c.surface,
+            terrainAlignmentLists = c.polys
         }
 end
 

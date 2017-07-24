@@ -7,7 +7,6 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
-local dump = require "datadumper"
 
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -210,13 +209,12 @@ local retriveTracks = function(tracks)
                 } end
         end)
     
-    return {
+    return pipe.new /
         {
             edges = edges * pipe.mapFlatten(pipe.select("a")),
             extInf = edges * pipe.mapFlatten(pipe.select("inf")),
             extSup = edges * pipe.mapFlatten(pipe.select("sup")),
         }
-    }
 end
 
 

@@ -3,7 +3,6 @@ local coor = require "flyingjunction/coor"
 local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
-local dump = require "datadumper"
 local junction = {}
 
 junction.infi = 1e8

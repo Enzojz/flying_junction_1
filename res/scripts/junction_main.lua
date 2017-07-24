@@ -8,8 +8,6 @@ local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
 
-local dump = require "datadumper"
-
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -89,44 +87,39 @@ local minimalR = function(offsets, info)
     return calculate(info.lower.r, info.upper.r)
 end
 
-local retriveExt = function(i, groupFn, radFn, rFn, guidelineFn)
+local retriveExt = function(protos)
     local radFactorList = {A = 1, B = -1}
-    local extHeightList = {upper = i.tunnelHeight + i.height, lower = i.height}
-    local extSlopeList = {upper = 1, lower = -1, A = i.slopeA, B = i.slopeB}
+    local extHeightList = {upper = protos.info.tunnelHeight + protos.info.height, lower = protos.info.height}
+    local extSlopeList = {upper = 1, lower = -1, A = protos.info.slopeA, B = protos.info.slopeB}
     
-    
-    local prepareArc = function(part, level)
+    local prepareArc = function(proto)
         return function(g)
             local config = {
-                initRad = radFn(g, part),
-                slope = extSlopeList[level] * extSlopeList[part],
-                height = extHeightList[level],
-                radFactor = radFactorList[part],
-                r = rFn(g, part, level),
+                initRad = proto.radFn(g),
+                slope = extSlopeList[proto.level] * extSlopeList[proto.part],
+                height = extHeightList[proto.level],
+                radFactor = radFactorList[proto.part],
+                r = proto.rFn(g),
             }
             local fn = jA.retriveFn(config)
             return {
-                guidelines = fn.retriveArc(guidelineFn(g)),
+                guidelines = fn.retriveArc(proto.guidelineFn(g)),
                 fn = fn,
                 config = config,
             }
         end
     end
     
-    local prepareArcs = function(type, part, level)
+    local prepareArcs = function(proto)
         return pipe.new
-            * groupFn(part, level, type)
-            * pipe.map(prepareArc(part, level))
+            * proto.group
+            * pipe.map(prepareArc(proto))
     end
     
-    return function(type, fn)
+    return function(fn)
         return {
-            upper = pipe.new
-            / fn(prepareArcs(type, "A", "upper"))
-            / fn(prepareArcs(type, "B", "upper")),
-            lower = pipe.new
-            / fn(prepareArcs(type, "A", "lower"))
-            / fn(prepareArcs(type, "B", "lower")),
+            upper = fn(prepareArcs(protos.upper.A)) + fn(prepareArcs(protos.upper.B)),
+            lower = fn(prepareArcs(protos.lower.A)) + fn(prepareArcs(protos.lower.B)),
         }
     end
 end
@@ -377,13 +370,13 @@ local function params(paramFilter)
                 key = "rLower",
                 name = _("Radius of lower tracks"),
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
-                defaultIndex = 0
+                defaultIndex = #rList - 1
             },
             {
                 key = "rUpper",
                 name = _("Radius of upper tracks"),
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
-                defaultIndex = 0
+                defaultIndex = #rList - 1
             },
             {
                 key = "transitionA",
@@ -510,63 +503,56 @@ local updateFn = function(fParams)
                 B = part(info.B, offsets)
             }
             
-            local extInfo = {
-                height = height,
-                tunnelHeight = tunnelHeight,
-                slopeA = trSlopeList[params.trSlopeA + 1] * 0.001,
-                slopeB = trSlopeList[params.trSlopeB + 1] * 0.001
-            }
-            local extEndList = {A = "inf", B = "sup"}
-            
-            local retrive = {
-                straight = retriveExt(extInfo,
-                    function(part, level, type) return group[part].ext[level][type][extEndList[part]] end,
-                    function(g) return g.rad end,
-                    function(g, part, level) return info[part][level].rFactor * g.guideline.r end,
-                    function(g) return g.guideline end),
-                curve = retriveExt(extInfo,
-                    function(part, level, type) return group[part][level][type] end,
-                    function(g, part) return g[extEndList[part]] end,
-                    function(g, part, level) return info[part][level].rFactor * g.r end,
-                    function(g) return g end)
-            }
-            
-            local retriveExtension = function(fn)
-                return {
-                    edges = fn("tracks", jA.retriveTracks),
-                    polys = fn("tracks", jA.retrivePolys),
-                    surface = fn("tracks", jA.retriveTrackSurfaces),
-                    walls = fn("walls", jA.retriveWalls)
+            local ext = pipe.exec * function()
+                local extEndList = {A = "inf", B = "sup"}
+                local extConfig = {
+                    straight = function(part, level, type)
+                        return {
+                            group = group[part].ext[level][type][extEndList[part]],
+                            radFn = function(g) return g.rad end,
+                            rFn = function(g) return info[part][level].rFactor * g.guideline.r end,
+                            guidelineFn = function(g) return g.guideline end,
+                            part = part,
+                            level = level
+                        } end,
+                    curve = function(part, level, type) return {
+                        group = group[part][level][type],
+                        radFn = function(g) return g[extEndList[part]] end,
+                        rFn = function(g) return info[part][level].rFactor * g.r end,
+                        guidelineFn = function(g) return g end,
+                        part = part,
+                        level = level
+                    } end
                 }
-            end
-            
-            local ext = {
-                straight = retriveExtension(retrive.straight),
-                curve = retriveExtension(retrive.curve)
-            }
-            
-            local extSelector = function(part)
-                local sel = function(level)
-                    local s = ext.straight[part][level]
-                    local c = ext.curve[part][level]
-                    return ({
-                        function() return s * pipe.flatten() end,
-                        function() return s * pipe.flatten() end,
-                        function() return pipe.new * func.concat(c[1], s[2]) end
-                    })[params.type]()
+                
+                local extProtos = function(type) return {
+                    upper = {
+                        A = params.type == 3 and extConfig.curve("A", "upper", type) or extConfig.straight("A", "upper", type),
+                        B = extConfig.straight("B", "upper", type)
+                    },
+                    lower = {
+                        A = params.type == 3 and extConfig.curve("A", "lower", type) or extConfig.straight("A", "lower", type),
+                        B = extConfig.straight("B", "lower", type)
+                    },
+                    info = {
+                        height = height,
+                        tunnelHeight = tunnelHeight,
+                        slopeA = trSlopeList[params.trSlopeA + 1] * 0.001,
+                        slopeB = trSlopeList[params.trSlopeB + 1] * 0.001
+                    }
+                }
                 end
+                
+                local retriveTracks = retriveExt(extProtos("tracks"))
+                local retriveWalls = retriveExt(extProtos("walls"))
+                
                 return {
-                    lower = sel("lower"),
-                    upper = sel("upper")
+                    edges = retriveTracks(jA.retriveTracks),
+                    polys = retriveTracks(jA.retrivePolys),
+                    surface = retriveTracks(jA.retriveTrackSurfaces),
+                    walls = retriveWalls(jA.retriveWalls)
                 }
             end
-            
-            local extension = {
-                edges = extSelector("edges"),
-                polys = extSelector("polys"),
-                surface = extSelector("surface"),
-                walls = extSelector("walls")
-            }
             
             local lowerTracks = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()})
             local upperTracks = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
@@ -584,24 +570,24 @@ local updateFn = function(fParams)
                 {
                     TUpperTracks(upperTracks.normal),
                     TLowerTracks(lowerTracks.normal),
-                    extension.edges.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
-                    extension.edges.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks,
+                    ext.edges.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
+                    ext.edges.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks,
                     
-                    extension.edges.lower[1].extInf * station.prepareEdges * TLowerTracks,
-                    extension.edges.upper[1].extInf * station.prepareEdges * TUpperTracks,
-                    extension.edges.lower[2].extSup * station.prepareEdges * TLowerTracks,
-                    extension.edges.upper[2].extSup * station.prepareEdges * TUpperTracks,
-
+                    ext.edges.lower[1].extInf * station.prepareEdges * TLowerTracks,
+                    ext.edges.upper[1].extInf * station.prepareEdges * TUpperTracks,
+                    ext.edges.lower[2].extSup * station.prepareEdges * TLowerTracks,
+                    ext.edges.upper[2].extSup * station.prepareEdges * TUpperTracks,
+                
                 -- TLowerExtTracks(lowerTracks.ext),
                 -- TUpperExtTracks(upperTracks.ext),
                 },
                 models = pipe.new
                 + generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1]
                 + generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
-                + extension.walls.lower
-                + extension.walls.upper
-                + extension.surface.lower
-                + extension.surface.upper
+                + ext.walls.lower
+                + ext.walls.upper
+                + ext.surface.lower
+                + ext.surface.upper
                 ,
                 terrainAlignmentLists = pipe.new
                 + {
@@ -623,8 +609,8 @@ local updateFn = function(fParams)
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
                     }
                 }
-                + extension.polys.lower
-                + extension.polys.upper
+                + ext.polys.lower
+                + ext.polys.upper
             }
             
             -- End of generation

@@ -487,7 +487,7 @@ local updateFn = function(fParams)
                         slope = extSlopeList[level] * extSlopeList[part],
                         height = extHeightList[level],
                         radFactor = radFactorList[part],
-                        r = info[part][level].rFactor * g.guideline.r
+                        r = info[part][level].rFactor * g.guideline.r,
                     }
                     local fn = jA.retriveFn(config)
                     return {
@@ -517,7 +517,10 @@ local updateFn = function(fParams)
                 }
             end
             
-            local ext = retrive("tracks", jA.retriveTracks)
+            local extEdges = retrive("tracks", jA.retriveTracks)
+            local extPolys = retrive("tracks", jA.retrivePolys)
+            local extSurface = retrive("tracks", jA.retriveTrackSurfaces)
+            local extWalls = retrive("walls", jA.retriveWalls)
             
             local lowerTracks = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()})
             local upperTracks = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
@@ -535,16 +538,18 @@ local updateFn = function(fParams)
                 {
                     TUpperTracks(upperTracks.normal),
                     TLowerTracks(lowerTracks.normal),
-                    pipe.new * ext.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
-                    pipe.new * ext.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks
+                    pipe.new * extEdges.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
+                    pipe.new * extEdges.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks
                 -- TLowerExtTracks(lowerTracks.ext),
                 -- TUpperExtTracks(upperTracks.ext),
                 },
                 models = pipe.new
                 + generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1]
                 + generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
-                -- + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("models"))
-                -- + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("models"))
+                + func.flatten(extWalls.lower)
+                + func.flatten(extWalls.upper)
+                + func.flatten(extSurface.lower)
+                + func.flatten(extSurface.upper)
                 ,
                 terrainAlignmentLists = pipe.new
                 + {
@@ -566,8 +571,8 @@ local updateFn = function(fParams)
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
                     }
                 }
-                + pipe.new * ext.upper * pipe.mapFlatten(pipe.select("terrainAlignmentLists"))
-                + pipe.new * ext.lower * pipe.mapFlatten(pipe.select("terrainAlignmentLists"))
+                + func.flatten(extPolys.lower)
+                + func.flatten(extPolys.upper)
             }
             
             -- End of generation

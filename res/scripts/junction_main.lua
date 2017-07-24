@@ -66,7 +66,7 @@ local minimalR = function(offsets, info)
     local offsetUpper = {offsets.upper.walls[1], offsets.upper.walls[#offsets.upper.walls]}
     
     local function incr(r)
-        return r == 0 and 0 or (r > 0 and r + 1 or r - 1)
+        return r == 0 and 0 or (r > 0 and r + 0.1 or r - 0.1)
     end
     
     local function calculate(rLower, rUpper)
@@ -587,6 +587,10 @@ local updateFn = function(fParams)
                     extension.edges.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
                     extension.edges.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks,
                     
+                    extension.edges.lower[1].extInf * station.prepareEdges * TLowerTracks,
+                    extension.edges.upper[1].extInf * station.prepareEdges * TUpperTracks,
+                    extension.edges.lower[2].extSup * station.prepareEdges * TLowerTracks,
+                    extension.edges.upper[2].extSup * station.prepareEdges * TUpperTracks,
 
                 -- TLowerExtTracks(lowerTracks.ext),
                 -- TUpperExtTracks(upperTracks.ext),

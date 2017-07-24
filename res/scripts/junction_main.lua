@@ -498,22 +498,26 @@ local updateFn = function(fParams)
                 end
             end
             
-            local prepareArcs = function(part, level)
+            local prepareArcs = function(type, part, level)
                 return pipe.new
-                    * group[part].ext[level].tracks[extEndList[part]]
+                    * group[part].ext[level][type][extEndList[part]]
                     * pipe.map(prepareArc(part, level))
             end
             
-            local ext = {
-                upper = {
-                    jA.retriveTracks(prepareArcs("A", "upper")),
-                    jA.retriveTracks(prepareArcs("B", "upper")),
-                },
-                lower = {
-                    jA.retriveTracks(prepareArcs("A", "lower")),
-                    jA.retriveTracks(prepareArcs("B", "lower")),
+            local function retrive(type, fn)
+                return {
+                    upper = {
+                        fn(prepareArcs(type, "A", "upper")),
+                        fn(prepareArcs(type, "B", "upper")),
+                    },
+                    lower = {
+                        fn(prepareArcs(type, "A", "lower")),
+                        fn(prepareArcs(type, "B", "lower")),
+                    }
                 }
-            }
+            end
+            
+            local ext = retrive("tracks", jA.retriveTracks)
             
             local lowerTracks = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()})
             local upperTracks = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})

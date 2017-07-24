@@ -163,14 +163,6 @@ local slopeProfile = function(slope)
     }
 end
 
-local makeStructure = function(group, fMake)
-    return group
-        * pipe.map(pipe.map(fMake))
-        * pipe.flatten()
-        * pipe.flatten()
-        * pipe.flatten()
-end
-
 local retriveFn = function(config)
     local slope = generateSlope(config.slope, config.height)
     
@@ -248,6 +240,14 @@ local retriveTracks = function(tracks)
         extEdges = edges * pipe.mapFlatten(pipe.select("b")),
         terrainAlignmentLists = polys
     }
+end
+
+local makeStructure = function(group, fMake)
+    return group
+        * pipe.map(pipe.map(fMake))
+        * pipe.flatten()
+        * pipe.flatten()
+        * pipe.flatten()
 end
 
 local retriveWalls = function(groupTr, groupWa, fn, config)

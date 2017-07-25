@@ -61,34 +61,42 @@ local function params()
 
 end
 
-local baseGuideline = function(initPt, initRad, r)
-    return arc.byOR(
-        coor.xyz(r, 0, 0),
-        math.abs(r)
-)
-end
-
 local retriveGeometry = function(config, slope)
     local rad = config.radFactor * slope.length / config.r
     local radT = slope.trans.length / slope.length * rad
     local radRef = junction.normalizeRad(config.initRad)
-    local limits = pipe.new * {{0, radT, 0.5 * rad}, {0.5 * rad, rad - radT, rad}}
-        * function(ls) return config.radFactor < 0 and ls or ls * pipe.map(pipe.rev()) * pipe.rev() end
-        * pipe.map(pipe.map(pipe.plus(radRef)))
+    local radList = pipe.new
+        * {0, 0, radT, rad * 0.5, rad - radT, rad, rad}
+        * (config.radFactor < 0 and pipe.noop() or pipe.rev())
+        * pipe.map(pipe.plus(radRef))
+    
+    local limits = pipe.new * {func.range(radList, 2, 4), func.range(radList, 4, 6)}
         * pipe.map(function(s) local rs = {}
             rs.inf, rs.mid, rs.sup = table.unpack(s)
             return rs
         end)
     
-    local retriveArc = function(guideline) return limits * pipe.map(function(l) return guideline:withLimits(l) end)
-        end
+    local retriveArc = function(guideline) return
+        limits * pipe.map(function(l) return guideline:withLimits(l) end)
+    end
+    
     local retrivefZ = function(profile)
-        return function(rx)
+        local fz = function(rx)
             local x = slope.length * math.abs((rx - radRef) / rad)
             local pf = func.filter(profile, function(s) return s.pred(x) end)[1]
-            return pf.ref(pf.arc / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end)
+            return pf.pt(x), pf
         end
+        
+        local fs = function(rx)
+            local pt, pf = fz(rx)
+            return pf.slope(pt)
+        end
+        
+        local zList = radList * pipe.map(fz) * pipe.map(function(p) return p.y end)
+        local sList = radList * pipe.map(fs) * (config.radFactor < 0 and pipe.noop() or pipe.map(pipe.neg()) )
+        return fz, func.zip(zList, sList, {"z", "s"})
     end
+    
     return retriveArc, retrivefZ
 end
 
@@ -101,84 +109,90 @@ local function gmPlaceA(fz, r)
 end
 
 
-local generateSlope = function(slope, height)
+local function generateSlope(slope, height)
     local sFactor = slope > 0 and 1 or -1
     local rad = math.atan(slope)
     local rTrans = 300
     local trans = {
         r = rTrans,
         dz = sFactor * rTrans * (1 - math.cos(rad)),
-        length = sFactor * rTrans * math.sin(rad)
+        length = height == 0 and 10 or sFactor * rTrans * math.sin(rad)
     }
     return {
         slope = slope,
         rad = rad,
         factor = sFactor,
-        length = (height - 2 * trans.dz) / slope + 2 * trans.length,
+        length = height == 0 and 30 or (height - 2 * trans.dz) / slope + 2 * trans.length,
         trans = trans,
         height = height
     }
 end
 
 local slopeProfile = function(slope)
-    local ref1 = slope.factor * math.pi * 0.5
-    local ref2 = -ref1
-    local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + slope.height), slope.trans.r)
-    local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r), slope.trans.r)
-    local pTr1 = arc1:pt(ref1 - slope.rad)
-    local pTr2 = arc2:pt(ref2 - slope.rad)
-    local pTrM = coor.xy(slope.length * 0.5, slope.height * 0.5)
-    return {
-        {
-            arc = arc.byOR(coor.xy(0, -slope.factor * junction.infi + slope.height), junction.infi),
-            ref = slope.height > 0 and func.max or func.min,
-            pred = function(x) return x < 0 end,
-        },
-        {
-            arc = arc1,
-            ref = slope.height > 0 and func.max or func.min,
-            pred = function(x) return x >= 0 and x <= pTr1.x end,
-        },
-        {
-            arc = arc.byOR(arc.byDR(arc1, junction.infi):pt(ref1 - slope.rad), junction.infi),
-            ref = slope.height < 0 and func.max or func.min,
-            pred = function(x) return x > pTr1.x and x < pTrM.x end,
-        },
-        {
-            arc = arc.byOR(arc.byDR(arc2, junction.infi):pt(ref2 - slope.rad), junction.infi),
-            ref = slope.height > 0 and func.max or func.min,
-            pred = function(x) return x >= pTrM.x and x < pTr2.x end,
-        },
-        {
-            arc = arc2,
-            ref = slope.height < 0 and func.max or func.min,
-            pred = function(x) return x >= pTr2.x and x <= slope.length end,
-        },
-        {
-            arc = arc.byOR(coor.xy(slope.length, slope.factor * junction.infi), junction.infi),
-            ref = slope.height < 0 and func.max or func.min,
-            pred = function(x) return x > slope.length end,
-        },
-    }
+    local flatProfile = function()
+        return {
+            {
+                pt = function(x) return coor.xy(x, slope.height) end,
+                slope = function(_) return 0 end,
+                pred = function(_) return true end,
+            },
+        }
+    end
+    local normalProfile = function()
+        local ref1 = slope.factor * math.pi * 0.5
+        local ref2 = -ref1
+        local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + slope.height), slope.trans.r)
+        local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r), slope.trans.r)
+        local pTr1 = arc1:pt(ref1 - slope.rad)
+        local pTr2 = arc2:pt(ref2 - slope.rad)
+        local lineSlope = line.byPtPt(pTr1, pTr2)
+        local intersection = function(ar, cond) return function(x) return cond(ar / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end) end end
+        return {
+            {
+                pred = function(x) return x < 0 end,
+                slope = function(_) return 0 end,
+                pt = function(x) return coor.xy(x, slope.height) end
+            },
+            {
+                ref = slope.height > 0 and func.max or func.min,
+                pred = function(x) return x >= 0 and x <= pTr1.x end,
+                slope = function(pt) return math.tan(arc1:rad(pt) - math.pi * 0.5) end,
+                pt = intersection(arc1, slope.height > 0 and func.max or func.min)
+            },
+            {
+                pred = function(x) return x > pTr1.x and x < pTr2.x end,
+                slope = function(_) return -lineSlope.a / lineSlope.b end,
+                pt = function(x) return lineSlope - line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)) end
+            },
+            {
+                pred = function(x) return x >= pTr2.x and x <= slope.length end,
+                slope = function(pt) return math.tan(arc2:rad(pt) - math.pi * 0.5) end,
+                pt = intersection(arc2, slope.height < 0 and func.max or func.min)
+            },
+            {
+                pred = function(x) return x > slope.length end,
+                slope = function(_) return 0 end,
+                pt = function(x) return coor.xy(x, 0) end
+            },
+        }
+    end
+    return slope.height == 0 and flatProfile() or normalProfile()
 end
 
 local retriveFn = function(config)
     local slope = generateSlope(config.slope, config.height)
     
     local retriveArc, retrivefZ = retriveGeometry(config, slope)
-    local fz = retrivefZ(slopeProfile(slope))
+    local profile = slopeProfile(slope)
+    local fz, zsList = retrivefZ(profile)
     local mPlaceA = gmPlaceA(fz, config.r)
     
-    local zsList = pipe.new
-        * func.zip(
-            pipe.new * {0, 0, slope.trans.dz, slope.height * 0.5, slope.height - slope.trans.dz, slope.height, slope.height} * function(ls) return config.radFactor > 0 and ls or func.rev(ls) end,
-            pipe.new * {0, 0, slope.slope, slope.slope, slope.slope, 0, 0} * function(ls) return config.radFactor > 0 and ls or func.rev(ls * pipe.map(pipe.neg())) end,
-            {"z", "s"})
-        * function(hsList) return hsList
-            * pipe.range(1, #hsList - 1)
-            * pipe.map2(hsList * pipe.range(2, #hsList), function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end)
-        end
-    
+    zsList = func.map2(
+        func.range(zsList, 1, #zsList - 1),
+        func.range(zsList, 2, #zsList),
+        function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end
+    )
+
     return {
         retriveArc = retriveArc,
         fz = fz,
@@ -331,7 +345,7 @@ local updateFn = function(params)
         nbTracks = nbTracks,
         radFactor = 1
     })
-
+    
     return
         {
             edgeLists = {(c.edges.edges + c.edges.extInf + c.edges.extSup) * station.prepareEdges * trackBuilder.nonAligned()},

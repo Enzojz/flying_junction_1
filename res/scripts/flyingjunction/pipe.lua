@@ -201,8 +201,10 @@ function pipe.select(name)
     end
 end
 
-function pipe.noop(x)
-    return x
+function pipe.noop()
+    return function(x)
+        return x
+    end
 end
 
 local pipeMeta = {

@@ -19,7 +19,7 @@ local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
-local heightList = {-11, -8.7, -5, -2.5, -0.5, 0, 0.5, 2.5, 5}
+local heightList = {0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
@@ -92,11 +92,12 @@ local retriveExt = function(protos)
     local extHeightList = {upper = protos.info.tunnelHeight + protos.info.height, lower = protos.info.height}
     local extSlopeList = {upper = 1, lower = -1, A = protos.info.slopeA, B = protos.info.slopeB}
     
-    local prepareArc = function(proto)
+    
+    local prepareArc = function(proto, slope)
         return function(g)
             local config = {
                 initRad = proto.radFn(g),
-                slope = extSlopeList[proto.level] * extSlopeList[proto.part],
+                slope = slope,
                 height = extHeightList[proto.level],
                 radFactor = radFactorList[proto.part],
                 r = proto.rFn(g),
@@ -111,9 +112,32 @@ local retriveExt = function(protos)
     end
     
     local prepareArcs = function(proto)
+        local oppositeHeight = {
+            lower = extHeightList["upper"],
+            upper = extHeightList["lower"],
+        }
+        
+        local oppositeSlope = {
+            lower = extSlopeList["upper"] * extSlopeList[proto.part],
+            upper = extSlopeList["lower"] * extSlopeList[proto.part],
+        }
+        
+        local opposite = {
+            height = oppositeHeight[proto.level],
+            slope = oppositeSlope[proto.level]
+        }
+        
+        local height = extHeightList[proto.level]
+        
+
+        local slope = (math.abs(height) >= math.abs(opposite.height))
+            and jA.generateSlope(extSlopeList[proto.level] * extSlopeList[proto.part], height)
+            or jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height
+        )
+
         return pipe.new
             * proto.group
-            * pipe.map(prepareArc(proto))
+            * pipe.map(prepareArc(proto, slope))
     end
     
     return function(fn)
@@ -242,6 +266,7 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
+    local makeSurface = junction.makeFn(mRoof, mPlace, coor.transZ(-11) * coor.scaleY(1.05))
     local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
     
     local walls = lowerGroup.walls
@@ -259,6 +284,7 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
                     }) end)
             end)
         * func.flatten
+    
     
     local upperFences = func.map(upperGroup.tracks, function(t)
         return {
@@ -300,6 +326,7 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
         + makeSideFence(upperGroup.walls[2])[1]
         + makeWall(upperGroup.walls[2])[1]
         + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
+        + func.mapFlatten(lowerGroup.tracks, function(t) return makeSurface(t)[1] end)
         + func.map(upperFences, function(f) return f[1] end)
         ,
         pipe.new
@@ -310,11 +337,12 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
         + makeSideFence(upperGroup.walls[1])[2]
         + makeWall(upperGroup.walls[1])[2]
         + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
+        + func.mapFlatten(lowerGroup.tracks, function(t) return makeSurface(t)[2] end)
         + func.map(upperFences, function(f) return f[2] end)
     }
 end
 
-local function params(paramFilter)
+local function params(paramFilter, defaultValue)
     return pipe.new *
         {
             paramsutil.makeTrackTypeParam(),
@@ -416,9 +444,9 @@ local function params(paramFilter)
             },
             {
                 key = "height",
-                name = _("Altitude Adjustment(m)"),
-                values = func.map(heightList, tostring),
-                defaultIndex = 2
+                name = _("Altitude Adjustment"),
+                values = func.map(heightList, function(h) return tostring(math.ceil(h * 100)) .. "%" end),
+                defaultIndex = #heightList - 1
             }
         }
         * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
@@ -449,7 +477,7 @@ local updateFn = function(fParams)
             local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
-            local height = heightList[params.height + 1]
+            local height = (heightList[params.height + 1] - 1) * tunnelHeight
             local mZ = coor.transZ(height)
             local mTunnelZ = coor.transZ(tunnelHeight)
             
@@ -524,6 +552,8 @@ local updateFn = function(fParams)
                         level = level
                     } end
                 }
+                
+                
                 
                 local extProtos = function(type) return {
                     upper = {

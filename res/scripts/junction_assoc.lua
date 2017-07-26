@@ -93,7 +93,7 @@ local retriveGeometry = function(config, slope)
         end
         
         local zList = radList * pipe.map(fz) * pipe.map(function(p) return p.y end)
-        local sList = radList * pipe.map(fs) * (config.radFactor < 0 and pipe.noop() or pipe.map(pipe.neg()) )
+        local sList = radList * pipe.map(fs) * (config.radFactor < 0 and pipe.noop() or pipe.map(pipe.neg()))
         return fz, func.zip(zList, sList, {"z", "s"})
     end
     
@@ -108,7 +108,6 @@ local function gmPlaceA(fz, r)
     end
 end
 
-
 local function generateSlope(slope, height)
     local sFactor = slope > 0 and 1 or -1
     local rad = math.atan(slope)
@@ -122,10 +121,19 @@ local function generateSlope(slope, height)
         slope = slope,
         rad = rad,
         factor = sFactor,
-        length = height == 0 and 30 or (height - 2 * trans.dz) / slope + 2 * trans.length,
+        length = math.abs(height == 0 and 30 or (height - 2 * trans.dz) / slope + 2 * trans.length),
         trans = trans,
         height = height
     }
+end
+
+local function solveSlope(refSlope, height)
+    local function solver(slope)
+        local x = generateSlope(slope, height)
+        return math.abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
+    end
+    
+    return height == 0 and func.with(generateSlope(-refSlope.slope, height), {length = refSlope.length}) or solver(-refSlope.slope)
 end
 
 local slopeProfile = function(slope)
@@ -180,24 +188,20 @@ local slopeProfile = function(slope)
 end
 
 local retriveFn = function(config)
-    local slope = generateSlope(config.slope, config.height)
-    
-    local retriveArc, retrivefZ = retriveGeometry(config, slope)
-    local profile = slopeProfile(slope)
+    local retriveArc, retrivefZ = retriveGeometry(config, config.slope)
+    local profile = slopeProfile(config.slope)
     local fz, zsList = retrivefZ(profile)
     local mPlaceA = gmPlaceA(fz, config.r)
     
-    zsList = func.map2(
-        func.range(zsList, 1, #zsList - 1),
-        func.range(zsList, 2, #zsList),
-        function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end
-    )
-
     return {
         retriveArc = retriveArc,
         fz = fz,
-        slope = slope,
-        zsList = zsList,
+        slope = config.slope,
+        zsList = func.map2(
+            func.range(zsList, 1, #zsList - 1),
+            func.range(zsList, 2, #zsList),
+            function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end
+        ),
         mPlaceA = mPlaceA,
         mPlaceD = function(guideline, rad1, rad2)
             local radc = (rad1 + rad2) * 0.5
@@ -362,5 +366,7 @@ return {
     retriveTrackSurfaces = retriveTrackSurfaces,
     retrivePolys = retrivePolys,
     retriveWalls = retriveWalls,
+    solveSlope = solveSlope,
+    generateSlope = generateSlope,
     params = params,
 }

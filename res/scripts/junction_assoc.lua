@@ -240,8 +240,8 @@ local retrivePolys = function(tracks)
     return tracks
         * pipe.mapFlatten(function(tr)
             local polys = pipe.new
-                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(1, 4)
-                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(1, 4)
+                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(10, 4)
+                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(10, 4)
             local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
             return {
                 {

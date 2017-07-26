@@ -15,6 +15,11 @@ function arc.new(a, b, r, limits)
         pt = arc.ptByRad,
         limits = arc.limits,
         withLimits = arc.withLimits,
+        extendLimitsRad = arc.extendLimitsRad,
+        extendLimits = arc.extendLimits,
+        extraRad = arc.extraRad,
+        extra = arc.extra,
+        tangent = arc.tangent
     }
     setmetatable(result, {
         __sub = arc.intersectionArc,
@@ -35,6 +40,41 @@ function arc.withLimits(a, limits)
     return func.with(a, limits)
 end
 
+function arc.extendLimitsRad(arc, dInf, dSup)
+    dSup = dSup or dInf
+    return arc:withLimits({
+        inf = arc.inf + (arc.inf > arc.mid and dInf or -dInf),
+        mid = arc.mid,
+        sup = arc.sup + (arc.sup > arc.mid and dSup or -dSup)
+    })
+end
+
+function arc.extendLimits(arc, dInf, dSup)
+    dSup = dSup or dInf
+    return arc:extendLimitsRad(dInf / arc.r, dSup / arc.r)
+end
+
+function arc.extraRad(arc, dInf, dSup)
+    dSup = dSup or dInf
+    return {
+        inf = arc:withLimits({
+            inf = arc.inf + (arc.inf > arc.mid and dInf or -dInf),
+            mid = arc.inf + 0.5 * (arc.inf > arc.mid and dInf or -dInf),
+            sup = arc.inf
+        }),
+        sup = arc:withLimits({
+            inf = arc.sup,
+            mid = arc.sup + 0.5 * (arc.sup > arc.mid and dSup or -dSup),
+            sup = arc.sup + (arc.sup > arc.mid and dSup or -dSup)
+        })
+    }
+end
+
+function arc.extra(arc, dInf, dSup)
+    dSup = dSup or dInf
+    return arc:extraRad(dInf / arc.r, dSup / arc.r)
+end
+
 function arc.limits(a)
     return {
         inf = a.inf,
@@ -47,8 +87,7 @@ function arc.ptByRad(arc, rad)
     return
         coor.xy(
             arc.o.x + arc.r * math.cos(rad),
-            arc.o.y + arc.r * math.sin(rad)
-)
+            arc.o.y + arc.r * math.sin(rad))
 end
 
 function arc.radByPt(arc, pt)
@@ -58,6 +97,10 @@ end
 
 function arc.ptByPt(arc, pt)
     return (pt - arc.o):normalized() * arc.r + arc.o
+end
+
+function arc.tangent(arc, rad)
+    return coor.xyz(0, (arc.sup > arc.inf and 1 or -1), 0) .. coor.rotZ(rad)
 end
 
 
@@ -131,12 +174,12 @@ function arc.intersectionArc(arc1, arc2)
 end
 
 function arc.coords(a, baseLength)
-    return function(from, rad)
-        local length = a.r * math.abs(rad)
+    return function(inf, sup)
+        local length = a.r * math.abs(sup - inf)
         local nSeg = (function(x) return (x < 1 or (x % 1 > 0.5)) and math.ceil(x) or math.floor(x) end)(length / baseLength)
         local scale = length / (nSeg * baseLength)
-        local dRad = rad / nSeg
-        local seq = math.abs(scale) < 1e-5 and {} or func.seqMap({0, nSeg}, function(n) return from + n * dRad end)
+        local dRad = (sup - inf) / nSeg
+        local seq = math.abs(scale) < 1e-5 and {} or func.seqMap({0, nSeg}, function(n) return inf + n * dRad end)
         return seq, scale
     end
 end

@@ -38,24 +38,25 @@ end
 junction.generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
+    local extArc = arc:extendLimits(5)
+
     local sup = toXyz(arc:pt(arc.sup))
     local inf = toXyz(arc:pt(arc.inf))
     local mid = toXyz(arc:pt(arc.mid))
     
-    local toVector = function(rad) return coor.xyz(0, (arc.mid > math.pi * 0.5 or arc.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad) end
     
-    local vecSup = toVector(arc.sup)
-    local vecInf = toVector(arc.inf)
-    local vecMid = toVector(arc.mid)
+    local vecSup = arc:tangent(arc.sup)
+    local vecInf = arc:tangent(arc.inf)
+    local vecMid = arc:tangent(arc.mid)
     
-    local supExt = sup + vecSup * 5
-    local infExt = inf - vecInf * 5
+    local supExt = toXyz(extArc:pt(extArc.sup))
+    local infExt = toXyz(extArc:pt(extArc.inf))
     
     return {
         {inf, mid, vecInf, vecMid},
         {mid, sup, vecMid, vecSup},
-        {infExt, inf, vecInf, vecInf},
-        {sup, supExt, vecSup, vecSup},
+        {infExt, inf, extArc:tangent(extArc.inf), vecInf},
+        {sup, supExt, vecSup, extArc:tangent(extArc.sup)},
     }
 end
 
@@ -82,14 +83,14 @@ junction.makeFn = function(model, mPlace, m)
             end)
         end
         return {
-            makeModel(coordsGen(junction.normalizeRad(obj.inf), junction.normalizeRad(obj.mid) - junction.normalizeRad(obj.inf))),
-            makeModel(coordsGen(junction.normalizeRad(obj.mid), junction.normalizeRad(obj.sup) - junction.normalizeRad(obj.mid)))
+            makeModel(coordsGen(obj.inf, obj.mid)),
+            makeModel(coordsGen(obj.mid, obj.sup))
         }
     end
 end
 
 local generatePolyArcEdge = function(group, from, to)
-    return pipe.from(junction.normalizeRad(group[from]), junction.normalizeRad(group[to]) - junction.normalizeRad(group[from]))
+    return pipe.from(group[from], group[to])
         * arc.coords(group, 5)
         * pipe.map(function(rad) return func.with(group:pt(rad), {z = 0, rad = rad}) end)
 end
@@ -97,38 +98,24 @@ end
 junction.generatePolyArc = function(groups, from, to)
     local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.r < q.r end))
     return function(extLon, extLat)
-        local limitsExtender = function(ext)
-            return function(group)
-                local extValue = (junction.normalizeRad(group.mid) > math.pi * 0.5 and -1 or 1) * ext / group.r
-                return group:withLimits(
-                    {
-                        inf = group.inf - extValue,
-                        mid = group.mid,
-                        sup = group.sup + extValue
-                    }
+            
+            local groupL, groupR = table.unpack(
+                pipe.new
+                / (groupO + extLat):extendLimits(extLon)
+                / (groupI + (-extLat)):extendLimits(extLon)
+                * pipe.sort(function(p, q) return p:pt(p.mid).x < q:pt(p.mid).x end)
             )
-            end
-        end
-        
-        local groupL, groupR = table.unpack(
-            pipe.new
-            / (groupO + extLat)
-            / (groupI + (-extLat))
-            * pipe.map(limitsExtender(extLon))
-            * pipe.sort(function(p, q) return p:pt(p.mid).x < q:pt(p.mid).x end)
-        )
-
-        return generatePolyArcEdge(groupR, from, to)
-            * function(ls) return ls * pipe.range(1, #ls - 1)
-                * pipe.map2(ls * pipe.range(2, #ls),
-                    function(f, t) return
-                        {
-                            f, t,
-                            func.with(groupL:pt(t.rad), {z = 0, rad = t.rad}),
-                            func.with(groupL:pt(f.rad), {z = 0, rad = f.rad}),
-                        }
-                    end)
-            end
+            return generatePolyArcEdge(groupR, from, to)
+                * function(ls) return ls * pipe.range(1, #ls - 1)
+                    * pipe.map2(ls * pipe.range(2, #ls),
+                        function(f, t) return
+                            {
+                                f, t,
+                                func.with(groupL:pt(t.rad), {z = 0, rad = t.rad}),
+                                func.with(groupL:pt(f.rad), {z = 0, rad = f.rad}),
+                            }
+                        end)
+                end
     end
 end
 

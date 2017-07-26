@@ -7,7 +7,7 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
-
+local dump = require "datadumper"
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
@@ -62,6 +62,7 @@ local function params()
 end
 
 local retriveGeometry = function(config, slope)
+    dump.dump(2)
     local rad = config.radFactor * slope.length / config.r
     local radT = slope.trans.length / slope.length * rad
     local radRef = junction.normalizeRad(config.initRad)
@@ -129,6 +130,7 @@ end
 
 local function solveSlope(refSlope, height)
     local function solver(slope)
+        dump.dump(1)
         local x = generateSlope(slope, height)
         return math.abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
     end

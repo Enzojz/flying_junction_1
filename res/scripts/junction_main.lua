@@ -129,11 +129,9 @@ local retriveExt = function(protos)
         
         local height = extHeightList[proto.level]
         
-
-        local slope = (math.abs(height) >= math.abs(opposite.height))
-            and jA.generateSlope(extSlopeList[proto.level] * extSlopeList[proto.part], height)
-            or jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height
-        )
+        local slope = (math.abs(height) < math.abs(opposite.height) and proto.equalLength)
+            and jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height)
+            or jA.generateSlope(extSlopeList[proto.level] * extSlopeList[proto.part], height)
 
         return pipe.new
             * proto.group
@@ -534,35 +532,41 @@ local updateFn = function(fParams)
             local ext = pipe.exec * function()
                 local extEndList = {A = "inf", B = "sup"}
                 local extConfig = {
-                    straight = function(part, level, type)
-                        return {
-                            group = group[part].ext[level][type][extEndList[part]],
-                            radFn = function(g) return g.rad end,
-                            rFn = function(g) return info[part][level].rFactor * g.guideline.r end,
-                            guidelineFn = function(g) return g.guideline end,
+                    straight = function(equalLength)
+                        return function(part, level, type)
+                            return {
+                                group = group[part].ext[level][type][extEndList[part]],
+                                radFn = function(g) return g.rad end,
+                                rFn = function(g) return info[part][level].rFactor * g.guideline.r end,
+                                guidelineFn = function(g) return g.guideline end,
+                                part = part,
+                                level = level,
+                                equalLength = equalLength or false
+                            } end
+                    end,
+                    curve = function(equalLength)
+                        return function(part, level, type) return {
+                            group = group[part][level][type],
+                            radFn = function(g) return g[extEndList[part]] end,
+                            rFn = function(g) return info[part][level].rFactor * g.r end,
+                            guidelineFn = function(g) return g end,
                             part = part,
-                            level = level
-                        } end,
-                    curve = function(part, level, type) return {
-                        group = group[part][level][type],
-                        radFn = function(g) return g[extEndList[part]] end,
-                        rFn = function(g) return info[part][level].rFactor * g.r end,
-                        guidelineFn = function(g) return g end,
-                        part = part,
-                        level = level
-                    } end
+                            level = level,
+                            equalLength = equalLength or false
+                        } end
+                    end
                 }
                 
                 
                 
                 local extProtos = function(type) return {
                     upper = {
-                        A = pipe.from("A", "upper", type) * (func.contains({3, 1}, params.type) and extConfig.curve or extConfig.straight),
-                        B = pipe.from("B", "upper", type) * (func.contains({1}, params.type) and extConfig.curve or extConfig.straight)
+                        A = pipe.from("A", "upper", type) * (func.contains({3, 1}, params.type) and extConfig.curve() or extConfig.straight(true)),
+                        B = pipe.from("B", "upper", type) * (func.contains({1}, params.type) and extConfig.curve() or extConfig.straight(true))
                     },
                     lower = {
-                        A = pipe.from("A", "lower", type) * (func.contains({3, 1}, params.type) and extConfig.curve or extConfig.straight),
-                        B = pipe.from("B", "lower", type) * (func.contains({1}, params.type) and extConfig.curve or extConfig.straight)
+                        A = pipe.from("A", "lower", type) * (func.contains({3, 1}, params.type) and extConfig.curve() or extConfig.straight(true)),
+                        B = pipe.from("B", "lower", type) * (func.contains({1}, params.type) and extConfig.curve() or extConfig.straight(true))
                     },
                     info = {
                         height = height,

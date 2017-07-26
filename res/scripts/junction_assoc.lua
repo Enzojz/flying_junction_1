@@ -7,7 +7,6 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
-local dump = require "datadumper"
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
@@ -62,7 +61,6 @@ local function params()
 end
 
 local retriveGeometry = function(config, slope)
-    dump.dump(2)
     local rad = config.radFactor * slope.length / config.r
     local radT = slope.trans.length / slope.length * rad
     local radRef = junction.normalizeRad(config.initRad)
@@ -109,7 +107,7 @@ local function gmPlaceA(fz, r)
     end
 end
 
-local function generateSlope(slope, height)
+local function generateSlope(slope, height, dz)
     local sFactor = slope > 0 and 1 or -1
     local rad = math.atan(slope)
     local rTrans = 300
@@ -121,6 +119,7 @@ local function generateSlope(slope, height)
     return {
         slope = slope,
         rad = rad,
+        dz = dz or 0,
         factor = sFactor,
         length = math.abs(height == 0 and 30 or (height - 2 * trans.dz) / slope + 2 * trans.length),
         trans = trans,
@@ -128,21 +127,20 @@ local function generateSlope(slope, height)
     }
 end
 
-local function solveSlope(refSlope, height)
+local function solveSlope(refSlope, height, dz)
     local function solver(slope)
-        dump.dump(1)
-        local x = generateSlope(slope, height)
+        local x = generateSlope(slope, height, dz)
         return math.abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
     end
     
-    return height == 0 and func.with(generateSlope(-refSlope.slope, height), {length = refSlope.length}) or solver(-refSlope.slope)
+    return height == 0 and func.with(generateSlope(-refSlope.slope, height, dz), {length = refSlope.length}) or solver(-refSlope.slope)
 end
 
 local slopeProfile = function(slope)
     local flatProfile = function()
         return {
             {
-                pt = function(x) return coor.xy(x, slope.height) end,
+                pt = function(x) return coor.xy(x, slope.height + slope.dz) end,
                 slope = function(_) return 0 end,
                 pred = function(_) return true end,
             },
@@ -151,8 +149,8 @@ local slopeProfile = function(slope)
     local normalProfile = function()
         local ref1 = slope.factor * math.pi * 0.5
         local ref2 = -ref1
-        local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + slope.height), slope.trans.r)
-        local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r), slope.trans.r)
+        local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + (slope.height + slope.dz)), slope.trans.r)
+        local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r + slope.dz), slope.trans.r)
         local pTr1 = arc1:pt(ref1 - slope.rad)
         local pTr2 = arc2:pt(ref2 - slope.rad)
         local lineSlope = line.byPtPt(pTr1, pTr2)
@@ -161,7 +159,7 @@ local slopeProfile = function(slope)
             {
                 pred = function(x) return x < 0 end,
                 slope = function(_) return 0 end,
-                pt = function(x) return coor.xy(x, slope.height) end
+                pt = function(x) return coor.xy(x, slope.height + slope.dz) end
             },
             {
                 ref = slope.height > 0 and func.max or func.min,
@@ -182,7 +180,7 @@ local slopeProfile = function(slope)
             {
                 pred = function(x) return x > slope.length end,
                 slope = function(_) return 0 end,
-                pt = function(x) return coor.xy(x, 0) end
+                pt = function(x) return coor.xy(x, slope.dz) end
             },
         }
     end
@@ -242,8 +240,8 @@ local retrivePolys = function(tracks)
     return tracks
         * pipe.mapFlatten(function(tr)
             local polys = pipe.new
-                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(10, 3.5)
-                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(10, 3.5)
+                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(1, 4)
+                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(1, 4)
             local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
             return {
                 {
@@ -345,16 +343,30 @@ local updateFn = function(params)
     
     local c = composite({
         initRad = r > 0 and math.pi or 0,
-        slope = sFactor * slopeList[params.slope + 1] * 0.001,
+        slope = generateSlope(sFactor * slopeList[params.slope + 1] * 0.001, height),
         height = height,
         r = r,
         nbTracks = nbTracks,
         radFactor = 1
     })
     
+    local d = composite({
+        initRad = r > 0 and math.pi or 0,
+        slope = generateSlope(-sFactor * slopeList[params.slope + 1] * 0.001, -height, 2 * height),
+        height = height,
+        r = r,
+        nbTracks = nbTracks,
+        radFactor = -1
+    })
+    
     return
         {
-            edgeLists = {(c.edges.edges + c.edges.extInf + c.edges.extSup) * station.prepareEdges * trackBuilder.nonAligned()},
+            edgeLists = {
+                (c.edges.edges) * station.prepareEdges * trackBuilder.nonAligned(),
+                (d.edges.edges) * station.prepareEdges * trackBuilder.tunnel(),
+                (d.edges.extSup) * station.prepareEdges * trackBuilder.tunnel(),
+                (c.edges.extInf) * station.prepareEdges * trackBuilder.nonAligned(),
+                },
             models = c.walls + c.surface,
             terrainAlignmentLists = c.polys
         }

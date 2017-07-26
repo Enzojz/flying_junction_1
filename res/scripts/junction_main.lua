@@ -132,7 +132,7 @@ local retriveExt = function(protos)
         local slope = (math.abs(height) < math.abs(opposite.height) and proto.equalLength)
             and jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height)
             or jA.generateSlope(extSlopeList[proto.level] * extSlopeList[proto.part], height)
-
+        
         return pipe.new
             * proto.group
             * pipe.map(prepareArc(proto, slope))
@@ -643,8 +643,8 @@ local updateFn = function(fParams)
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
                     }
                 }
-                + ext.polys.lower
                 + ext.polys.upper
+                + ext.polys.lower
             }
             
             -- End of generation

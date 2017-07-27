@@ -197,7 +197,7 @@ end
 
 stationlib.prepareEdges = function(edges)
     return {
-        edges = edges * pipe.map(pipe.select("edge")) * coor.make,
+        edges = edges * pipe.map(pipe.select("edge")) * pipe.map(pipe.map(coor.vec2Tuple)) * coor.make,
         snapNodes = snapNodes(edges)
     }
 end

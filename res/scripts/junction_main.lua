@@ -7,7 +7,7 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
-
+local dump = require "datadumper"
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -28,6 +28,7 @@ local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
 
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
+    local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
     return {
         normal = pipe.new
         * func.map2(tracks1, tracks2,
@@ -37,24 +38,22 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
                 return pipe.new
                     * seg
-                    * pipe.map(pipe.map(coor.vec2Tuple))
+                    * pipe.map(pipe.map2(m, coor.apply))
                     * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"})
             end)
-        * pipe.flatten()
-        * station.prepareEdges
-        * function(r) return func.with(r, {edges = coor.applyEdges(trans.mpt, trans.mvec)(r.edges)}) end,
+        * pipe.flatten(),
         ext = pipe.new
         * func.map2(tracks1, tracks2,
             function(t1, t2)
                 local seg = {junction.generateArc(t1)[3], junction.generateArc(t2)[4]}
                 return pipe.new
                     * seg
-                    * pipe.map(pipe.map(coor.vec2Tuple))
+                    * pipe.map(pipe.map2(m, coor.apply))
                     * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
             end)
         * pipe.flatten()
-        * station.prepareEdges
-        * function(r) return func.with(r, {edges = coor.applyEdges(trans.mpt, trans.mvec)(r.edges)}) end
+    -- * station.prepareEdges
+    -- * function(r) return func.with(r, {edges = coor.applyEdges(trans.mpt, trans.mvec)(r.edges)}) end
     }
 end
 
@@ -140,8 +139,14 @@ local retriveExt = function(protos)
     
     return function(fn)
         return {
-            upper = fn(prepareArcs(protos.upper.A)) + fn(prepareArcs(protos.upper.B)),
-            lower = fn(prepareArcs(protos.lower.A)) + fn(prepareArcs(protos.lower.B)),
+            upper = {
+                A = fn(prepareArcs(protos.upper.A)),
+                B = fn(prepareArcs(protos.upper.B))
+            },
+            lower = {
+                A = fn(prepareArcs(protos.lower.A)),
+                B = fn(prepareArcs(protos.lower.B))
+            }
         }
     end
 end
@@ -599,29 +604,39 @@ local updateFn = function(fParams)
                 + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
                 + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
             
+            local edges = pipe.new
+                * {
+                    (
+                    ext.edges.lower.A * pipe.mapFlatten(pipe.select("inf"))
+                    + ext.edges.lower.A * pipe.mapFlatten(pipe.select("main"))
+                    + lowerTracks.normal
+                    + ext.edges.lower.B * pipe.mapFlatten(pipe.select("main"))
+                    + ext.edges.lower.B * pipe.mapFlatten(pipe.select("sup"))
+                    )
+                    * station.prepareEdges * TLowerTracks,
+                    (
+                    ext.edges.upper.A * pipe.mapFlatten(pipe.select("inf"))
+                    + ext.edges.upper.A * pipe.mapFlatten(pipe.select("main"))
+                    + upperTracks.normal
+                    + ext.edges.upper.B * pipe.mapFlatten(pipe.select("main"))
+                    + ext.edges.upper.B * pipe.mapFlatten(pipe.select("sup"))
+                    )
+                    * station.prepareEdges * TUpperTracks,
+                }
+            
             local result = {
-                edgeLists =
-                {
-                    TUpperTracks(upperTracks.normal),
-                    TLowerTracks(lowerTracks.normal),
-                    ext.edges.lower * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TLowerTracks,
-                    ext.edges.upper * pipe.mapFlatten(pipe.select("edges")) * station.prepareEdges * TUpperTracks,
-                    
-                    ext.edges.lower[1].extInf * station.prepareEdges * TLowerTracks,
-                    ext.edges.upper[1].extInf * station.prepareEdges * TUpperTracks,
-                    ext.edges.lower[2].extSup * station.prepareEdges * TLowerTracks,
-                    ext.edges.upper[2].extSup * station.prepareEdges * TUpperTracks,
-                
-                -- TLowerExtTracks(lowerTracks.ext),
-                -- TUpperExtTracks(upperTracks.ext),
-                },
+                edgeLists = edges,
                 models = pipe.new
                 + generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1]
                 + generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
-                + ext.walls.lower
-                + ext.walls.upper
-                + ext.surface.lower
-                + ext.surface.upper
+                + ext.walls.lower.A
+                + ext.walls.upper.A
+                + ext.surface.lower.A
+                + ext.surface.upper.A
+                + ext.walls.lower.B
+                + ext.walls.upper.B
+                + ext.surface.lower.B
+                + ext.surface.upper.B
                 ,
                 terrainAlignmentLists = pipe.new
                 + {
@@ -643,8 +658,10 @@ local updateFn = function(fParams)
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
                     }
                 }
-                + ext.polys.upper
-                + ext.polys.lower
+                + ext.polys.upper.A
+                + ext.polys.upper.B
+                + ext.polys.lower.A
+                + ext.polys.lower.B
             }
             
             -- End of generation

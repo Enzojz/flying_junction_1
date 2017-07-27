@@ -157,28 +157,28 @@ local slopeProfile = function(slope)
         local intersection = function(ar, cond) return function(x) return cond(ar / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end) end end
         return {
             {
-                pred = function(x) return x < 0 end,
+                pred = function(x) return x <= 0 end,
                 slope = function(_) return 0 end,
                 pt = function(x) return coor.xy(x, slope.height + slope.dz) end
             },
             {
                 ref = slope.height > 0 and func.max or func.min,
-                pred = function(x) return x >= 0 and x <= pTr1.x end,
+                pred = function(x) return x > 0 and x < pTr1.x end,
                 slope = function(pt) return math.tan(arc1:rad(pt) - math.pi * 0.5) end,
                 pt = intersection(arc1, slope.height > 0 and func.max or func.min)
             },
             {
-                pred = function(x) return x > pTr1.x and x < pTr2.x end,
+                pred = function(x) return x >= pTr1.x and x <= pTr2.x end,
                 slope = function(_) return -lineSlope.a / lineSlope.b end,
                 pt = function(x) return lineSlope - line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)) end
             },
             {
-                pred = function(x) return x >= pTr2.x and x <= slope.length end,
+                pred = function(x) return x > pTr2.x and x < slope.length end,
                 slope = function(pt) return math.tan(arc2:rad(pt) - math.pi * 0.5) end,
                 pt = intersection(arc2, slope.height < 0 and func.max or func.min)
             },
             {
-                pred = function(x) return x > slope.length end,
+                pred = function(x) return x >= slope.length end,
                 slope = function(_) return 0 end,
                 pt = function(x) return coor.xy(x, slope.dz) end
             },
@@ -212,27 +212,27 @@ local retriveFn = function(config)
 end
 
 local retriveTracks = function(tracks)
-    local edges = tracks
+    return tracks
         * pipe.map(function(tr) return
             tr.guidelines
             * pipe.map(junction.generateArc)
             * function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end
             * pipe.map2(tr.fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end)
-            * pipe.map(pipe.map(coor.vec2Tuple))
+            -- * pipe.map(pipe.map(coor.vec2Tuple))
             * function(edge) return
                 {
-                    a = pipe.new * func.range(edge, 2, #edge - 1) * pipe.zip(func.seqMap({1, 4}, function(_) return {false, false} end), {"edge", "snap"}),
+                    main = pipe.new * func.range(edge, 2, #edge - 1) * pipe.zip(func.seqMap({1, 4}, function(_) return {false, false} end), {"edge", "snap"}),
                     inf = pipe.new * {edge[1]} * pipe.zip({{true, false}}, {"edge", "snap"}),
                     sup = pipe.new * {edge[#edge]} * pipe.zip({{false, true}}, {"edge", "snap"}),
                 } end
         end)
     
-    return pipe.new /
-        {
-            edges = edges * pipe.mapFlatten(pipe.select("a")),
-            extInf = edges * pipe.mapFlatten(pipe.select("inf")),
-            extSup = edges * pipe.mapFlatten(pipe.select("sup")),
-        }
+    -- return pipe.new /
+    --     {
+    --         edges = edges * pipe.mapFlatten(pipe.select("a")),
+    --         extInf = edges * pipe.mapFlatten(pipe.select("inf")),
+    --         extSup = edges * pipe.mapFlatten(pipe.select("sup")),
+    --     }
 end
 
 

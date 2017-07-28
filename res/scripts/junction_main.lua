@@ -30,26 +30,31 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
     
-    local segs = func.map2(tracks1, tracks2,
-        function(t1, t2) return {junction.generateArc(t1), junction.generateArc(t2)} end)
-    
-    return {
-        main = func.mapFlatten(segs, function(seg)
-            return pipe.new * {seg[1][1], seg[2][2]}
+    return pipe.new
+        * func.zip(tracks1, tracks2)
+        * pipe.map(pipe.map(junction.generateArc))
+        * pipe.map(function(seg)
+            return {
+                main = pipe.new
+                * {seg[1][1], seg[2][2]} * pipe.map(pipe.map2(m, coor.apply))
+                * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"}),
+                inf = pipe.new
+                * {seg[1][3]}
                 * pipe.map(pipe.map2(m, coor.apply))
-                * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"})
-        end),
-        inf = func.mapFlatten(segs, function(seg)
-            return pipe.new * {seg[1][3]}
+                * pipe.zip({{true, false}}, {"edge", "snap"}),
+                sup = pipe.new
+                * {seg[2][4]}
                 * pipe.map(pipe.map2(m, coor.apply))
-                * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
-        end),
-        sup = func.mapFlatten(segs, function(seg)
-            return pipe.new * {seg[2][4]}
-                * pipe.map(pipe.map2(m, coor.apply))
-                * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
+                * pipe.zip({{false, true}}, {"edge", "snap"})
+            }
         end)
-    }
+        * function(ls)
+            return {
+                inf = ls * pipe.map(pipe.select("inf")),
+                sup = ls * pipe.map(pipe.select("sup")),
+                main = ls * pipe.map(pipe.select("main"))
+            }
+        end
 end
 
 
@@ -599,23 +604,30 @@ local updateFn = function(fParams)
                 + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
                 + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
             
+            local fusion = function(...)
+                local ls = table.pack(...)
+            
+            end
+            
             local edges = pipe.new
                 * {
                     (
-                    ext.edges.lower.A * pipe.mapFlatten(pipe.select("inf"))
-                    + ext.edges.lower.A * pipe.mapFlatten(pipe.select("main"))
+                    ext.edges.lower.A.inf
+                    + ext.edges.lower.A.main
                     + lowerTracks.main
-                    + ext.edges.lower.B * pipe.mapFlatten(pipe.select("main"))
-                    + ext.edges.lower.B * pipe.mapFlatten(pipe.select("sup"))
+                    + ext.edges.lower.B.main
+                    + ext.edges.lower.B.sup
                     )
+                    * pipe.flatten()
                     * station.prepareEdges * TLowerTracks,
                     (
-                    ext.edges.upper.A * pipe.mapFlatten(pipe.select("inf"))
-                    + ext.edges.upper.A * pipe.mapFlatten(pipe.select("main"))
+                    ext.edges.upper.A.inf
+                    + ext.edges.upper.A.main
                     + upperTracks.main
-                    + ext.edges.upper.B * pipe.mapFlatten(pipe.select("main"))
-                    + ext.edges.upper.B * pipe.mapFlatten(pipe.select("sup"))
+                    + ext.edges.upper.B.main
+                    + ext.edges.upper.B.sup
                     )
+                    * pipe.flatten()
                     * station.prepareEdges * TUpperTracks,
                 }
             

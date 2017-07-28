@@ -220,11 +220,24 @@ local retriveTracks = function(tracks)
             * pipe.map2(tr.fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end)
             * function(edge) return
                 {
-                    main = pipe.new * func.range(edge, 2, #edge - 1) * pipe.zip(func.seqMap({1, 4}, function(_) return {false, false} end), {"edge", "snap"}),
-                    inf = pipe.new * {edge[1]} * pipe.zip({{true, false}}, {"edge", "snap"}),
-                    sup = pipe.new * {edge[#edge]} * pipe.zip({{false, true}}, {"edge", "snap"}),
+                    main = pipe.new
+                    * func.range(edge, 2, #edge - 1)
+                    * pipe.zip({{false, false}, {false, false}, {false, false}, {false, false}}, {"edge", "snap"}),
+                    inf = pipe.new
+                    * {edge[1]}
+                    * pipe.zip({{true, false}}, {"edge", "snap"}),
+                    sup = pipe.new
+                    * {edge[#edge]}
+                    * pipe.zip({{false, true}}, {"edge", "snap"}),
                 } end
         end)
+        * function(ls)
+            return {
+                inf = ls * pipe.map(pipe.select("inf")),
+                sup = ls * pipe.map(pipe.select("sup")),
+                main = ls * pipe.map(pipe.select("main"))
+            }
+        end
 end
 
 

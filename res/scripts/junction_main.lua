@@ -29,6 +29,11 @@ local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
+    local merge = function(ls) return {
+        edge = ls * pipe.map(pipe.select("edge")),
+        snap = ls * pipe.map(pipe.select("snap"))
+    }
+    end
     
     return pipe.new
         * func.zip(tracks1, tracks2)
@@ -36,7 +41,8 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
         * pipe.map(function(seg)
             return {
                 main = pipe.new
-                * {seg[1][1], seg[2][2]} * pipe.map(pipe.map2(m, coor.apply))
+                * {seg[1][1], seg[2][2]}
+                * pipe.map(pipe.map2(m, coor.apply))
                 * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"}),
                 inf = pipe.new
                 * {seg[1][3]}
@@ -50,9 +56,9 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
         end)
         * function(ls)
             return {
-                inf = ls * pipe.map(pipe.select("inf")),
-                sup = ls * pipe.map(pipe.select("sup")),
-                main = ls * pipe.map(pipe.select("main"))
+                main = ls * pipe.map(pipe.select("main")) * pipe.map(merge),
+                inf = ls * pipe.map(pipe.select("inf")) * pipe.map(merge),
+                sup = ls * pipe.map(pipe.select("sup")) * pipe.map(merge)
             }
         end
 end
@@ -604,32 +610,37 @@ local updateFn = function(fParams)
                 + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
                 + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
             
-            local fusion = function(...)
-                local ls = table.pack(...)
-            
+            local function fusion(result, ls, ...)
+                return ls
+                    and fusion(result
+                        * pipe.map2(ls,
+                            function(current, new) return
+                                {
+                                    edge = current.edge + new.edge,
+                                    snap = current.snap + new.snap
+                                } end), ...)
+                    or result
             end
             
-            local edges = pipe.new
-                * {
-                    (
-                    ext.edges.lower.A.inf
-                    + ext.edges.lower.A.main
-                    + lowerTracks.main
-                    + ext.edges.lower.B.main
-                    + ext.edges.lower.B.sup
-                    )
-                    * pipe.flatten()
-                    * station.prepareEdges * TLowerTracks,
-                    (
-                    ext.edges.upper.A.inf
-                    + ext.edges.upper.A.main
-                    + upperTracks.main
-                    + ext.edges.upper.B.main
-                    + ext.edges.upper.B.sup
-                    )
-                    * pipe.flatten()
-                    * station.prepareEdges * TUpperTracks,
-                }
+            
+            local edges = {
+                fusion(
+                    ext.edges.lower.A.inf,
+                    ext.edges.lower.A.main,
+                    lowerTracks.main,
+                    ext.edges.lower.B.main,
+                    ext.edges.lower.B.sup
+                )
+                * station.prepareEdges * TLowerTracks,
+                fusion(
+                    ext.edges.upper.A.inf,
+                    ext.edges.upper.A.main,
+                    upperTracks.main,
+                    ext.edges.upper.B.main,
+                    ext.edges.upper.B.sup
+                )
+                * station.prepareEdges * TUpperTracks,
+            }
             
             local result = {
                 edgeLists = edges,

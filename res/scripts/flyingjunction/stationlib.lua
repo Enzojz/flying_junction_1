@@ -3,6 +3,8 @@ local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
 
+local dump = require "datadumper"
+
 
 local stationlib = {
     platformWidth = 5,
@@ -188,16 +190,16 @@ end
 
 local snapNodes = function(edges)
     return edges
-        * pipe.map(pipe.select("snap"))
+        * pipe.mapFlatten(pipe.select("snap"))
         * pipe.flatten()
-        * function(ls) return ls * pipe.map2(func.seq(0, #ls - 1), function(s, n) return {snap = s, index = n} end) end
+        * function(ls) return ls * pipe.zip(func.seq(0, #ls - 1), {"snap", "index"}) end
         * pipe.filter(pipe.select("snap"))
         * pipe.map(pipe.select("index"))
 end
 
 stationlib.prepareEdges = function(edges)
     return {
-        edges = edges * pipe.map(pipe.select("edge")) * pipe.map(pipe.map(coor.vec2Tuple)) * coor.make,
+        edges = edges * pipe.mapFlatten(pipe.select("edge")) * pipe.map(pipe.map(coor.vec2Tuple)) * coor.make,
         snapNodes = snapNodes(edges)
     }
 end

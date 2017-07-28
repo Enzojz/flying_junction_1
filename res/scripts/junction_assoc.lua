@@ -212,6 +212,11 @@ local retriveFn = function(config)
 end
 
 local retriveTracks = function(tracks)
+    local merge = function(ls) return {
+        edge = ls * pipe.map(pipe.select("edge")),
+        snap = ls * pipe.map(pipe.select("snap"))
+    }
+    end
     return tracks
         * pipe.map(function(tr) return
             tr.guidelines
@@ -233,9 +238,9 @@ local retriveTracks = function(tracks)
         end)
         * function(ls)
             return {
-                inf = ls * pipe.map(pipe.select("inf")),
-                sup = ls * pipe.map(pipe.select("sup")),
-                main = ls * pipe.map(pipe.select("main"))
+                inf = ls * pipe.map(pipe.select("inf")) * pipe.map(merge),
+                sup = ls * pipe.map(pipe.select("sup")) * pipe.map(merge),
+                main = ls * pipe.map(pipe.select("main")) * pipe.map(merge)
             }
         end
 end

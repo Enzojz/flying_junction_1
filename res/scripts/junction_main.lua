@@ -29,31 +29,26 @@ local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
+    
+    local segs = func.map2(tracks1, tracks2,
+        function(t1, t2) return {junction.generateArc(t1), junction.generateArc(t2)} end)
+    
     return {
-        normal = pipe.new
-        * func.map2(tracks1, tracks2,
-            function(t1, t2)
-                local seg = {junction.generateArc(t1)[1], junction.generateArc(t2)[2]}
-                seg[1][2], seg[2][1] = average(seg[1][2], seg[2][1])
-                seg[1][4], seg[2][3] = average(seg[1][4], seg[2][3])
-                return pipe.new
-                    * seg
-                    * pipe.map(pipe.map2(m, coor.apply))
-                    * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"})
-            end)
-        * pipe.flatten(),
-        ext = pipe.new
-        * func.map2(tracks1, tracks2,
-            function(t1, t2)
-                local seg = {junction.generateArc(t1)[3], junction.generateArc(t2)[4]}
-                return pipe.new
-                    * seg
-                    * pipe.map(pipe.map2(m, coor.apply))
-                    * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
-            end)
-        * pipe.flatten()
-    -- * station.prepareEdges
-    -- * function(r) return func.with(r, {edges = coor.applyEdges(trans.mpt, trans.mvec)(r.edges)}) end
+        main = func.mapFlatten(segs, function(seg)
+            return pipe.new * {seg[1][1], seg[2][2]}
+                * pipe.map(pipe.map2(m, coor.apply))
+                * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"})
+        end),
+        inf = func.mapFlatten(segs, function(seg)
+            return pipe.new * {seg[1][3]}
+                * pipe.map(pipe.map2(m, coor.apply))
+                * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
+        end),
+        sup = func.mapFlatten(segs, function(seg)
+            return pipe.new * {seg[2][4]}
+                * pipe.map(pipe.map2(m, coor.apply))
+                * pipe.zip({{true, false}, {false, true}}, {"edge", "snap"})
+        end)
     }
 end
 
@@ -609,7 +604,7 @@ local updateFn = function(fParams)
                     (
                     ext.edges.lower.A * pipe.mapFlatten(pipe.select("inf"))
                     + ext.edges.lower.A * pipe.mapFlatten(pipe.select("main"))
-                    + lowerTracks.normal
+                    + lowerTracks.main
                     + ext.edges.lower.B * pipe.mapFlatten(pipe.select("main"))
                     + ext.edges.lower.B * pipe.mapFlatten(pipe.select("sup"))
                     )
@@ -617,7 +612,7 @@ local updateFn = function(fParams)
                     (
                     ext.edges.upper.A * pipe.mapFlatten(pipe.select("inf"))
                     + ext.edges.upper.A * pipe.mapFlatten(pipe.select("main"))
-                    + upperTracks.normal
+                    + upperTracks.main
                     + ext.edges.upper.B * pipe.mapFlatten(pipe.select("main"))
                     + ext.edges.upper.B * pipe.mapFlatten(pipe.select("sup"))
                     )

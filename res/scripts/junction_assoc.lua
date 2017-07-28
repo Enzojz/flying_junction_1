@@ -218,7 +218,6 @@ local retriveTracks = function(tracks)
             * pipe.map(junction.generateArc)
             * function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end
             * pipe.map2(tr.fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end)
-            -- * pipe.map(pipe.map(coor.vec2Tuple))
             * function(edge) return
                 {
                     main = pipe.new * func.range(edge, 2, #edge - 1) * pipe.zip(func.seqMap({1, 4}, function(_) return {false, false} end), {"edge", "snap"}),
@@ -226,13 +225,6 @@ local retriveTracks = function(tracks)
                     sup = pipe.new * {edge[#edge]} * pipe.zip({{false, true}}, {"edge", "snap"}),
                 } end
         end)
-    
-    -- return pipe.new /
-    --     {
-    --         edges = edges * pipe.mapFlatten(pipe.select("a")),
-    --         extInf = edges * pipe.mapFlatten(pipe.select("inf")),
-    --         extSup = edges * pipe.mapFlatten(pipe.select("sup")),
-    --     }
 end
 
 
@@ -362,11 +354,11 @@ local updateFn = function(params)
     return
         {
             edgeLists = {
-                (c.edges.edges) * station.prepareEdges * trackBuilder.nonAligned(),
+            (c.edges.edges) * station.prepareEdges * trackBuilder.nonAligned(),
                 (d.edges.edges) * station.prepareEdges * trackBuilder.tunnel(),
                 (d.edges.extSup) * station.prepareEdges * trackBuilder.tunnel(),
                 (c.edges.extInf) * station.prepareEdges * trackBuilder.nonAligned(),
-                },
+            },
             models = c.walls + c.surface,
             terrainAlignmentLists = c.polys
         }

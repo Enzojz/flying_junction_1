@@ -49,6 +49,9 @@ local vecXyMeta = {
     end,
     __mod = function(lhs, rhs)
         return (lhs - rhs):length()
+    end,
+    __unm = function(lhs)
+        return lhs * -1
     end
 }
 
@@ -85,6 +88,9 @@ local vecXyzMeta = {
     end,
     __mod = function(lhs, rhs)
         return (lhs - rhs):length()
+    end,
+    __unm = function(lhs)
+        return lhs * -1
     end
 }
 

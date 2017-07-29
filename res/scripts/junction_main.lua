@@ -610,61 +610,27 @@ local updateFn = function(fParams)
                 + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
                 + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
             
-            local function fusion(result, ls, ...)
-                local fst = function(l) return l[1][1], function(v) local r = l + {}; r[1][1] = v; return r end end
-                local lst = function(l) return l[#l][2], function(v) local r = l + {}; r[#r][2] = v; return r end end
-                
-                local connect = function(l, r)
-                    local pattern = {
-                        {fst, fst},
-                        {fst, lst},
-                        {lst, fst},
-                        {lst, lst}
-                    }
-                    
-                    return pipe.new
-                        * func.map(pattern, function(fns)
-                            local fl, fr = table.unpack(fns)
-                            local lp, rl = fl(l)
-                            local rp, rr = fr(r)
-                            return (lp - rp):length() < 0.1
-                                and rl(lp) + rr(lp)
-                                or nil
-                        end)
-                        * pipe.filter(pipe.noop())
-                        * function(ls) return #ls == 0 and l + r or #ls[1] end
-                end
-                
-                return ls
-                    and fusion(result
-                        * pipe.map2(ls,
-                            function(current, new)
-                                dump.dump({c = current, n = new})
-                                return
-                                    {
-                                        edge = connect(current.edge, new.edge),
-                                        snap = current.snap + new.snap
-                                    } end),
-                        ...)
-                    or result
-            end
             
             
             local edges = {
-                fusion(
-                    ext.edges.lower.A.inf,
-                    ext.edges.lower.A.main,
-                    lowerTracks.main,
-                    ext.edges.lower.B.main,
-                    ext.edges.lower.B.sup
+                station.fusionEdges(
+                    {
+                        ext.edges.lower.A.inf,
+                        ext.edges.lower.A.main,
+                        lowerTracks.main,
+                        ext.edges.lower.B.main,
+                        ext.edges.lower.B.sup
+                    }
                 )
                 * station.prepareEdges * TLowerTracks,
-                fusion(
-                    ext.edges.upper.A.inf,
-                    ext.edges.upper.A.main,
-                    upperTracks.main,
-                    ext.edges.upper.B.main,
-                    ext.edges.upper.B.sup
+                station.fusionEdges(
+                    {
+                        ext.edges.upper.A.inf,
+                        ext.edges.upper.A.main,
+                        upperTracks.main,
+                        ext.edges.upper.B.main,
+                        ext.edges.upper.B.sup
+                    }
                 )
                 * station.prepareEdges * TUpperTracks,
             }

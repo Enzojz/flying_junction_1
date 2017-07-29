@@ -7,7 +7,7 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
-local dump = require "datadumper"
+
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"

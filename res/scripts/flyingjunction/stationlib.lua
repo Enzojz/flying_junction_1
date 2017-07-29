@@ -3,9 +3,6 @@ local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
 
-local dump = require "datadumper"
-
-
 local stationlib = {
     platformWidth = 5,
     trackWidth = 5,

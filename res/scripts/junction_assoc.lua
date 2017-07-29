@@ -212,35 +212,34 @@ local retriveFn = function(config)
 end
 
 local retriveTracks = function(tracks)
-    local merge = function(ls) return {
-        edge = ls * pipe.map(pipe.select("edge")),
-        snap = ls * pipe.map(pipe.select("snap"))
-    }
-    end
     return tracks
         * pipe.map(function(tr) return
             tr.guidelines
             * pipe.map(junction.generateArc)
             * function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end
             * pipe.map2(tr.fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end)
-            * function(edge) return
-                {
-                    main = pipe.new
-                    * func.range(edge, 2, #edge - 1)
-                    * pipe.zip({{false, false}, {false, false}, {false, false}, {false, false}}, {"edge", "snap"}),
-                    inf = pipe.new
-                    * {edge[1]}
-                    * pipe.zip({{true, false}}, {"edge", "snap"}),
-                    sup = pipe.new
-                    * {edge[#edge]}
-                    * pipe.zip({{false, true}}, {"edge", "snap"}),
-                } end
+            * function(edge) return {
+                main = pipe.new
+                * {{edge[2], edge[3]}, {edge[4], edge[5]}}
+                * pipe.map(function(e) return {
+                    edge = pipe.new * e,
+                    snap = pipe.new / {false, false} / {false, false}
+                } end)
+                * station.joinEdges,
+                inf = {
+                    edge = pipe.new * {edge[1]},
+                    snap = pipe.new * {{true, false}}
+                },
+                sup = {
+                    edge = pipe.new * {edge[#edge]},
+                    snap = pipe.new * {{false, true}}
+                },
+            } end
         end)
-        * function(ls)
-            return {
-                inf = ls * pipe.map(pipe.select("inf")) * pipe.map(merge),
-                sup = ls * pipe.map(pipe.select("sup")) * pipe.map(merge),
-                main = ls * pipe.map(pipe.select("main")) * pipe.map(merge)
+        * function(ls) return {
+                inf = ls * pipe.map(pipe.select("inf")),
+                sup = ls * pipe.map(pipe.select("sup")),
+                main = ls * pipe.map(pipe.select("main"))
             }
         end
 end

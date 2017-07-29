@@ -204,60 +204,63 @@ stationlib.prepareEdges = function(edges)
     }
 end
 
+stationlib.joinEdges = function(edges)
+    local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
+    local fst = function(l) return l[1][1] end
+    local lst = function(l) return l[#l][2] end
+    local rev = function(l) return pipe.new
+        * func.map(l, function(e)
+            local f, t, vf, vt = table.unpack(e)
+            return {t, f, -vt, -vf}
+        end)
+        * pipe.rev()
+    end
+    local joinEdge = function(l, r)
+        local x = l + r
+        x[#l][2], x[#l + 1][1] = average(x[#l][2], x[#l + 1][1])
+        x[#l][4], x[#l + 1][3] = average(x[#l][4], x[#l + 1][3])
+        return x
+    end
+    local connect = function(l, r)
+        local pattern = {
+            {fst, fst, function() return rev(l), r end},
+            {fst, lst, function() return rev(l), rev(r) end},
+            {lst, fst, function() return l, r end},
+            {lst, lst, function() return l, rev(r) end}
+        }
+        
+        return pipe.new
+            * func.map(pattern, function(fns)
+                local pl, pr, fadj = table.unpack(fns)
+                return (pl(l) - pr(r)):length() < 0.1
+                    and joinEdge(fadj())
+                    or nil
+            end)
+            * pipe.filter(pipe.noop())
+            * function(ls) return #ls == 0 and l + r or #ls[1] end
+    end
+    
+    local function join(result, ls, ...) return ls
+        and join(
+            {
+                edge = connect(result.edge, ls.edge),
+                snap = result.snap + ls.snap
+            },
+            ...)
+        or result
+    end
+    
+    return #edges > 1 and join(table.unpack(edges)) or table.unpack(edges)
+end
 
 stationlib.fusionEdges = function(edges)
-    local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
     local function fusion(result, ls, ...)
-        local fst = function(l) return l[1][1] end
-        local lst = function(l) return l[#l][2] end
-        
-        local rev = function(l) return pipe.new
-            * func.map(l, function(e)
-                local f, t, vf, vt = table.unpack(e)
-                return {t, f, -vt, -vf}
-            end)
-            * pipe.rev()
-        end
-        
-        local join = function(l, r)
-            local x = l + r
-            x[#l][2], x[#l + 1][1] = average(x[#l][2], x[#l + 1][1])
-            x[#l][4], x[#l + 1][3] = average(x[#l][4], x[#l + 1][3])
-            return x
-        end
-        
-        local connect = function(l, r)
-            local pattern = {
-                {fst, fst, function() return rev(l), r end},
-                {fst, lst, function() return rev(l), rev(r) end},
-                {lst, fst, function() return l, r end},
-                {lst, lst, function() return l, rev(r) end}
-            }
-            
-            return pipe.new
-                * func.map(pattern, function(fns)
-                    local pl, pr, fadj = table.unpack(fns)
-                    return (pl(l) - pr(r)):length() < 0.1
-                        and join(fadj())
-                        or nil
-                end)
-                * pipe.filter(pipe.noop())
-                * function(ls) return #ls == 0 and l + r or #ls[1] end
-        end
-        
         return ls
-            and fusion(pipe.new * result
-                * pipe.map2(ls,
-                    function(current, new)
-                        return
-                            {
-                                edge = connect(current.edge, new.edge),
-                                snap = current.snap + new.snap
-                            } end),
+            and fusion(result * pipe.map2(ls, function(current, new) return current / new end),
                 ...)
             or result
     end
-    return #edges > 1 and fusion(table.unpack(edges)) or table.unpack(edges)
+    return #edges > 0 and fusion(edges[1] * pipe.map(function(_) return pipe.new end), table.unpack(edges)) * pipe.map(stationlib.joinEdges) or {}
 end
 
 

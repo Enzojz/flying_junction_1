@@ -24,42 +24,37 @@ local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
 
-local function average(op1, op2) return (op1 + op2) * 0.5, (op1 + op2) * 0.5 end
-
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
-    local merge = function(ls) return {
-        edge = ls * pipe.map(pipe.select("edge")),
-        snap = ls * pipe.map(pipe.select("snap"))
-    }
-    end
-    
     return pipe.new
         * func.zip(tracks1, tracks2)
         * pipe.map(pipe.map(junction.generateArc))
+        * pipe.map(pipe.map(pipe.map(pipe.map2(m, coor.apply))))
         * pipe.map(function(seg)
             return {
                 main = pipe.new
-                * {seg[1][1], seg[2][2]}
-                * pipe.map(pipe.map2(m, coor.apply))
-                * pipe.zip({{false, false}, {false, false}}, {"edge", "snap"}),
-                inf = pipe.new
-                * {seg[1][3]}
-                * pipe.map(pipe.map2(m, coor.apply))
-                * pipe.zip({{true, false}}, {"edge", "snap"}),
-                sup = pipe.new
-                * {seg[2][4]}
-                * pipe.map(pipe.map2(m, coor.apply))
-                * pipe.zip({{false, true}}, {"edge", "snap"})
+                * {{seg[1][1]}, {seg[2][2]}}
+                * pipe.map(function(e) return {
+                    edge = pipe.new * e,
+                    snap = pipe.new / {false, false}
+                } end)
+                * station.joinEdges,
+                inf = {
+                    edge = {seg[1][3]},
+                    snap = {{true, false}}
+                },
+                sup = {
+                    edge = {seg[2][4]},
+                    snap = {{false, true}}
+                }
             }
         end)
-        * function(ls)
-            return {
-                main = ls * pipe.map(pipe.select("main")) * pipe.map(merge),
-                inf = ls * pipe.map(pipe.select("inf")) * pipe.map(merge),
-                sup = ls * pipe.map(pipe.select("sup")) * pipe.map(merge)
-            }
+        * function(ls) return {
+            main = ls * pipe.map(pipe.select("main")),
+            inf = ls * pipe.map(pipe.select("inf")),
+            sup = ls * pipe.map(pipe.select("sup"))
+        }
         end
 end
 

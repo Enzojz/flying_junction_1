@@ -295,7 +295,7 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     local makeExtWallFence = junction.makeFn(mRoofFenceS, mPlaceD, coor.scaleY(1.05))
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
-    local makeSurface = junction.makeFn(mRoof, mPlace, coor.transZ(-11) * coor.scaleY(1.05))
+    -- local makeSurface = junction.makeFn(mRoof, mPlace, coor.transZ(-11) * coor.scaleY(1.05))
     local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
     
     local walls = lowerGroup.walls
@@ -347,31 +347,41 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     end)
     
     return {
-        pipe.new
-        + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
-        + makeExtWall(lowerGroup.extWalls[1])[1]
-        + makeExtWallFence(lowerGroup.extWalls[1])[1]
-        + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
-        + func.map(fences, function(f) return f[1] end)
-        + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
-        + makeSideFence(upperGroup.walls[2])[1]
-        + makeWall(upperGroup.walls[2])[1]
-        + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
-        + func.mapFlatten(lowerGroup.tracks, function(t) return makeSurface(t)[1] end)
-        + func.map(upperFences, function(f) return f[1] end)
+        {
+            fixed = pipe.new
+            + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
+            + func.map(fences, function(f) return f[1] end)
+            + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
+            + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
+            ,
+            upper = pipe.new
+            + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
+            + makeSideFence(upperGroup.walls[2])[1]
+            + makeWall(upperGroup.walls[2])[1]
+            + func.map(upperFences, function(f) return f[1] end)
+            ,
+            lower = pipe.new
+            + makeExtWall(lowerGroup.extWalls[1])[1]
+            + makeExtWallFence(lowerGroup.extWalls[1])[1]
+        }
         ,
-        pipe.new
-        + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
-        + makeExtWall(lowerGroup.extWalls[2])[2]
-        + makeExtWallFence(lowerGroup.extWalls[2])[2]
-        + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
-        + func.map(fences, function(f) return f[2] end)
-        + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
-        + makeSideFence(upperGroup.walls[1])[2]
-        + makeWall(upperGroup.walls[1])[2]
-        + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
-        + func.mapFlatten(lowerGroup.tracks, function(t) return makeSurface(t)[2] end)
-        + func.map(upperFences, function(f) return f[2] end)
+        {
+            fixed = pipe.new
+            + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
+            + func.map(fences, function(f) return f[2] end)
+            + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
+            + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
+            ,
+            upper = pipe.new
+            + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
+            + makeSideFence(upperGroup.walls[1])[2]
+            + makeWall(upperGroup.walls[1])[2]
+            + func.map(upperFences, function(f) return f[2] end)
+            ,
+            lower = pipe.new
+            + makeExtWall(lowerGroup.extWalls[2])[2]
+            + makeExtWallFence(lowerGroup.extWalls[2])[2]
+        }
     }
 end
 
@@ -510,7 +520,8 @@ local updateFn = function(fParams)
             local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
-            local height = (heightList[params.height + 1] - 1) * tunnelHeight
+            local heightFactor = heightList[params.height + 1]
+            local height = (heightFactor - 1) * tunnelHeight
             local mZ = coor.transZ(height)
             local mTunnelZ = coor.transZ(tunnelHeight)
             
@@ -518,9 +529,8 @@ local updateFn = function(fParams)
             local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
             local TLowerTracks = lowerTrackBuilder.nonAligned()
             local TUpperTracks = upperTrackBuilder.nonAligned()
-            local TLowerExtTracks = lowerTrackBuilder.nonAligned()
-            local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
-            
+            -- local TLowerExtTracks = lowerTrackBuilder.nonAligned()
+            -- local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
             local info = {
@@ -655,19 +665,33 @@ local updateFn = function(fParams)
                 * station.prepareEdges * TUpperTracks,
             }
             
+            local structure = {
+                A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1],
+                B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
+            }
+            
             local result = {
                 edgeLists = edges,
                 models = pipe.new
-                + generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1]
-                + generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
-                + ext.walls.lower.A
-                + ext.walls.upper.A
-                + ext.surface.lower.A
+                + structure.A.fixed
+                + structure.B.fixed
                 + ext.surface.upper.A
-                + ext.walls.lower.B
-                + ext.walls.upper.B
-                + ext.surface.lower.B
                 + ext.surface.upper.B
+                + (heightFactor > 0
+                and pipe.new
+                + structure.A.upper
+                + structure.B.upper
+                + ext.walls.upper.A
+                + ext.walls.upper.B
+                or {}
+                )
+                + (heightFactor < 1
+                and pipe.new
+                + structure.A.lower
+                + structure.B.lower
+                + ext.walls.lower.A
+                + ext.walls.lower.B
+                or {})
                 ,
                 terrainAlignmentLists = pipe.new
                 + {

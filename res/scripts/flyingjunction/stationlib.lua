@@ -250,14 +250,16 @@ stationlib.joinEdges = function(edges)
     return #edges > 1 and join(table.unpack(edges)) or table.unpack(edges)
 end
 
-stationlib.fusionEdges = function(edges)
+stationlib.fusionEdges = function(fst, ...)
     local function fusion(result, ls, ...)
         return ls
             and fusion(result * pipe.map2(ls, function(current, new) return current / new end),
                 ...)
             or result
     end
-    return #edges > 0 and fusion(edges[1] * pipe.map(function(_) return pipe.new end), table.unpack(edges)) * pipe.map(stationlib.joinEdges) or {}
+    return fst
+        and fusion(fst * pipe.map(function(_) return pipe.new end), fst, ...) * pipe.map(stationlib.joinEdges)
+        or {}
 end
 
 

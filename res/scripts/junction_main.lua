@@ -17,7 +17,7 @@ local bridgeType = "z_concrete_flying_junction.lua"
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
 local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
 
-local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
+local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
 local heightList = {0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
@@ -187,7 +187,7 @@ local function part(info, offsets)
     }
     
     local result = {
-        lower = {
+        lower = pipe.new * {
             tracks = func.map(gRef.lower.tracks, function(l) return l:withLimits(limitRads.lower) end),
             walls = pipe.new
             * func.map(gRef.lower.walls, function(l)
@@ -202,7 +202,24 @@ local function part(info, offsets)
                 for i = #walls, 2, -1 do walls[i].sup = walls[i - 1].sup end
                 return walls
             end
-        },
+        }
+        * function(ls) return func.with(ls,
+            {
+                extWalls = {
+                    ls.walls[1]:withLimits({
+                        inf = limitRads.lower.inf,
+                        mid = ls.walls[1].inf,
+                        sup = limitRads.lower.sup,
+                    }),
+                    ls.walls[#ls.walls]:withLimits({
+                        inf = limitRads.lower.inf,
+                        mid = ls.walls[#ls.walls].sup,
+                        sup = limitRads.lower.sup,
+                    }),
+                }
+            }
+        )
+        end,
         upper = {
             tracks = func.map(gRef.upper.tracks, function(l) return l:withLimits(limitRads.upper) end),
             walls = {
@@ -220,10 +237,10 @@ local function part(info, offsets)
         }
     }
     
-    local inferExt = function(level, type, pos)
-        return func.map(result[level][type],
+    local inferExt = function(guidelines, fnRad)
+        return pipe.new * func.map(guidelines,
             function(g)
-                local p = g:pt(g[pos])
+                local p = g:pt(fnRad(g))
                 local guideline = arc.byOR(p + (g.o - p):normalized() * (junction.infi - g.xOffset), (junction.infi - g.xOffset))
                 
                 return {
@@ -237,22 +254,25 @@ local function part(info, offsets)
     local ext = {
         lower = {
             tracks = {
-                inf = inferExt("lower", "tracks", "inf"),
-                sup = inferExt("lower", "tracks", "sup")
+                inf = inferExt(result.lower.tracks, function(g) return g.inf end),
+                sup = inferExt(result.lower.tracks, function(g) return g.sup end)
             },
             walls = {
-                inf = inferExt("lower", "walls", "inf"),
-                sup = inferExt("lower", "walls", "sup")
+                inf = inferExt(result.lower.walls, function(_) return limitRads.lower.inf end)
+                * function(ls) return {ls[1], ls[#ls]} end
+                ,
+                sup = inferExt(result.lower.walls, function(_) return limitRads.lower.sup end)
+                * function(ls) return {ls[1], ls[#ls]} end
             }
         },
         upper = {
             tracks = {
-                inf = inferExt("upper", "tracks", "inf"),
-                sup = inferExt("upper", "tracks", "sup")
+                inf = inferExt(result.upper.tracks, function(g) return g.inf end),
+                sup = inferExt(result.upper.tracks, function(g) return g.sup end)
             },
             walls = {
-                inf = inferExt("upper", "walls", "inf"),
-                sup = inferExt("upper", "walls", "sup")
+                inf = inferExt(result.upper.walls, function(g) return g.inf end),
+                sup = inferExt(result.upper.walls, function(g) return g.sup end)
             }
         }
     }
@@ -261,13 +281,18 @@ local function part(info, offsets)
 end
 
 local function generateStructure(lowerGroup, upperGroup, mZ)
-    
     local function mPlace(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
         local pt = guideline:pt(rad)
-        return coor.rotZ(rad) * coor.transX(pt.x) * coor.transY(pt.y) * mZ * coor.transZ(-11)
+        return coor.rotZ(rad) * coor.trans(func.with(pt, {z = -11})) * mZ
+    end
+    local mPlaceD = function(guideline, rad1, rad2)
+        local radc = (rad1 + rad2) * 0.5
+        return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -11}))
     end
     
+    local makeExtWall = junction.makeFn(mSidePillar, mPlaceD, coor.scaleY(1.05))
+    local makeExtWallFence = junction.makeFn(mRoofFenceS, mPlaceD, coor.scaleY(1.05))
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
     local makeSurface = junction.makeFn(mRoof, mPlace, coor.transZ(-11) * coor.scaleY(1.05))
@@ -324,6 +349,8 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     return {
         pipe.new
         + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
+        + makeExtWall(lowerGroup.extWalls[1])[1]
+        + makeExtWallFence(lowerGroup.extWalls[1])[1]
         + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
         + func.map(fences, function(f) return f[1] end)
         + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
@@ -335,6 +362,8 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
         ,
         pipe.new
         + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
+        + makeExtWall(lowerGroup.extWalls[2])[2]
+        + makeExtWallFence(lowerGroup.extWalls[2])[2]
         + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
         + func.map(fences, function(f) return f[2] end)
         + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
@@ -609,23 +638,19 @@ local updateFn = function(fParams)
             
             local edges = {
                 station.fusionEdges(
-                    {
-                        ext.edges.lower.A.inf,
-                        ext.edges.lower.A.main,
-                        lowerTracks.main,
-                        ext.edges.lower.B.main,
-                        ext.edges.lower.B.sup
-                    }
+                    ext.edges.lower.A.inf,
+                    ext.edges.lower.A.main,
+                    lowerTracks.main,
+                    ext.edges.lower.B.main,
+                    ext.edges.lower.B.sup
                 )
                 * station.prepareEdges * TLowerTracks,
                 station.fusionEdges(
-                    {
-                        ext.edges.upper.A.inf,
-                        ext.edges.upper.A.main,
-                        upperTracks.main,
-                        ext.edges.upper.B.main,
-                        ext.edges.upper.B.sup
-                    }
+                    ext.edges.upper.A.inf,
+                    ext.edges.upper.A.main,
+                    upperTracks.main,
+                    ext.edges.upper.B.main,
+                    ext.edges.upper.B.sup
                 )
                 * station.prepareEdges * TUpperTracks,
             }

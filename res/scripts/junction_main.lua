@@ -352,9 +352,11 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
             + func.map(fences, function(f) return f[1] end)
             + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
             + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
+            + func.mapFlatten(func.range(sideFencesL, 2, #sideFencesL), function(t) return makeSideFence(t)[1] end)
+            + func.mapFlatten(func.range(sideFencesR, 1, #sideFencesR - 1), function(t) return makeSideFence(t)[2] end)
             ,
             upper = pipe.new
-            + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
+            + makeSideFence(sideFencesL[1])[1]
             + makeSideFence(upperGroup.walls[2])[1]
             + makeWall(upperGroup.walls[2])[1]
             + func.map(upperFences, function(f) return f[1] end)
@@ -372,7 +374,7 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
             + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
             ,
             upper = pipe.new
-            + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
+            + makeSideFence(sideFencesR[#sideFencesR])[2]
             + makeSideFence(upperGroup.walls[1])[2]
             + makeWall(upperGroup.walls[1])[2]
             + func.map(upperFences, function(f) return f[2] end)
@@ -668,7 +670,7 @@ local updateFn = function(fParams)
                 A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1],
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
             }
-            
+
             local result = {
                 edgeLists = edges,
                 models = pipe.new
@@ -680,42 +682,47 @@ local updateFn = function(fParams)
                 and pipe.new
                 + structure.A.upper
                 + structure.B.upper
-                + ext.walls.upper.A
-                + ext.walls.upper.B
+                + ext.walls.upper.A * pipe.flatten()
+                + ext.walls.upper.B * pipe.flatten()
                 or {}
                 )
                 + (heightFactor < 1
                 and pipe.new
                 + structure.A.lower
                 + structure.B.lower
-                + ext.walls.lower.A
-                + ext.walls.lower.B
+                + ext.walls.lower.A[1]
+                + ext.walls.lower.A[#ext.walls.lower.A]
+                + ext.walls.lower.B[1]
+                + ext.walls.lower.B[#ext.walls.lower.B]
                 or {})
                 ,
                 terrainAlignmentLists = pipe.new
                 + {
                     {
-                        type = "GREATER",
-                        faces = upperPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
-                    },
-                    {
-                        type = "LESS",
+                        type = heightFactor == 0 and "EQUAL" or "LESS",
                         faces = upperPolys * pipe.map(pipe.map(mTunnelZ * mZ)) * pipe.map(pipe.map(coor.vec2Tuple))
                     },
                     {
-                        type = "LESS",
-                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
-                        slopeLow = junction.infi,
-                    },
-                    {
                         type = "GREATER",
-                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                        faces = upperPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
                     }
                 }
                 + ext.polys.upper.A
                 + ext.polys.upper.B
                 + ext.polys.lower.A
                 + ext.polys.lower.B
+                + {
+                    
+                    {
+                        type = "LESS",
+                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                        slopeLow = heightFactor == 1 and 0.75 or junction.infi,
+                    },
+                    {
+                        type = "GREATER",
+                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                    }
+                }
             }
             
             -- End of generation

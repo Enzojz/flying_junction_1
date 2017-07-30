@@ -8,8 +8,6 @@ local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
 
-local dump = require "datadumper"
-
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
@@ -297,9 +295,8 @@ local retriveWalls = function(walls)
             w.guidelines * pipe.map(junction.makeFn(mSidePillar, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD), coor.scaleY(1.05)))
             + w.guidelines * pipe.map(junction.makeFn(mRoofFenceS, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD), coor.scaleY(1.05)))
         end)
-        * pipe.flatten()
-        * pipe.flatten()
-        * pipe.flatten()
+        * pipe.map(pipe.flatten())
+        * pipe.map(pipe.flatten())
 end
 
 local composite = function(config)

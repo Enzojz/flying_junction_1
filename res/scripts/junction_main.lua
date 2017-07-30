@@ -593,7 +593,7 @@ local updateFn = function(fParams)
                     curve = function(equalLength)
                         return function(part, level, type) return {
                             group = group[part][level][type],
-                            radFn = function(g) return g[extEndList[part]] end,
+                            radFn = function(g) return group[part][level].tracks[1][extEndList[part]] end,
                             rFn = function(g) return info[part][level].rFactor * g.r end,
                             guidelineFn = function(g) return g end,
                             part = part,

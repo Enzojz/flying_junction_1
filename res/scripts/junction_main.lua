@@ -295,7 +295,6 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     local makeExtWallFence = junction.makeFn(mRoofFenceS, mPlaceD, coor.scaleY(1.05))
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
     local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
-    -- local makeSurface = junction.makeFn(mRoof, mPlace, coor.transZ(-11) * coor.scaleY(1.05))
     local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
     
     local walls = lowerGroup.walls
@@ -637,12 +636,12 @@ local updateFn = function(fParams)
             local upperTracks = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
             
             local upperPolys = pipe.new
-                + junction.generatePolyArc(group.A.upper.walls, "inf", "mid")(0, 0)
-                + junction.generatePolyArc(group.B.upper.walls, "mid", "sup")(0, 0)
+                + junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 4)
+                + junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 4)
             
             local lowerPolys = pipe.new
-                + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
-                + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
+                + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 4)
+                + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 4)
             
             
             

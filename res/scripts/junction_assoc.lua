@@ -7,6 +7,9 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
+
+local dump = require "datadumper"
+
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
@@ -237,20 +240,21 @@ local retriveTracks = function(tracks)
             } end
         end)
         * function(ls) return {
-                inf = ls * pipe.map(pipe.select("inf")),
-                sup = ls * pipe.map(pipe.select("sup")),
-                main = ls * pipe.map(pipe.select("main"))
-            }
+            inf = ls * pipe.map(pipe.select("inf")),
+            sup = ls * pipe.map(pipe.select("sup")),
+            main = ls * pipe.map(pipe.select("main"))
+        }
         end
 end
 
 
-local retrivePolys = function(tracks)
+local retrivePolys = function(tracks, extLat)
+    extLat = extLat or 10
     return tracks
         * pipe.mapFlatten(function(tr)
             local polys = pipe.new
-                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(10, 4)
-                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(10, 4)
+                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(extLat, 4)
+                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(extLat, 4)
             local polyTracks = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
             return {
                 {
@@ -323,8 +327,8 @@ local composite = function(config)
         end)
     
     return {
-        edges = table.unpack(retriveTracks(tracks)),
-        polys = retrivePolys(tracks),
+        edges = retriveTracks(tracks),
+        polys = retrivePolys(tracks, 1),
         surface = retriveTrackSurfaces(tracks),
         walls = retriveWalls(walls)
     }
@@ -350,7 +354,7 @@ local updateFn = function(params)
     local nbTracks = params.nbTracks + 1
     local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
     
-    local c = composite({
+    local surface = composite({
         initRad = r > 0 and math.pi or 0,
         slope = generateSlope(sFactor * slopeList[params.slope + 1] * 0.001, height),
         height = height,
@@ -359,7 +363,7 @@ local updateFn = function(params)
         radFactor = 1
     })
     
-    local d = composite({
+    local underground = composite({
         initRad = r > 0 and math.pi or 0,
         slope = generateSlope(-sFactor * slopeList[params.slope + 1] * 0.001, -height, 2 * height),
         height = height,
@@ -367,17 +371,20 @@ local updateFn = function(params)
         nbTracks = nbTracks,
         radFactor = -1
     })
-    
     return
         {
             edgeLists = {
-            (c.edges.edges) * station.prepareEdges * trackBuilder.nonAligned(),
-                (d.edges.edges) * station.prepareEdges * trackBuilder.tunnel(),
-                (d.edges.extSup) * station.prepareEdges * trackBuilder.tunnel(),
-                (c.edges.extInf) * station.prepareEdges * trackBuilder.nonAligned(),
+                station.fusionEdges(
+                    surface.edges.inf,
+                    surface.edges.main
+                ) * station.prepareEdges * trackBuilder.nonAligned(),
+                station.fusionEdges(
+                    underground.edges.main,
+                    underground.edges.sup
+                ) * station.prepareEdges * trackBuilder.tunnel()
             },
-            models = c.walls + c.surface,
-            terrainAlignmentLists = c.polys
+            models = surface.walls + surface.surface,
+            terrainAlignmentLists = surface.polys
         }
 end
 

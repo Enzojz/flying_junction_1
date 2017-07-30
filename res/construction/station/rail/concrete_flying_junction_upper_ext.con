@@ -2,7 +2,7 @@ local jAssoc = require "junction_assoc"
 
 function data()
     return {
-        type = "RAIL_STATION",
+        type = "ASSET_DEFAULT",
         description = {
             name = _("Concrete Flying Junction"),
             description = _("An European style flying junction")
@@ -10,7 +10,11 @@ function data()
         availability = {
             yearFrom = 1892
         },
+        buildMode = "SINGLE",
+        categories = {"misc"},
         order = 27218,
+        skipCollision = false,
+        autoRemovable = false,
         params = jAssoc.params(),
         
         updateFn = jAssoc.updateFn

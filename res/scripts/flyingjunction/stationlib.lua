@@ -308,8 +308,6 @@ end
 stationlib.setSlope = function(slope)
     return function(result)
         local mr = coor.rotX(math.atan(slope * 0.001))
-        local mpt = mr
-        local mvec = mr
         return applyResult(mr, mr)(result)
     end
 end

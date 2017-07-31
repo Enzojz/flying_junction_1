@@ -5,6 +5,9 @@ local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = {}
 
+local pi = math.pi
+local abs = math.abs
+
 junction.infi = 1e8
 junction.buildCoors = function(numTracks, groupSize)
     local function builder(xOffsets, uOffsets, baseX, nbTracks)
@@ -32,7 +35,7 @@ junction.buildCoors = function(numTracks, groupSize)
 end
 
 junction.normalizeRad = function(rad)
-    return (rad < math.pi * -0.5) and junction.normalizeRad(rad + math.pi * 2) or rad
+    return (rad < pi * -0.5) and junction.normalizeRad(rad + pi * 2) or rad
 end
 
 junction.generateArc = function(arc)
@@ -65,7 +68,7 @@ junction.fArcs = function(offsets, rad, r)
     return func.map(offsets, function(x)
         local newArc = arc.byOR(
             coor.xyz(r, 0, 0) .. coor.rotZ(rad),
-            math.abs(r) - x
+            abs(r) - x
         )
         newArc.xOffset = x
         return newArc

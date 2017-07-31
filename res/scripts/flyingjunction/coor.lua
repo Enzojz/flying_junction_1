@@ -31,6 +31,10 @@ local func = require "flyingjunction/func"
 local coor = {}
 coor.make = laneutil.makeLanes
 
+local sin = math.sin
+local cos = math.cos
+local sqrt = math.sqrt
+local rad = math.rad
 
 local vecXyMeta = {
     __add = function(lhs, rhs)
@@ -55,7 +59,7 @@ local vecXyMeta = {
     end
 }
 
-local vecXyLength = function(self) return math.sqrt(self.x * self.x + self.y * self.y) end
+local vecXyLength = function(self) return sqrt(self.x * self.x + self.y * self.y) end
 local vecXyNormalized = function(self) return self / self:length() end
 
 function coor.xy(x, y)
@@ -94,7 +98,7 @@ local vecXyzMeta = {
     end
 }
 
-local vecXyzLength = function(self) return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z) end
+local vecXyzLength = function(self) return sqrt(self.x * self.x + self.y * self.y + self.z * self.z) end
 local vecXyzNormalized  = function(self) return self / self:length() end
 local vecXyzToTuple  = function(self) return {self.x, self.y, self.z} end
 
@@ -192,8 +196,8 @@ function coor.I()
 end
 
 function coor.rotZ(rotX)
-    local sx = math.sin(rotX)
-    local cx = math.cos(rotX)
+    local sx = sin(rotX)
+    local cx = cos(rotX)
     
     return init * {
         cx, sx, 0, 0,
@@ -204,8 +208,8 @@ function coor.rotZ(rotX)
 end
 
 function coor.rotY(rotX)
-    local sx = math.sin(rotX)
-    local cx = math.cos(rotX)
+    local sx = sin(rotX)
+    local cx = cos(rotX)
     
     return init * {
         cx, 0, sx, 0,
@@ -217,8 +221,8 @@ end
 
 
 function coor.rotX(rotX)
-    local sx = math.sin(rotX)
-    local cx = math.cos(rotX)
+    local sx = sin(rotX)
+    local cx = cos(rotX)
     
     return init * {
         1, 0, 0, 0,
@@ -428,7 +432,7 @@ end
 
 function coor.rotateEdgeByZ(degree, center, edge)
     local mt0, mt1 = coor.translateAndBack(center)
-    local mtr = coor.rotZ(math.rad(degree))
+    local mtr = coor.rotZ(rad(degree))
     return coor.rotate(edge, mt0, mtr, mt1)
 end
 

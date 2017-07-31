@@ -8,6 +8,11 @@ local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
 
+local abs = math.abs
+local floor = math.floor
+local ceil = math.ceil
+local pi = math.pi
+
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
@@ -129,7 +134,7 @@ local retriveExt = function(protos)
         
         local height = extHeightList[proto.level]
         
-        local slope = (math.abs(height) < math.abs(opposite.height) and proto.equalLength)
+        local slope = (abs(height) < abs(opposite.height) and proto.equalLength)
             and jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height)
             or jA.generateSlope(extSlopeList[proto.level] * extSlopeList[proto.part], height)
         
@@ -316,8 +321,8 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     
     local upperFences = func.map(upperGroup.tracks, function(t)
         return {
-            station.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t, t.inf)),
-            station.newModel(mSidePillar, coor.rotZ(math.pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t, t.sup)),
+            station.newModel(mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t, t.inf)),
+            station.newModel(mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t, t.sup)),
         }
     end)
     
@@ -441,38 +446,50 @@ local function params(paramFilter, defaultValue)
             {
                 key = "rLower",
                 name = _("Radius of lower tracks"),
-                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = #rList - 1
             },
             {
                 key = "rUpper",
                 name = _("Radius of upper tracks"),
-                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
+                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = #rList - 1
             },
             {
                 key = "transitionA",
                 name = _("Transition A"),
-                values = {_("Both"), _("Lower"), _("Upper")},
+                values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
             {
                 key = "trSlopeA",
-                name = _("Transition A Slope") .. "(‰)",
+                name = _("Transition A slope") .. "(‰)",
                 values = func.map(trSlopeList, tostring),
-                defaultIndex = #trSlopeList - 1
+                defaultIndex = #trSlopeList * 0.5
+            },
+            {
+                key = "typeSlopeA",
+                name = _("Form of asc. tr. A"),
+                values = {_("Solid"), _("Bridge")},
+                defaultIndex = 0
             },
             {
                 key = "transitionB",
                 name = _("Transition B"),
-                values = {_("Both"), _("Lower"), _("Upper")},
+                values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
             {
                 key = "trSlopeB",
-                name = _("Transition B Slope") .. "(‰)",
+                name = _("Transition B slope") .. "(‰)",
                 values = func.map(trSlopeList, tostring),
                 defaultIndex = #trSlopeList - 1
+            },
+            {
+                key = "typeSlopeA",
+                name = _("Form of asc. tr. B"),
+                values = {_("Solid"), _("Bridge")},
+                defaultIndex = 0
             },
             {
                 key = "isMir",
@@ -482,14 +499,14 @@ local function params(paramFilter, defaultValue)
             },
             {
                 key = "slope",
-                name = _("Slope(‰)"),
+                name = _("General Slope(‰)"),
                 values = func.map(slopeList, tostring),
                 defaultIndex = 0
             },
             {
                 key = "height",
                 name = _("Altitude Adjustment"),
-                values = func.map(heightList, function(h) return tostring(math.ceil(h * 100)) .. "%" end),
+                values = func.map(heightList, function(h) return tostring(ceil(h * 100)) .. "%" end),
                 defaultIndex = #heightList - 1
             }
         }
@@ -541,12 +558,15 @@ local updateFn = function(fParams)
                         r = retriveR(params.rLower) * params.fRLowerA,
                         rFactor = params.fRLowerA,
                         rad = -0.5 * rad,
+                        used = func.contains({0, 1}, params.transitionA)
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
                         r = retriveR(params.rUpper) * params.fRUpperA,
                         rFactor = params.fRUpperA,
                         rad = 0.5 * rad,
+                        used = func.contains({0, 2}, params.transitionA),
+                        isBridge = params.typeSlopeA == 1
                     }
                 },
                 B = {
@@ -554,6 +574,7 @@ local updateFn = function(fParams)
                         nbTracks = params.nbLowerTracks + 1,
                         r = retriveR(params.rLower) * params.fRLowerB,
                         rFactor = params.fRLowerB,
+                        used = func.contains({0, 1}, params.transitionB),
                         rad = -0.5 * rad,
                     },
                     upper = {
@@ -561,6 +582,8 @@ local updateFn = function(fParams)
                         r = retriveR(params.rUpper) * params.fRUpperB,
                         rFactor = params.fRUpperB,
                         rad = 0.5 * rad,
+                        used = func.contains({0, 2}, params.transitionB),
+                        isBridge = params.typeSlopeB == 1
                     }
                 }
             }

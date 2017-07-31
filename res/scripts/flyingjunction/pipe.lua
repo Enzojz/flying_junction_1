@@ -29,23 +29,21 @@ local pipe = {}
 
 function pipe.fold(init, fun)
     return function(ls)
-        for _, e in ipairs(ls) do
-            init = fun(init, e)
-        end
+        for i = 1, #ls do init = fun(init, ls[i]) end
         return init
     end
 end
 
 function pipe.forEach(fun)
     return function(ls)
-        for _, e in ipairs(ls) do fun(e) end
+        for i = 1, #ls do fun(ls[i]) end
     end
 end
 
 function pipe.map(fun)
     return function(ls)
         local result = {}
-        for i, e in ipairs(ls) do result[i] = fun(e) end
+        for i = 1, #ls do result[i] = fun(ls[i]) end
         return result
     end
 end
@@ -62,8 +60,8 @@ end
 function pipe.mapPair(fun)
     return function(ls)
         local result = {}
-        for i, e in ipairs(ls) do
-            local k, v = fun(e)
+        for i = 1, #ls do
+            local k, v = fun(ls[i])
             result[k] = v
         end
         return result
@@ -73,8 +71,10 @@ end
 function pipe.filter(pre)
     return function(ls)
         local result = {}
-        for _, e in ipairs(ls) do
-            if pre(e) then result[#result + 1] = e end
+        for i = 1, #ls do
+            if (pre(ls[i])) then
+                result[#result + 1] = ls[i]
+            end
         end
         return result
     end
@@ -82,23 +82,17 @@ end
 
 function pipe.concat(t2)
     return function(t1)
-        local res = {}
-        for _, v in ipairs(t1) do
-            table.insert(res, v)
-        end
-        for _, v in ipairs(t2) do
-            table.insert(res, v)
-        end
-        return res
+        local result = {}
+        for i = 1, #t1 do result[#result + 1] = t1[i] end
+        for i = 1, #t2 do result[#result + 1] = t2[i] end
+        return result
     end
 end
 
 function pipe.flatten()
     return function(ls)
         local result = {}
-        for _, v in ipairs(ls) do
-            result = pipe.concat(v)(result)
-        end
+        for i = 1, #ls do result = pipe.concat(ls[i])(result) end
         return result
     end
 end
@@ -112,7 +106,7 @@ end
 function pipe.map2(ls2, fun)
     return function(ls1)
         local result = {}
-        for i, e in ipairs(ls1) do result[i] = fun(e, ls2[i]) end
+        for i = 1, #ls1 do result[i] = fun(ls1[i], ls2[i]) end
         return result
     end
 end
@@ -121,16 +115,14 @@ end
 function pipe.range(from, to)
     return function(ls)
         local result = {}
-        for i = from, to do table.insert(result, ls[i]) end
+        for i = from, to do result[#result + 1] = ls[i] end
         return result
     end
 end
 
 function pipe.contains(e)
     return function(ls)
-        for _, x in ipairs(ls) do
-            if (x == e) then return true end
-        end
+        for i = 1, #ls do if (ls[i] == e) then return true end end
         return false
     end
 end
@@ -190,7 +182,7 @@ function pipe.zip(ls2, name)
     name = name or {1, 2}
     return function(ls1)
         local result = {}
-        for i, e in ipairs(ls1) do result[i] = {[name[1]] = e, [name[2]] = ls2[i]} end
+        for i = 1, #ls1 do result[i] = {[name[1]] = ls1[i], [name[2]] = ls2[i]} end
         return result
     end
 end

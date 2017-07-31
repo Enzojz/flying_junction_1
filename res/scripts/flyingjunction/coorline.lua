@@ -2,18 +2,21 @@ local coor = require "flyingjunction/coor"
 local line = {}
 
 
+local sin = math.sin
+local cos = math.cos
+
 -- line in form of
 -- a.x + b.y + 1 = 0, if c != 0
 -- if not
 -- a.x + b.y + 0 = 0;
 function line.new(a, b, c)
-    local result = c ~= 0 and {a = a/c, b = b/c, c = 1} or {a = a, b = b, c = 0}
+    local result = c ~= 0 and {a = a / c, b = b / c, c = 1} or {a = a, b = b, c = 0}
     result.vector = line.vec
-    setmetatable(result, 
-    {
-        __sub = line.intersection,
-        __div = function(lhs, rhs) return rhs / lhs end
-    })
+    setmetatable(result,
+        {
+            __sub = line.intersection,
+            __div = function(lhs, rhs) return rhs / lhs end
+        })
     return result
 end
 
@@ -29,7 +32,7 @@ function line.byPtPt(pt1, pt2)
 end
 
 function line.byRadPt(rad, pt)
-    return line.byVecPt({y = math.sin(rad), x = math.cos(rad)}, pt)
+    return line.byVecPt({y = sin(rad), x = cos(rad)}, pt)
 end
 
 function line.vec(l)

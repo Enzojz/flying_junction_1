@@ -10,8 +10,19 @@ local cos = math.cos
 -- if not
 -- a.x + b.y + 0 = 0;
 function line.new(a, b, c)
-    local result = c ~= 0 and {a = a / c, b = b / c, c = 1} or {a = a, b = b, c = 0}
-    result.vector = line.vec
+    local result = c ~= 0
+        and {
+            a = a / c,
+            b = b / c,
+            c = 1,
+            vector = line.vec
+        }
+        or {
+            a = a,
+            b = b,
+            c = 0,
+            vector = line.vec
+        }
     setmetatable(result,
         {
             __sub = line.intersection,

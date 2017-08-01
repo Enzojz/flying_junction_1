@@ -101,9 +101,7 @@ end
 
 function func.seq(from, to)
     local result = {}
-    for i = from, to do
-        table.insert(result, i)
-    end
+    for i = from, to do result[#result + 1] = i end
     return result
 end
 

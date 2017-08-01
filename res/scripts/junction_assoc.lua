@@ -380,7 +380,7 @@ local updateFn = function(params)
                     underground.edges.sup
                 ) * station.prepareEdges * trackBuilder.tunnel()
             },
-            models = surface.walls + surface.surface,
+            models = (surface.walls + surface.surface) * pipe.flatten(),
             terrainAlignmentLists = surface.polys
         }
 end

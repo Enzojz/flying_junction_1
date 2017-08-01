@@ -7,7 +7,7 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
-
+local dump = require "datadumper"
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
@@ -24,7 +24,7 @@ local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
-local heightList = {0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1}
+local heightList = {0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1, 1.1, 1.2, 1.25, 1.5}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
@@ -47,12 +47,12 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                 * station.joinEdges
                 * station.mergeEdges,
                 inf = {
-                    edge = {seg[1][3]},
-                    snap = {{true, false}}
+                    edge = pipe.new * {seg[1][3]},
+                    snap = pipe.new / {true, false}
                 },
                 sup = {
-                    edge = {seg[2][4]},
-                    snap = {{false, true}}
+                    edge = pipe.new * {seg[2][4]},
+                    snap = pipe.new / {false, true}
                 }
             }
         end)
@@ -448,13 +448,13 @@ local function params(paramFilter, defaultValue)
                 key = "rLower",
                 name = _("Radius of lower tracks"),
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
-                defaultIndex = #rList - 1
+                defaultIndex = 0
             },
             {
                 key = "rUpper",
                 name = _("Radius of upper tracks"),
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
-                defaultIndex = #rList - 1
+                defaultIndex = 0
             },
             {
                 key = "transitionA",
@@ -484,10 +484,10 @@ local function params(paramFilter, defaultValue)
                 key = "trSlopeB",
                 name = _("Transition B slope") .. "(‰)",
                 values = func.map(trSlopeList, tostring),
-                defaultIndex = #trSlopeList - 1
+                defaultIndex = #trSlopeList * 0.5
             },
             {
-                key = "typeSlopeA",
+                key = "typeSlopeB",
                 name = _("Form of asc. tr. B"),
                 values = {_("Solid"), _("Bridge")},
                 defaultIndex = 0
@@ -508,7 +508,7 @@ local function params(paramFilter, defaultValue)
                 key = "height",
                 name = _("Altitude Adjustment"),
                 values = func.map(heightList, function(h) return tostring(ceil(h * 100)) .. "%" end),
-                defaultIndex = #heightList - 1
+                defaultIndex = 6
             }
         }
         * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
@@ -540,8 +540,9 @@ local updateFn = function(fParams)
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
             local heightFactor = heightList[params.height + 1]
-            local height = (heightFactor - 1) * tunnelHeight
+            local height = ((heightFactor > 1 and 1 or heightFactor) - 1) * tunnelHeight
             local mZ = coor.transZ(height)
+            local extraZ = heightFactor > 1 and ((heightFactor - 1) * tunnelHeight) or 0
             local mTunnelZ = coor.transZ(tunnelHeight)
             
             local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
@@ -549,7 +550,7 @@ local updateFn = function(fParams)
             local TLowerTracks = lowerTrackBuilder.nonAligned()
             local TUpperTracks = upperTrackBuilder.nonAligned()
             -- local TLowerExtTracks = lowerTrackBuilder.nonAligned()
-            -- local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
+            local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
             local info = {
@@ -559,7 +560,8 @@ local updateFn = function(fParams)
                         r = retriveR(params.rLower) * params.fRLowerA,
                         rFactor = params.fRLowerA,
                         rad = -0.5 * rad,
-                        used = func.contains({0, 1}, params.transitionA)
+                        used = func.contains({0, 1}, params.transitionA),
+                        isBridge = false
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
@@ -575,8 +577,9 @@ local updateFn = function(fParams)
                         nbTracks = params.nbLowerTracks + 1,
                         r = retriveR(params.rLower) * params.fRLowerB,
                         rFactor = params.fRLowerB,
-                        used = func.contains({0, 1}, params.transitionB),
                         rad = -0.5 * rad,
+                        used = func.contains({0, 1}, params.transitionB),
+                        isBridge = false
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
@@ -658,8 +661,10 @@ local updateFn = function(fParams)
                 }
             end
             
-            local lowerTracks = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()})
-            local upperTracks = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
+            local trackEdges = {
+                lower = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()}),
+                upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
+            }
             
             local upperPolys = pipe.new
                 + junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 4)
@@ -669,55 +674,84 @@ local updateFn = function(fParams)
                 + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 4)
                 + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 4)
             
+            local function selectEdge(level)
+                return station.fusionEdges(pipe.new
+                    + (
+                    info.A[level].used
+                    and {
+                        ext.edges[level].A.inf,
+                        ext.edges[level].A.main
+                    }
+                    or {trackEdges[level].inf}
+                    )
+                    + {trackEdges[level].main}
+                    + (
+                    info.B[level].used
+                    and {
+                        ext.edges[level].B.main,
+                        ext.edges[level].B.sup
+                    }
+                    or {trackEdges[level].sup}
+                )),
+                pipe.new
+                + (info.A[level].used and (info.A[level].isBridge and {true, true} or {false, false}) or {true})
+                + {false}
+                + (info.B[level].used and (info.B[level].isBridge and {true, true} or {false, false}) or {true})
+            end
             
+            local lowerEdges, _ = selectEdge("lower")
+            local upperEdges, upperBridges = selectEdge("upper")
+            
+            local bridgeEdges = upperEdges
+                * pipe.zip(upperBridges, {"e", "b"})
+                * pipe.filter(function(e) return e.b end)
+                * pipe.map(pipe.select("e"))
+            
+            local solidEdges = upperEdges
+                * pipe.zip(upperBridges, {"e", "b"})
+                * pipe.filter(function(e) return not e.b end)
+                * pipe.map(pipe.select("e"))
             
             local edges = {
-                station.fusionEdges(
-                    ext.edges.lower.A.inf,
-                    ext.edges.lower.A.main,
-                    lowerTracks.main,
-                    ext.edges.lower.B.main,
-                    ext.edges.lower.B.sup
-                )
-                * station.prepareEdges * TLowerTracks,
-                station.fusionEdges(
-                    ext.edges.upper.A.inf,
-                    ext.edges.upper.A.main,
-                    upperTracks.main,
-                    ext.edges.upper.B.main,
-                    ext.edges.upper.B.sup
-                )
-                * station.prepareEdges * TUpperTracks,
+                lowerEdges * pipe.map(station.mergeEdges) * station.prepareEdges * TLowerTracks,
+                solidEdges * pipe.map(station.mergeEdges) * station.prepareEdges * TUpperTracks,
+                bridgeEdges * pipe.map(station.mergeEdges) * station.prepareEdges * TUpperExtTracks,
             }
             
             local structure = {
                 A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1],
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
             }
-
+            
+            local function withIf(level, part)
+                return function(c)
+                    return (info[part][level].used and not info[part][level].isBridge) and c or {}
+                end
+            end
+            
             local result = {
                 edgeLists = edges,
                 models = pipe.new
                 + structure.A.fixed
                 + structure.B.fixed
-                + ext.surface.upper.A
-                + ext.surface.upper.B
+                + withIf("upper", "A")(ext.surface.upper.A)
+                + withIf("upper", "B")(ext.surface.upper.B)
                 + (heightFactor > 0
                 and pipe.new
                 + structure.A.upper
                 + structure.B.upper
-                + ext.walls.upper.A * pipe.flatten()
-                + ext.walls.upper.B * pipe.flatten()
+                + withIf("upper", "A")(ext.walls.upper.A * pipe.flatten())
+                + withIf("upper", "B")(ext.walls.upper.B * pipe.flatten())
                 or {}
                 )
                 + (heightFactor < 1
                 and pipe.new
                 + structure.A.lower
                 + structure.B.lower
-                + ext.walls.lower.A[1]
-                + ext.walls.lower.A[#ext.walls.lower.A]
-                + ext.walls.lower.B[1]
-                + ext.walls.lower.B[#ext.walls.lower.B]
+                + withIf("lower", "A")(ext.walls.lower.A[1])
+                + withIf("lower", "A")(ext.walls.lower.A[#ext.walls.lower.A])
+                + withIf("lower", "B")(ext.walls.lower.B[1])
+                + withIf("lower", "B")(ext.walls.lower.B[#ext.walls.lower.B])
                 or {})
                 ,
                 terrainAlignmentLists = pipe.new
@@ -731,16 +765,16 @@ local updateFn = function(fParams)
                         faces = upperPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
                     }
                 }
-                + ext.polys.upper.A
-                + ext.polys.upper.B
-                + ext.polys.lower.A
-                + ext.polys.lower.B
+                + withIf("upper", "A")(ext.polys.upper.A)
+                + withIf("upper", "B")(ext.polys.upper.B)
+                + withIf("lower", "A")(ext.polys.lower.A)
+                + withIf("lower", "B")(ext.polys.lower.B)
                 + {
                     
                     {
                         type = "LESS",
                         faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
-                        slopeLow = heightFactor == 1 and 0.75 or junction.infi,
+                        slopeLow = heightFactor >= 1 and 0.75 or junction.infi,
                     },
                     {
                         type = "GREATER",
@@ -755,6 +789,7 @@ local updateFn = function(fParams)
                 * result
                 * station.setMirror(params.isMir == 1)
                 * station.setSlope(slopeList[params.slope + 1])
+                * station.setHeight(extraZ)
     end
 end
 

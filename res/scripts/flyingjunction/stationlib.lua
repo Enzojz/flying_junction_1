@@ -259,7 +259,7 @@ stationlib.mergeEdges = function(edges)
     }
 end
 
-stationlib.fusionEdges = function(fst, ...)
+stationlib.fusionEdges = function(edges)
     local function transpose(result, ls, ...)
         return ls
             and (result
@@ -269,11 +269,10 @@ stationlib.fusionEdges = function(fst, ...)
             )
             or result
     end
-    return fst
-        and transpose(nil, fst, ...)
+    return #edges > 0
+        and transpose(nil, table.unpack(edges))
         * pipe.map(stationlib.joinEdges)
         * function(ls) return transpose(nil, table.unpack(ls)) end
-        * pipe.map(stationlib.mergeEdges)
         or {}
 end
 

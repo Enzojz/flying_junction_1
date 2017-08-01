@@ -122,4 +122,10 @@ junction.generatePolyArc = function(groups, from, to)
     end
 end
 
+function junction.regularizeRad(rad)
+    return rad > pi
+        and junction.regularizeRad(rad - pi)
+        or (rad < -pi and junction.regularizeRad(rad + pi) or rad)
+end
+
 return junction

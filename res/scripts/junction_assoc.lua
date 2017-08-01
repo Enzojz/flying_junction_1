@@ -7,7 +7,7 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
-local dump = require "datadumper"
+
 local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
 local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
 local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
@@ -16,6 +16,8 @@ local rList = {junction.infi * 0.001, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 
 local slopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local heightList = {11, 10, 9, 8, 7, 6, 5, 4, 3}
 local wallHeight = 11
+
+local pi = math.pi
 
 local function params()
     return {
@@ -104,7 +106,7 @@ local function gmPlaceA(fz, r)
     return function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
         local p1, p2 = fz(rad1), fz(rad2)
-        return coor.shearZoY((r > 0 and -1 or 1) * (p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+        return coor.shearZoY((r < 0 and -1 or 1) * (p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
     end
 end
 
@@ -206,7 +208,7 @@ local retriveFn = function(config)
         mPlaceA = mPlaceA,
         mPlaceD = function(guideline, rad1, rad2)
             local radc = (rad1 + rad2) * 0.5
-            return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
+            return coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
         end,
         isDesc = function(a, b) return config.height > 0 and a or b end
     }

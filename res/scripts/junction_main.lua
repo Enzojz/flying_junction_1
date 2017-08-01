@@ -7,7 +7,7 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
-local dump = require "datadumper"
+
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
@@ -27,7 +27,7 @@ local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
 local heightList = {0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1, 1.1, 1.2, 1.25, 1.5}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
 
-local ptXSelector = function(lhs, rhs) return lhs:length() < rhs:length() end
+local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
 
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
@@ -290,11 +290,11 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     local function mPlace(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
         local pt = guideline:pt(rad)
-        return coor.rotZ(rad) * coor.trans(func.with(pt, {z = -11})) * mZ
+        return coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = -11})) * mZ
     end
     local mPlaceD = function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
-        return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -11}))
+        return coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = -11}))
     end
     
     local makeExtWall = junction.makeFn(mSidePillar, mPlaceD, coor.scaleY(1.05))
@@ -667,12 +667,12 @@ local updateFn = function(fParams)
             }
             
             local upperPolys = pipe.new
-                + junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 4)
-                + junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 4)
+                + junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 3.5)
+                + junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 3.5)
             
             local lowerPolys = pipe.new
-                + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 4)
-                + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 4)
+                + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
+                + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
             
             local function selectEdge(level)
                 return station.fusionEdges(pipe.new

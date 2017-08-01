@@ -102,7 +102,7 @@ local vecXyzMeta = {
 }
 
 local vecXyzLength = function(self) return sqrt(self:length2()) end
-local vecXyLength2 = function(self) return self.x * self.x + self.y * self.y + self.z * self.z end
+local vecXyzLength2 = function(self) return self.x * self.x + self.y * self.y + self.z * self.z end
 local vecXyzNormalized = function(self) return self / self:length() end
 local vecXyzToTuple = function(self) return {self.x, self.y, self.z} end
 
@@ -112,7 +112,7 @@ function coor.xyz(x, y, z)
         y = y,
         z = z,
         length = vecXyzLength,
-        length2 = vecXyLength2,
+        length2 = vecXyzLength2,
         normalized = vecXyzNormalized,
         toTuple = vecXyzToTuple
     }

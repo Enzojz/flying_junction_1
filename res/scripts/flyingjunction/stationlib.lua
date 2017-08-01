@@ -2,7 +2,7 @@ local func = require "flyingjunction/func"
 local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
-local dump = require "datadumper"
+
 local stationlib = {
     platformWidth = 5,
     trackWidth = 5,
@@ -123,7 +123,7 @@ stationlib.buildCoors = function(nSeg)
     return build
 end
 
-stationlib.noSnap = function(e) return {} end
+stationlib.noSnap = function(_) return {} end
 
 stationlib.makePlatforms = function(uOffsets, platforms, m)
     local length = #platforms * stationlib.segmentLength
@@ -229,7 +229,7 @@ stationlib.joinEdges = function(edges)
         return pipe.new
             * func.map(pattern, function(fns)
                 local pl, pr, fadj = table.unpack(fns)
-                return (pl(l) - pr(r)):length() < 0.1
+                return (pl(l) - pr(r)):length2() < 0.01
                     and joinEdge(fadj())
                     or nil
             end)

@@ -44,7 +44,8 @@ local generateTrackGroups = function(tracks1, tracks2, trans)
                     edge = pipe.new * e,
                     snap = pipe.new / {false, false}
                 } end)
-                * station.joinEdges,
+                * station.joinEdges
+                * station.mergeEdges,
                 inf = {
                     edge = {seg[1][3]},
                     snap = {{true, false}}

@@ -2,7 +2,7 @@ local func = require "flyingjunction/func"
 local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
 local trackEdge = require "flyingjunction/trackedge"
-
+local dump = require "datadumper"
 local stationlib = {
     platformWidth = 5,
     trackWidth = 5,
@@ -213,10 +213,11 @@ stationlib.joinEdges = function(edges)
         * pipe.rev()
     end
     local joinEdge = function(l, r)
-        local x = l + r
-        x[#l][2], x[#l + 1][1] = average(x[#l][2], x[#l + 1][1])
-        x[#l][4], x[#l + 1][3] = average(x[#l][4], x[#l + 1][3])
-        return x
+        local newL = l + {}
+        local newR = r + {}
+        newL[#l][2], newR[1][1] = average(newL[#l][2], newR[1][1])
+        newL[#l][4], newR[1][3] = average(newL[#l][4], newR[1][3])
+        return {newL, newR}
     end
     local connect = function(l, r)
         local pattern = {
@@ -225,7 +226,6 @@ stationlib.joinEdges = function(edges)
             {lst, fst, function() return l, r end},
             {lst, lst, function() return l, rev(r) end}
         }
-        
         return pipe.new
             * func.map(pattern, function(fns)
                 local pl, pr, fadj = table.unpack(fns)
@@ -234,31 +234,46 @@ stationlib.joinEdges = function(edges)
                     or nil
             end)
             * pipe.filter(pipe.noop())
-            * function(ls) return #ls == 0 and l + r or #ls[1] end
+            * function(ls) return #ls == 0 and {l, r} or #ls[1] end
     end
     
-    local function join(result, ls, ...) return ls
-        and join(
-            {
-                edge = connect(result.edge, ls.edge),
-                snap = result.snap + ls.snap
-            },
-            ...)
-        or result
+    local function join(result, fst, snd, ...)
+        local function fn(...)
+            local newEdges = connect(fst.edge, snd.edge)
+            return join(
+                result / (func.with(fst, {edge = newEdges[1]})),
+                func.with(snd, {edge = newEdges[2]}),
+                ...
+        )
+        end
+        return snd and fn(...) or result / fst
     end
     
-    return #edges > 1 and join(table.unpack(edges)) or table.unpack(edges)
+    return #edges > 1 and join(pipe.new, table.unpack(edges)) or edges
+end
+
+stationlib.mergeEdges = function(edges)
+    return {
+        edge = edges * pipe.mapFlatten(pipe.select("edge")),
+        snap = edges * pipe.mapFlatten(pipe.select("snap")),
+    }
 end
 
 stationlib.fusionEdges = function(fst, ...)
-    local function fusion(result, ls, ...)
+    local function transpose(result, ls, ...)
         return ls
-            and fusion(result * pipe.map2(ls, function(current, new) return current / new end),
+            and (result
+            and transpose(result * pipe.map2(ls, function(current, new) return current / new end),
                 ...)
+            or transpose(ls * pipe.map(function(_) return pipe.new end), ls, ...)
+            )
             or result
     end
     return fst
-        and fusion(fst * pipe.map(function(_) return pipe.new end), fst, ...) * pipe.map(stationlib.joinEdges)
+        and transpose(nil, fst, ...)
+        * pipe.map(stationlib.joinEdges)
+        * function(ls) return transpose(nil, table.unpack(ls)) end
+        * pipe.map(stationlib.mergeEdges)
         or {}
 end
 

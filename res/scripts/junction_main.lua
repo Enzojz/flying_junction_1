@@ -29,6 +29,12 @@ local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
 
+local projectPolys = function(mZ)
+    return function(...)
+        return pipe.new * func.flatten({...}) * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple))
+    end
+end
+
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
@@ -471,7 +477,7 @@ local function params(paramFilter, defaultValue)
             {
                 key = "typeSlopeA",
                 name = _("Form of asc. tr. A"),
-                values = {_("Solid"), _("Bridge")},
+                values = {_("Solid"), _("Bridge"), _("Terra")},
                 defaultIndex = 0
             },
             {
@@ -489,7 +495,7 @@ local function params(paramFilter, defaultValue)
             {
                 key = "typeSlopeB",
                 name = _("Form of asc. tr. B"),
-                values = {_("Solid"), _("Bridge")},
+                values = {_("Solid"), _("Bridge"), _("Terra")},
                 defaultIndex = 0
             },
             {
@@ -561,7 +567,8 @@ local updateFn = function(fParams)
                         rFactor = params.fRLowerA,
                         rad = -0.5 * rad,
                         used = func.contains({0, 1}, params.transitionA),
-                        isBridge = false
+                        isBridge = false,
+                        isTerra = false,
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
@@ -569,7 +576,8 @@ local updateFn = function(fParams)
                         rFactor = params.fRUpperA,
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionA),
-                        isBridge = params.typeSlopeA == 1
+                        isBridge = params.typeSlopeA == 1,
+                        isTerra = params.typeSlopeA == 2
                     }
                 },
                 B = {
@@ -579,7 +587,8 @@ local updateFn = function(fParams)
                         rFactor = params.fRLowerB,
                         rad = -0.5 * rad,
                         used = func.contains({0, 1}, params.transitionB),
-                        isBridge = false
+                        isBridge = false,
+                        isTerra = false,
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
@@ -587,7 +596,8 @@ local updateFn = function(fParams)
                         rFactor = params.fRUpperB,
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionB),
-                        isBridge = params.typeSlopeB == 1
+                        isBridge = params.typeSlopeB == 1,
+                        isTerra = params.typeSlopeB == 2
                     }
                 }
             }
@@ -666,13 +676,15 @@ local updateFn = function(fParams)
                 upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
             }
             
-            local upperPolys = pipe.new
-                + junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 3.5)
-                + junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 3.5)
+            local upperPolys = {
+                A = junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 3.5),
+                B = junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 3.5)
+            }
             
-            local lowerPolys = pipe.new
-                + junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5)
-                + junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
+            local lowerPolys = {
+                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5),
+                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
+            }
             
             local function selectEdge(level)
                 return station.fusionEdges(pipe.new
@@ -729,19 +741,79 @@ local updateFn = function(fParams)
                 end
             end
             
+            local function withIf2(level, part)
+                return function(c)
+                    return (info[part][level].used and not info[part][level].isTerra and not info[part][level].isBridge) and c or {}
+                end
+            end
+            
+            local uPolys = function(part)
+                local i = info[part].upper
+                local polySet = ext.polys.upper[part]
+                return (not i.used or i.isBridge)
+                    and {}
+                    or (
+                    i.isTerra
+                    and {
+                        {
+                            type = "EQUAL",
+                            faces = projectPolys(coor.I())(polySet.trackPolys),
+                            slopeLow = 0.75,
+                            slopeHigh = 0.75,
+                        }
+                    }
+                    or {
+                        {
+                            type = "GREATER",
+                            faces = projectPolys(coor.I())(polySet.polys),
+                            slopeLow = 0.75,
+                            slopeHigh = 0.75,
+                        },
+                        {
+                            type = "LESS",
+                            faces = projectPolys(coor.I())(polySet.trackPolys),
+                            slopeLow = 0.75,
+                            slopeHigh = 0.75,
+                        }
+                    }
+            )
+            end
+            
+            local lPolys = function(part)
+                local i = info[part].lower
+                local polySet = ext.polys.lower[part]
+                return (not i.used)
+                    and {}
+                    or {
+                        {
+                            type = "LESS",
+                            faces = projectPolys(coor.I())(polySet.trackPolys),
+                            slopeLow = junction.infi,
+                            slopeHigh = junction.infi,
+                        },
+                        {
+                            type = "GREATER",
+                            faces = projectPolys(coor.I())(polySet.trackPolys),
+                            slopeLow = 0.75,
+                            slopeHigh = 0.75,
+                        }
+                    }
+            end
+            
+            
             local result = {
                 edgeLists = edges,
                 models = pipe.new
                 + structure.A.fixed
                 + structure.B.fixed
-                + withIf("upper", "A")(ext.surface.upper.A)
-                + withIf("upper", "B")(ext.surface.upper.B)
+                + withIf2("upper", "A")(ext.surface.upper.A)
+                + withIf2("upper", "B")(ext.surface.upper.B)
                 + (heightFactor > 0
                 and pipe.new
                 + structure.A.upper
                 + structure.B.upper
-                + withIf("upper", "A")(ext.walls.upper.A * pipe.flatten())
-                + withIf("upper", "B")(ext.walls.upper.B * pipe.flatten())
+                + withIf2("upper", "A")(ext.walls.upper.A * pipe.flatten())
+                + withIf2("upper", "B")(ext.walls.upper.B * pipe.flatten())
                 or {}
                 )
                 + (heightFactor < 1
@@ -757,28 +829,46 @@ local updateFn = function(fParams)
                 terrainAlignmentLists = pipe.new
                 + {
                     {
-                        type = heightFactor == 0 and "EQUAL" or "LESS",
-                        faces = upperPolys * pipe.map(pipe.map(mTunnelZ * mZ)) * pipe.map(pipe.map(coor.vec2Tuple))
+                        type = (heightFactor == 0 or info.A.upper.isTerra) and "EQUAL" or "LESS",
+                        faces = projectPolys(mTunnelZ * mZ)(upperPolys.A),
+                        slopeLow = 0.75,
+                        slopeHigh = 0.75,
+                    },
+                    {
+                        type = (heightFactor == 0 or info.B.upper.isTerra) and "EQUAL" or "LESS",
+                        faces = projectPolys(mTunnelZ * mZ)(upperPolys.B),
+                        slopeLow = 0.75,
+                        slopeHigh = 0.75,
                     },
                     {
                         type = "GREATER",
-                        faces = upperPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                        faces = info.A.upper.isTerra and {} or projectPolys(mZ)(upperPolys.A),
+                        slopeLow = 0.75,
+                        slopeHigh = 0.75,
+                    },
+                    {
+                        type = "GREATER",
+                        faces = info.B.upper.isTerra and {} or projectPolys(mZ)(upperPolys.B),
+                        slopeLow = 0.75,
+                        slopeHigh = 0.75,
                     }
                 }
-                + withIf("upper", "A")(ext.polys.upper.A)
-                + withIf("upper", "B")(ext.polys.upper.B)
-                + withIf("lower", "A")(ext.polys.lower.A)
-                + withIf("lower", "B")(ext.polys.lower.B)
+                + uPolys("A")
+                + uPolys("B")
+                + lPolys("A")
+                + lPolys("B")
                 + {
-                    
                     {
                         type = "LESS",
-                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                        faces = projectPolys(mZ)(lowerPolys.A, lowerPolys.B),
                         slopeLow = heightFactor >= 1 and 0.75 or junction.infi,
+                        slopeHigh = heightFactor >= 1 and 0.75 or junction.infi,
                     },
                     {
                         type = "GREATER",
-                        faces = lowerPolys * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple)),
+                        faces = projectPolys(mZ)(lowerPolys.A, lowerPolys.B),
+                        slopeLow = 0.75,
+                        slopeHigh = 0.75,
                     }
                 }
             }

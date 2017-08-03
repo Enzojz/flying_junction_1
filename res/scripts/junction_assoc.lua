@@ -261,36 +261,12 @@ local retrivePolys = function(tracks, extLat)
                 polys = polys,
                 trackPolys = trackPolys
             }
-        -- return {
-        --     {
-        --         type = tr.fn.isDesc("GREATER", "LESS"),
-        --         faces = polys * pipe.map(pipe.map(coor.vec2Tuple)),
-        --         slopeLow = 0.75,
-        --         slopeHigh = 0.75,
-        --         pos = 1
-        --     },
-        --     {
-        --         type = "LESS",
-        --         faces = polyTracks * pipe.map(pipe.map(coor.vec2Tuple)),
-        --         slopeLow = tr.fn.isDesc(0.75, junction.infi),
-        --         slopeHigh = tr.fn.isDesc(0.75, junction.infi),
-        --         pos = 2
-        --     },
-        --     {
-        --         type = "GREATER",
-        --         faces = tr.fn.isDesc({}, polyTracks * pipe.map(pipe.map(coor.vec2Tuple))),
-        --         slopeLow = 0.75,
-        --         slopeHigh = 0.75,
-        --         pos = 3
-        --     }
-        -- }
         end)
         * function(ls) return
             {
                 polys = ls * pipe.mapFlatten(pipe.select("polys")),
                 trackPolys = ls * pipe.mapFlatten(pipe.select("trackPolys"))
             } end
--- * pipe.sort(function(l, r) return l.pos < r.pos end)
 end
 
 local retriveTrackSurfaces = function(tracks)

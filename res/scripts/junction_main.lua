@@ -8,6 +8,8 @@ local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
 
+local dump = require "datadumper"
+
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
@@ -150,18 +152,29 @@ local retriveExt = function(protos)
             * pipe.map(prepareArc(proto, slope))
     end
     
-    return function(fn)
-        return {
-            upper = {
-                A = fn(prepareArcs(protos.upper.A)),
-                B = fn(prepareArcs(protos.upper.B))
-            },
-            lower = {
-                A = fn(prepareArcs(protos.lower.A)),
-                B = fn(prepareArcs(protos.lower.B))
-            }
+    return {
+        upper = {
+            A = prepareArcs(protos.upper.A),
+            B = prepareArcs(protos.upper.B)
+        },
+        lower = {
+            A = prepareArcs(protos.lower.A),
+            B = prepareArcs(protos.lower.B)
         }
-    end
+    }
+end
+
+local function retriveX(fn, prepared)
+    return {
+        upper = {
+            A = fn(prepared.upper.A),
+            B = fn(prepared.upper.B)
+        },
+        lower = {
+            A = fn(prepared.lower.A),
+            B = fn(prepared.lower.B)
+        }
+    }
 end
 
 local function part(info, offsets)
@@ -398,6 +411,44 @@ local function generateStructure(lowerGroup, upperGroup, mZ)
     }
 end
 
+local function mergePoly(...)
+    local polys = pipe.new * {...}
+    local p = {
+        equal = polys * pipe.map(pipe.select("equal")) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        less = polys * pipe.map(pipe.select("less")) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        greater = polys * pipe.map(pipe.select("greater")) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        slot = polys * pipe.map(pipe.select("slot")) * pipe.filter(pipe.noop()) * pipe.flatten(),
+    }
+    
+    return pipe.new * {
+        {
+            type = "EQUAL",
+            faces = p.equal,
+            slopeLow = 0.75,
+            slopeHigh = 0.75,
+        },
+        {
+            type = "LESS",
+            faces = p.less,
+            slopeLow = 0.75,
+            slopeHigh = 0.75,
+        },
+        {
+            type = "GREATER",
+            faces = p.greater,
+            slopeLow = 0.75,
+            slopeHigh = 0.75,
+        },
+        {
+            type = "LESS",
+            faces = p.slot,
+            slopeLow = junction.infi,
+            slopeHigh = junction.infi,
+        },
+    }
+    * pipe.filter(function(e) return #e.faces > 0 end)
+end
+
 local function params(paramFilter, defaultValue)
     return pipe.new *
         {
@@ -612,7 +663,7 @@ local updateFn = function(fParams)
                 B = part(info.B, offsets)
             }
             
-            local ext = pipe.exec * function()
+            local ext, preparedExt = pipe.exec * function()
                 local extEndList = {A = "inf", B = "sup"}
                 local extConfig = {
                     straight = function(equalLength)
@@ -640,8 +691,6 @@ local updateFn = function(fParams)
                     end
                 }
                 
-                
-                
                 local extProtos = function(type) return {
                     upper = {
                         A = pipe.from("A", "upper", type) * (func.contains({3, 1}, params.type) and extConfig.curve() or extConfig.straight(true)),
@@ -660,15 +709,17 @@ local updateFn = function(fParams)
                 }
                 end
                 
-                local retriveTracks = retriveExt(extProtos("tracks"))
-                local retriveWalls = retriveExt(extProtos("walls"))
+                local preparedExt = {
+                    tracks = retriveExt(extProtos("tracks")),
+                    walls = retriveExt(extProtos("walls"))
+                }
                 
                 return {
-                    edges = retriveTracks(jA.retriveTracks),
-                    polys = retriveTracks(jA.retrivePolys),
-                    surface = retriveTracks(jA.retriveTrackSurfaces),
-                    walls = retriveWalls(jA.retriveWalls)
-                }
+                    edges = retriveX(jA.retriveTracks, preparedExt.tracks),
+                    polys = retriveX(jA.retrivePolys, preparedExt.tracks),
+                    surface = retriveX(jA.retriveTrackSurfaces, preparedExt.tracks),
+                    walls = retriveX(jA.retriveWalls, preparedExt.walls)
+                }, preparedExt
             end
             
             local trackEdges = {
@@ -735,6 +786,7 @@ local updateFn = function(fParams)
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
             }
             
+            
             local function withIf(level, part)
                 return function(c)
                     return (info[part][level].used and not info[part][level].isBridge) and c or {}
@@ -755,26 +807,11 @@ local updateFn = function(fParams)
                     or (
                     i.isTerra
                     and {
-                        {
-                            type = "EQUAL",
-                            faces = projectPolys(coor.I())(polySet.trackPolys),
-                            slopeLow = 0.75,
-                            slopeHigh = 0.75,
-                        }
+                        equal = projectPolys(coor.I())(polySet.trackPolys)
                     }
                     or {
-                        {
-                            type = "GREATER",
-                            faces = projectPolys(coor.I())(polySet.polys),
-                            slopeLow = 0.75,
-                            slopeHigh = 0.75,
-                        },
-                        {
-                            type = "LESS",
-                            faces = projectPolys(coor.I())(polySet.trackPolys),
-                            slopeLow = 0.75,
-                            slopeHigh = 0.75,
-                        }
+                        greater = projectPolys(coor.I())(polySet.polys),
+                        less = projectPolys(coor.I())(polySet.trackPolys)
                     }
             )
             end
@@ -785,21 +822,28 @@ local updateFn = function(fParams)
                 return (not i.used)
                     and {}
                     or {
-                        {
-                            type = "LESS",
-                            faces = projectPolys(coor.I())(polySet.trackPolys),
-                            slopeLow = junction.infi,
-                            slopeHigh = junction.infi,
-                        },
-                        {
-                            type = "GREATER",
-                            faces = projectPolys(coor.I())(polySet.trackPolys),
-                            slopeLow = 0.75,
-                            slopeHigh = 0.75,
-                        }
+                        slot = projectPolys(coor.I())(polySet.trackPolys),
+                        greater = projectPolys(coor.I())(polySet.trackPolys)
                     }
             end
             
+            local uXPolys = {
+                equal = pipe.new
+                + ((info.A.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mZ)(upperPolys.A) or {})
+                + ((info.B.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mZ)(upperPolys.B) or {})
+                ,
+                less = pipe.new
+                + ((not info.A.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mZ)(upperPolys.A) or {})
+                + ((not info.B.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mZ)(upperPolys.B) or {})
+                ,
+                greater = pipe.new + (info.A.upper.isTerra and {} or projectPolys(mZ)(upperPolys.A))
+                + (info.B.upper.isTerra and {} or projectPolys(mZ)(upperPolys.B))
+            }
+            
+            local lXPolys = {
+                slot = projectPolys(mZ)(lowerPolys.A, lowerPolys.B),
+                greater = projectPolys(mZ)(lowerPolys.A, lowerPolys.B)
+            }
             
             local result = {
                 edgeLists = edges,
@@ -826,51 +870,7 @@ local updateFn = function(fParams)
                 + withIf("lower", "B")(ext.walls.lower.B[#ext.walls.lower.B])
                 or {})
                 ,
-                terrainAlignmentLists = pipe.new
-                + {
-                    {
-                        type = (heightFactor == 0 or info.A.upper.isTerra) and "EQUAL" or "LESS",
-                        faces = projectPolys(mTunnelZ * mZ)(upperPolys.A),
-                        slopeLow = 0.75,
-                        slopeHigh = 0.75,
-                    },
-                    {
-                        type = (heightFactor == 0 or info.B.upper.isTerra) and "EQUAL" or "LESS",
-                        faces = projectPolys(mTunnelZ * mZ)(upperPolys.B),
-                        slopeLow = 0.75,
-                        slopeHigh = 0.75,
-                    },
-                    {
-                        type = "GREATER",
-                        faces = info.A.upper.isTerra and {} or projectPolys(mZ)(upperPolys.A),
-                        slopeLow = 0.75,
-                        slopeHigh = 0.75,
-                    },
-                    {
-                        type = "GREATER",
-                        faces = info.B.upper.isTerra and {} or projectPolys(mZ)(upperPolys.B),
-                        slopeLow = 0.75,
-                        slopeHigh = 0.75,
-                    }
-                }
-                + uPolys("A")
-                + uPolys("B")
-                + lPolys("A")
-                + lPolys("B")
-                + {
-                    {
-                        type = "LESS",
-                        faces = projectPolys(mZ)(lowerPolys.A, lowerPolys.B),
-                        slopeLow = heightFactor >= 1 and 0.75 or junction.infi,
-                        slopeHigh = heightFactor >= 1 and 0.75 or junction.infi,
-                    },
-                    {
-                        type = "GREATER",
-                        faces = projectPolys(mZ)(lowerPolys.A, lowerPolys.B),
-                        slopeLow = 0.75,
-                        slopeHigh = 0.75,
-                    }
-                }
+                terrainAlignmentLists = mergePoly(uXPolys, uPolys("A"), uPolys("B")) + mergePoly(lXPolys, lPolys("A"), lPolys("B"))
             }
             
             -- End of generation

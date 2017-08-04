@@ -37,6 +37,21 @@ local projectPolys = function(mZ)
     end
 end
 
+local function detectSlopeIntersection(lower, upper, fz, currentRad, s)
+    local step = 1 / lower.r
+    local ptL = lower:pt(currentRad)
+    local ptRad = junction.normalizeRad(upper:rad(ptL))
+    local ptR = upper:pt(ptRad)
+    local z = fz(ptRad)
+    local w = z.y / 0.75 + 3
+
+    return ((ptL - ptR):length() > w)
+        and currentRad
+        or
+        (currentRad > 1.5 * pi or currentRad < -0.5 * pi or ptL:length() >100) and currentRad or
+        detectSlopeIntersection(lower, upper, fz, currentRad + (s > 0 and step or -step), s)
+end
+
 local generateTrackGroups = function(tracks1, tracks2, trans)
     trans = trans or {mpt = coor.I(), mvec = coor.I()}
     local m = {trans.mpt, trans.mpt, trans.mvec, trans.mvec}
@@ -663,7 +678,7 @@ local updateFn = function(fParams)
                 B = part(info.B, offsets)
             }
             
-            local ext, preparedExt = pipe.exec * function()
+            local ext, preparedExt = (function()
                 local extEndList = {A = "inf", B = "sup"}
                 local extConfig = {
                     straight = function(equalLength)
@@ -720,7 +735,7 @@ local updateFn = function(fParams)
                     surface = retriveX(jA.retriveTrackSurfaces, preparedExt.tracks),
                     walls = retriveX(jA.retriveWalls, preparedExt.walls)
                 }, preparedExt
-            end
+            end)()
             
             local trackEdges = {
                 lower = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()}),
@@ -786,6 +801,49 @@ local updateFn = function(fParams)
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
             }
             
+            local slopeWalls = {
+                {
+                    lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
+                    upper = preparedExt.walls.upper.A[1].guidelines[1],
+                    fz = preparedExt.walls.upper.A[1].fn.fz,
+                    from = "sup", to = "inf"
+                },
+                {
+                    lower = preparedExt.walls.lower.B[1].guidelines[1],
+                    upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                    fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                    from = "inf", to = "sup"
+                }
+            }
+            
+            local mx = pipe.new
+                * slopeWalls
+                * pipe.mapFlatten(function(sw)
+                    local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
+                    local arc = sw.lower:withLimits({
+                        [sw.from] = sw.lower[sw.from],
+                        [sw.to] = loc,
+                        mid = (sw.lower[sw.from] + loc) * 0.5
+                    })
+                    
+                    local function mPlace(guideline, rad1, rad2)
+                        local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
+                        local h1 = 11 * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
+                        local h = 11 * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
+                        local pt = guideline:pt(rad)
+                        return coor.shearZoY(h1 / math.abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
+                    end
+                    
+                    local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
+                    local makeFence = junction.makeFn(mRoofFenceS, mPlace, coor.scaleY(1.05))
+                    
+                    return {
+                        makeWall(arc),
+                        makeFence(arc)
+                    }
+                end)
+                * pipe.flatten()
+                * pipe.flatten()
             
             local function withIf(level, part)
                 return function(c)
@@ -869,6 +927,7 @@ local updateFn = function(fParams)
                 + withIf("lower", "B")(ext.walls.lower.B[1])
                 + withIf("lower", "B")(ext.walls.lower.B[#ext.walls.lower.B])
                 or {})
+                + mx
                 ,
                 terrainAlignmentLists = mergePoly(uXPolys, uPolys("A"), uPolys("B")) + mergePoly(lXPolys, lPolys("A"), lPolys("B"))
             }

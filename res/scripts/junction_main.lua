@@ -8,8 +8,6 @@ local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
 
-local dump = require "datadumper"
-
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
@@ -37,6 +35,16 @@ local projectPolys = function(mDepth)
     end
 end
 
+local mPlaceSlopeWall = function(sw, arc, upperHeight)
+    return function(guideline, rad1, rad2)
+        local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
+        local h1 = upperHeight * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
+        local h = upperHeight * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
+        local pt = guideline:pt(rad)
+        return coor.shearZoY(h1 / math.abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
+    end
+end
+
 local function detectSlopeIntersection(lower, upper, fz, currentRad, s)
     local step = 1 / lower.r
     local ptL = lower:pt(currentRad)
@@ -44,11 +52,11 @@ local function detectSlopeIntersection(lower, upper, fz, currentRad, s)
     local ptR = upper:pt(ptRad)
     local z = fz(ptRad)
     local w = z.y / 0.75 + 3
-
+    
     return ((ptL - ptR):length() > w)
         and currentRad
         or
-        (currentRad > 1.5 * pi or currentRad < -0.5 * pi or ptL:length() >100) and currentRad or
+        (currentRad > 1.5 * pi or currentRad < -0.5 * pi or ptL:length() > 100) and currentRad or
         detectSlopeIntersection(lower, upper, fz, currentRad + (s > 0 and step or -step), s)
 end
 
@@ -801,34 +809,39 @@ local updateFn = function(fParams)
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mDepth)[2]
             }
             
-            local slopeWalls = {
-                {
-                    lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
-                    upper = preparedExt.walls.upper.A[1].guidelines[1],
-                    fz = preparedExt.walls.upper.A[1].fn.fz,
-                    from = "sup", to = "inf"
-                },
-                {
-                    lower = preparedExt.walls.lower.B[1].guidelines[1],
-                    upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
-                    fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
-                    from = "inf", to = "sup"
-                },
-                {
-                    lower = preparedExt.walls.lower.A[1].guidelines[2],
-                    upper = preparedExt.walls.upper.A[1].guidelines[1],
-                    fz = preparedExt.walls.upper.A[1].fn.fz,
-                    from = "sup", to = "inf"
-                },
-                {
-                    lower = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[1],
-                    upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
-                    fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
-                    from = "inf", to = "sup"
-                },
-            }
-            
-            local mx = pipe.new
+            local slopeWalls = pipe.new
+                + (info.A.upper.isTerra
+                and {
+                    {
+                        lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
+                        upper = preparedExt.walls.upper.A[1].guidelines[1],
+                        fz = preparedExt.walls.upper.A[1].fn.fz,
+                        from = "sup", to = "inf"
+                    },
+                    {
+                        lower = preparedExt.walls.lower.A[1].guidelines[2],
+                        upper = preparedExt.walls.upper.A[1].guidelines[1],
+                        fz = preparedExt.walls.upper.A[1].fn.fz,
+                        from = "sup", to = "inf"
+                    }
+                } or {})
+                + (info.B.upper.isTerra
+                and {
+                    {
+                        lower = preparedExt.walls.lower.B[1].guidelines[1],
+                        upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                        fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                        from = "inf", to = "sup"
+                    },
+                    {
+                        lower = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[1],
+                        upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                        fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                        from = "inf", to = "sup"
+                    },
+                } or {}
+            )
+            local slopeWallModels = pipe.new
                 * slopeWalls
                 * pipe.mapFlatten(function(sw)
                     local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
@@ -837,23 +850,12 @@ local updateFn = function(fParams)
                         [sw.to] = loc,
                         mid = (sw.lower[sw.from] + loc) * 0.5
                     })
-
-                    local upperHeight = tunnelHeight * heightFactor
                     
-                    local function mPlace(guideline, rad1, rad2)
-                        local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
-                        local h1 = upperHeight * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
-                        local h = upperHeight * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
-                        local pt = guideline:pt(rad)
-                        return coor.shearZoY(h1 / math.abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
-                    end
-                    
-                    local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
-                    local makeFence = junction.makeFn(mRoofFenceS, mPlace, coor.scaleY(1.05))
+                    local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight * heightFactor)
                     
                     return {
-                        makeWall(arc),
-                        makeFence(arc)
+                        junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))(arc),
+                        junction.makeFn(mRoofFenceS, mPlace, coor.scaleY(1.05))(arc)
                     }
                 end)
                 * pipe.flatten()
@@ -943,7 +945,7 @@ local updateFn = function(fParams)
                 + withIf("lower", "B")(ext.walls.lower.B[1])
                 + withIf("lower", "B")(ext.walls.lower.B[#ext.walls.lower.B])
                 or {})
-                + mx
+                + slopeWallModels
                 ,
                 terrainAlignmentLists = mergePoly(uXPolys, uPolys("A"), uPolys("B")) + mergePoly(lXPolys, lPolys("A"), lPolys("B"))
             }

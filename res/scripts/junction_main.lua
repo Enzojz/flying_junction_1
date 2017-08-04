@@ -31,9 +31,9 @@ local tunnelHeightList = {11, 10, 9.5, 8.7}
 
 local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
 
-local projectPolys = function(mZ)
+local projectPolys = function(mDepth)
     return function(...)
-        return pipe.new * func.flatten({...}) * pipe.map(pipe.map(mZ)) * pipe.map(pipe.map(coor.vec2Tuple))
+        return pipe.new * func.flatten({...}) * pipe.map(pipe.map(mDepth)) * pipe.map(pipe.map(coor.vec2Tuple))
     end
 end
 
@@ -320,11 +320,11 @@ local function part(info, offsets)
     return func.with(result, {ext = ext})
 end
 
-local function generateStructure(lowerGroup, upperGroup, mZ)
+local function generateStructure(lowerGroup, upperGroup, mDepth)
     local function mPlace(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
         local pt = guideline:pt(rad)
-        return coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = -11})) * mZ
+        return coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = -11})) * mDepth
     end
     local mPlaceD = function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
@@ -437,12 +437,6 @@ local function mergePoly(...)
     
     return pipe.new * {
         {
-            type = "EQUAL",
-            faces = p.equal,
-            slopeLow = 0.75,
-            slopeHigh = 0.75,
-        },
-        {
             type = "LESS",
             faces = p.less,
             slopeLow = 0.75,
@@ -451,6 +445,12 @@ local function mergePoly(...)
         {
             type = "GREATER",
             faces = p.greater,
+            slopeLow = 0.75,
+            slopeHigh = 0.75,
+        },
+        {
+            type = "EQUAL",
+            faces = p.equal,
             slopeLow = 0.75,
             slopeHigh = 0.75,
         },
@@ -612,8 +612,8 @@ local updateFn = function(fParams)
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
             local heightFactor = heightList[params.height + 1]
-            local height = ((heightFactor > 1 and 1 or heightFactor) - 1) * tunnelHeight
-            local mZ = coor.transZ(height)
+            local depth = ((heightFactor > 1 and 1 or heightFactor) - 1) * tunnelHeight
+            local mDepth = coor.transZ(depth)
             local extraZ = heightFactor > 1 and ((heightFactor - 1) * tunnelHeight) or 0
             local mTunnelZ = coor.transZ(tunnelHeight)
             
@@ -716,7 +716,7 @@ local updateFn = function(fParams)
                         B = pipe.from("B", "lower", type) * (func.contains({1}, params.type) and extConfig.curve() or extConfig.straight(true))
                     },
                     info = {
-                        height = height,
+                        height = depth,
                         tunnelHeight = tunnelHeight,
                         slopeA = trSlopeList[params.trSlopeA + 1] * 0.001,
                         slopeB = trSlopeList[params.trSlopeB + 1] * 0.001
@@ -738,8 +738,8 @@ local updateFn = function(fParams)
             end)()
             
             local trackEdges = {
-                lower = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mZ, mvec = coor.I()}),
-                upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mZ, mvec = coor.I()})
+                lower = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mDepth, mvec = coor.I()}),
+                upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mDepth, mvec = coor.I()})
             }
             
             local upperPolys = {
@@ -797,8 +797,8 @@ local updateFn = function(fParams)
             }
             
             local structure = {
-                A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mZ)[1],
-                B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mZ)[2]
+                A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mDepth)[1],
+                B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mDepth)[2]
             }
             
             local slopeWalls = {
@@ -813,7 +813,19 @@ local updateFn = function(fParams)
                     upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
                     fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
                     from = "inf", to = "sup"
-                }
+                },
+                {
+                    lower = preparedExt.walls.lower.A[1].guidelines[2],
+                    upper = preparedExt.walls.upper.A[1].guidelines[1],
+                    fz = preparedExt.walls.upper.A[1].fn.fz,
+                    from = "sup", to = "inf"
+                },
+                {
+                    lower = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[1],
+                    upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                    fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                    from = "inf", to = "sup"
+                },
             }
             
             local mx = pipe.new
@@ -825,11 +837,13 @@ local updateFn = function(fParams)
                         [sw.to] = loc,
                         mid = (sw.lower[sw.from] + loc) * 0.5
                     })
+
+                    local upperHeight = tunnelHeight * heightFactor
                     
                     local function mPlace(guideline, rad1, rad2)
                         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
-                        local h1 = 11 * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
-                        local h = 11 * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
+                        local h1 = upperHeight * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
+                        local h = upperHeight * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
                         local pt = guideline:pt(rad)
                         return coor.shearZoY(h1 / math.abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
                     end
@@ -880,6 +894,7 @@ local updateFn = function(fParams)
                 return (not i.used)
                     and {}
                     or {
+                        less = projectPolys(coor.I())(polySet.polys),
                         slot = projectPolys(coor.I())(polySet.trackPolys),
                         greater = projectPolys(coor.I())(polySet.trackPolys)
                     }
@@ -887,20 +902,21 @@ local updateFn = function(fParams)
             
             local uXPolys = {
                 equal = pipe.new
-                + ((info.A.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mZ)(upperPolys.A) or {})
-                + ((info.B.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mZ)(upperPolys.B) or {})
+                + ((info.A.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.A) or {})
+                + ((info.B.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.B) or {})
                 ,
                 less = pipe.new
-                + ((not info.A.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mZ)(upperPolys.A) or {})
-                + ((not info.B.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mZ)(upperPolys.B) or {})
+                + ((not info.A.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.A) or {})
+                + ((not info.B.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.B) or {})
                 ,
-                greater = pipe.new + (info.A.upper.isTerra and {} or projectPolys(mZ)(upperPolys.A))
-                + (info.B.upper.isTerra and {} or projectPolys(mZ)(upperPolys.B))
+                greater = pipe.new + (info.A.upper.isTerra and {} or projectPolys(mDepth)(upperPolys.A))
+                + (info.B.upper.isTerra and {} or projectPolys(mDepth)(upperPolys.B))
             }
             
             local lXPolys = {
-                slot = projectPolys(mZ)(lowerPolys.A, lowerPolys.B),
-                greater = projectPolys(mZ)(lowerPolys.A, lowerPolys.B)
+                less = projectPolys(coor.I())(lowerPolys.A, lowerPolys.B),
+                slot = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B),
+                greater = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
             }
             
             local result = {

@@ -106,7 +106,7 @@ local function gmPlaceA(fz, r)
     return function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
         local p1, p2 = fz(rad1), fz(rad2)
-        return coor.shearZoY((r < 0 and -1 or 1) * (p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+        return coor.shearZoY((p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
     end
 end
 
@@ -124,7 +124,7 @@ local function generateSlope(slope, height, dz)
         rad = rad,
         dz = dz or 0,
         factor = sFactor,
-        length = math.abs(height == 0 and 30 or (height - 2 * trans.dz) / slope + 2 * trans.length),
+        length = math.abs(height == 0 and 40 or (height - 2 * trans.dz) / slope + 2 * trans.length),
         trans = trans,
         height = height
     }
@@ -251,21 +251,21 @@ end
 
 local retrivePolys = function(tracks, extLat)
     extLat = extLat or 10
+    
     return tracks
         * pipe.map(function(tr)
-            local polys = pipe.new
-                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(extLat, 4)
-                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(extLat, 4)
-            local trackPolys = polys * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
-            return {
-                polys = polys,
-                trackPolys = trackPolys
-            }
+            return (pipe.new
+                + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(extLat, 3.5)
+                + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(extLat, 3.5)
+                )
+                * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end))
         end)
         * function(ls) return
             {
-                polys = ls * pipe.mapFlatten(pipe.select("polys")),
-                trackPolys = ls * pipe.mapFlatten(pipe.select("trackPolys"))
+                trackPolys = ls * pipe.flatten(),
+                polys = pipe.new
+                + junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(1)), "inf", "sup")(extLat, 3.5)
+                + junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(2)), "inf", "sup")(extLat, 3.5)
             } end
 end
 

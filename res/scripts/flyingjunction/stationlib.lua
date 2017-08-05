@@ -292,7 +292,8 @@ stationlib.surfaceOf = function(size, center, ...)
         * pipe.map(function(v) return v:toTuple() end)
 end
 
-local applyResult = function(mpt, mvec)
+local applyResult = function(mpt, mvec, mirrored)
+    mirrored = mirrored or false
     return function(result)
         local mapEdgeList = function(edgeList)
             return func.with(edgeList, {edges = func.map(edgeList.edges, coor.applyEdge(mpt, mvec))})
@@ -306,15 +307,16 @@ local applyResult = function(mpt, mvec)
             return func.with(ta, {faces = func.map(ta.faces, mapFaces)})
         end
         
+        local mapGroundFaces = function(gf)
+            return func.with(gf, {face = func.map(mirrored and func.rev(gf.face) or gf.face, function(f) return (coor.tuple2Vec(f) .. mpt):toTuple() end) })
+        end
+        
         return func.with(result,
             {
-                edgeLists = func.map(result.edgeLists, mapEdgeList),
-                models = func.map(result.models, mapModel),
-                terrainAlignmentLists = func.map(result.terrainAlignmentLists, mapTerrainList),
-                groundFaces = {},
-                terminalGroups = {},
-                cost = 1000,
-                maintenanceCost = 1000 / 6
+                edgeLists = result.edgeLists and func.map(result.edgeLists, mapEdgeList) or {},
+                models = result.models and func.map(result.models, mapModel) or {},
+                terrainAlignmentLists = result.terrainAlignmentLists and func.map(result.terrainAlignmentLists, mapTerrainList) or {},
+                groundFaces = result.groundFaces and func.map(result.groundFaces, mapGroundFaces) or {}
             })
     end
 end
@@ -336,7 +338,7 @@ end
 stationlib.setMirror = function(isMirror)
     return function(result)
         local mf = isMirror and coor.flipX() or coor.I()
-        return applyResult(mf, mf)(result)
+        return applyResult(mf, mf, isMirror)(result)
     end
 end
 

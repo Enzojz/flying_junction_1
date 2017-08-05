@@ -7,7 +7,7 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
-
+local dump = require "datadumper"
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
@@ -20,7 +20,7 @@ local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
 local bridgeType = "z_concrete_flying_junction.lua"
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10}
+local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
@@ -342,8 +342,9 @@ local function generateStructure(lowerGroup, upperGroup, mDepth)
     local makeExtWall = junction.makeFn(mSidePillar, mPlaceD, coor.scaleY(1.05))
     local makeExtWallFence = junction.makeFn(mRoofFenceS, mPlaceD, coor.scaleY(1.05))
     local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
-    local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05))
+    local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05) * coor.transZ(0.1))
     local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
+    
     
     local walls = lowerGroup.walls
     
@@ -377,7 +378,7 @@ local function generateStructure(lowerGroup, upperGroup, mDepth)
         }
     end)
     
-    local sideFencesL = func.map(func.range(lowerGroup.walls, 1, #lowerGroup.walls - 1), function(t)
+    local sideFencesL = func.map(lowerGroup.walls, function(t)
         return t:withLimits({
             sup = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
             mid = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
@@ -385,7 +386,7 @@ local function generateStructure(lowerGroup, upperGroup, mDepth)
         })
     end)
     
-    local sideFencesR = func.map(func.range(lowerGroup.walls, 2, #lowerGroup.walls), function(t)
+    local sideFencesR = func.map(lowerGroup.walls, function(t)
         return t:withLimits({
             inf = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
             mid = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
@@ -400,8 +401,8 @@ local function generateStructure(lowerGroup, upperGroup, mDepth)
             + func.map(fences, function(f) return f[1] end)
             + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
             + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
-            + func.mapFlatten(func.range(sideFencesL, 2, #sideFencesL), function(t) return makeSideFence(t)[1] end)
-            + func.mapFlatten(func.range(sideFencesR, 1, #sideFencesR - 1), function(t) return makeSideFence(t)[2] end)
+            + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
+            + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[1] end)
             ,
             upper = pipe.new
             + makeSideFence(sideFencesL[1])[1]
@@ -841,8 +842,22 @@ local updateFn = function(fParams)
                     },
                 } or {}
             )
-            local slopeWallModels = pipe.new
-                * slopeWalls
+            dump.dump(slopeWalls)
+            -- local slopeWallArcs = slopeWalls
+            --     * pipe.map(function(sw)
+            --         local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
+                    
+            --         return sw.lower:withLimits({
+            --             [sw.from] = loc,
+            --             [sw.to] = sw.lower[sw.to],
+            --             mid = loc
+            --         })
+                
+            --     end)
+            --     * pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end)
+            --     * function(ls) return {A = ls[1] + ls[2], B = ls[3] + ls[4]} end
+            
+            local slopeWallModels = slopeWalls
                 * pipe.mapFlatten(function(sw)
                     local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
                     local arc = sw.lower:withLimits({
@@ -860,6 +875,8 @@ local updateFn = function(fParams)
                 end)
                 * pipe.flatten()
                 * pipe.flatten()
+            
+            
             
             local function withIf(level, part)
                 return function(c)
@@ -915,12 +932,15 @@ local updateFn = function(fParams)
                 + (info.B.upper.isTerra and {} or projectPolys(mDepth)(upperPolys.B))
             }
             
+            
+            
+            
+            
             local lXPolys = {
-                less = projectPolys(coor.I())(lowerPolys.A, lowerPolys.B),
-                slot = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B),
+                -- less = projectPolys(coor.I())(slopeWallArcs.A, slopeWallArcs.B),
+                slot = projectPolys(mDepth * coor.transZ(-0.1))(lowerPolys.A, lowerPolys.B),
                 greater = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
             }
-            
             local result = {
                 edgeLists = edges,
                 models = pipe.new
@@ -948,6 +968,25 @@ local updateFn = function(fParams)
                 + slopeWallModels
                 ,
                 terrainAlignmentLists = mergePoly(uXPolys, uPolys("A"), uPolys("B")) + mergePoly(lXPolys, lPolys("A"), lPolys("B"))
+                ,
+                groundFaces = pipe.new
+                * {
+                    upperPolys.A,
+                    upperPolys.B,
+                    lowerPolys.A,
+                    lowerPolys.B,
+                    ext.polys.lower.A.polys,
+                    ext.polys.lower.B.polys,
+                    ext.polys.upper.A.polys,
+                    ext.polys.upper.B.polys
+                }
+                * pipe.flatten()
+                * pipe.mapFlatten(function(p)
+                    return {
+                        {face = func.map(p, coor.vec2Tuple), modes = {{type = "FILL", key = "building_paving_fill"}}},
+                        {face = func.map(p, coor.vec2Tuple), modes = {{type = "STROKE_OUTER", key = "building_paving"}}}
+                    }
+                end)
             }
             
             -- End of generation

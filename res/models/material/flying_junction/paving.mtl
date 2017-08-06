@@ -1,0 +1,55 @@
+function data()
+return {
+	params = {
+		fade_out_range = {
+			fadeOutEndDist = 20000,
+			fadeOutStartDist = 10000,
+			
+		},
+		map_albedo = {
+			compressionAllowed = true,
+			fileName = "ground_texture/industry_gravel_big_01_albedo.dds",
+			magFilter = "LINEAR",
+			minFilter = "LINEAR_MIPMAP_LINEAR",
+			mipmapAlphaScale = 0,
+			type = "TWOD",
+			wrapS = "REPEAT",
+			wrapT = "REPEAT",
+			
+		},
+		map_metal_gloss_ao = {
+			compressionAllowed = true,
+			fileName = "ground_texture/industry_gravel_big_01_metal_gloss_ao.dds",
+			magFilter = "LINEAR",
+			minFilter = "LINEAR_MIPMAP_LINEAR",
+			mipmapAlphaScale = 0,
+			type = "TWOD",
+			wrapS = "REPEAT",
+			wrapT = "REPEAT",
+			
+		},
+		map_normal = {
+			compressionAllowed = true,
+			fileName = "ground_texture/lot_detail_normal.dds",
+			magFilter = "LINEAR",
+			minFilter = "LINEAR_MIPMAP_LINEAR",
+			mipmapAlphaScale = 0,
+			type = "TWOD",
+			wrapS = "REPEAT",
+			wrapT = "REPEAT",
+			
+		},
+		polygon_offset = {
+			factor = 0,
+			units = 0,
+		},
+		two_sided = {
+			twoSided = false,
+			
+		},
+		
+	},
+	type = "PHYSICAL_NRML_MAP",
+	
+}
+end

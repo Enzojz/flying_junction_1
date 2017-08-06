@@ -1,0 +1,42 @@
+function data()
+return {
+	boundingInfo = {
+		bbMax = { 2.5, 5, 11, },
+		bbMin = { -2.5, -5, 9, },
+	},
+	collider = {
+		params = {
+			
+		},
+		type = "MESH",
+	},
+	lods = {
+		{
+			children = {
+				{
+					id = "flying_junction/concrete/roof.msh",
+					transf = {
+						1, 0, 0, 0,
+					    0, 1, 0, 0,
+						0, 0, 1, 0,
+						0, 0, 0, 1 
+					},
+					type = "MESH",
+				}, 
+			},
+			matConfigs = {
+				{ 0, }, 
+			},
+			static = false,
+			visibleFrom = 0,
+			visibleTo = 5000,
+		}, 
+	},
+	metadata = {
+		cost = {
+			price = 10000,
+		},
+	},
+	
+}
+end

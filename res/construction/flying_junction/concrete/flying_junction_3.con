@@ -1,0 +1,31 @@
+local jMain = require "junction_main"
+
+function data()
+    return {
+        type = "RAIL_STATION",
+        description = {
+            name = _("Concrete Flying Junction"),
+            description = _("An European style flying junction")
+        },
+        availability = {
+            yearFrom = 1892
+        },
+        order = 27221,
+        params = jMain.params({"curvedLevel"}),
+        
+        updateFn = jMain.updateFn(function(params)
+            params.fRLowerA = -1
+            params.fRLowerB = -1
+            params.fRUpperA = 1
+            params.fRUpperB = 1
+            params.type = 3
+        end,
+        {
+            mSidePillar = "flying_junction/concrete/pillar_side.mdl",
+            mRoofFenceF = "flying_junction/concrete/roof_fence_front.mdl",
+            mRoofFenceS = "flying_junction/concrete/roof_fence_side.mdl",
+            mRoof = "flying_junction/concrete/roof.mdl",
+            bridgeType = "z_concrete_flying_junction.lua",
+        })
+    }
+end

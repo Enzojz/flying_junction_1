@@ -1,0 +1,36 @@
+function data() return 
+  { animations = {  }, matConfigs = { { 0, 0 } }, 
+    subMeshes = 
+      { 
+        { 
+          indices = 
+            { 
+              normal = { count = 72, offset = 1152 }, 
+              position = { count = 72, offset = 1152 }, 
+              tangent = { count = 72, offset = 1152 }, 
+              uv0 = { count = 72, offset = 1152 }, 
+             }, materials = { "flying_junction/concrete.mtl" }
+         }, 
+        { 
+          indices = 
+            { 
+              normal = { count = 24, offset = 1224 }, 
+              position = { count = 24, offset = 1224 }, 
+              tangent = { count = 24, offset = 1224 }, 
+              uv0 = { count = 24, offset = 1224 }, 
+             }, 
+          materials = { "flying_junction/paving.mtl" }
+         }
+       }, 
+    vertexAttr = 
+      { 
+        normal = 
+          { count = 288, numComp = 3, offset = 480 }, 
+        position = 
+          { count = 288, numComp = 3, offset = 0 }, 
+        tangent = 
+          { count = 384, numComp = 4, offset = 768 }, 
+        uv0 = 
+          { count = 192, numComp = 2, offset = 288 }, 
+       }
+   } end

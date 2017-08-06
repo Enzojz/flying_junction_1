@@ -12,7 +12,7 @@ function data()
             yearTo = 1800
         },
         order = 27219,
-        params = jMain.params({"curvedLevel", "transitionA", "transitionB", "trSlopeA", "trSlopeB", "typeSlopeA", "typeSlopeB" }),
+        params = jMain.params({"curvedLevel", "transitionA", "transitionB", "trSlopeA", "trSlopeB", "typeSlopeA", "typeSlopeB", "heightTunnel"}),
         
         updateFn = jMain.updateFn(function(params)
             params.fRLowerA = -1
@@ -26,6 +26,14 @@ function data()
             params.typeSlopeA = 1
             params.typeSlopeB = 1
             params.type = 1
-        end)
+            params.heightTunnel = 0
+        end,
+        {
+            mSidePillar = "flying_junction/concrete/pillar_side.mdl",
+            mRoofFenceF = "flying_junction/concrete/roof_fence_front.mdl",
+            mRoofFenceS = "flying_junction/concrete/roof_fence_side.mdl",
+            mRoof = "flying_junction/concrete/roof.mdl",
+            bridgeType = "z_concrete_flying_junction.lua",
+        })
     }
 end

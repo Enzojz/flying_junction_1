@@ -15,10 +15,10 @@ return {
 		{
 			children = {
 				{
-					id = "bridge/rail/concrete_flying_junction/infra_junc_pillar_top_rep.msh",
+					id = "bridge/rail/flying_junction/concrete/pillar_top_rep.msh",
 					transf = {
-						0, 1, 0, 0,
-					   -1, 0, 0, 0,
+						1, 0, 0, 0,
+					    0, 1, 0, 0,
 						0, 0, 1, 0,
 						0, 0, 0, 1 
 					},

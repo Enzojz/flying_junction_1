@@ -82,7 +82,7 @@ junction.makeFn = function(model, mPlace, m)
         local coordsGen = arc.coords(obj, 5)
         local function makeModel(seq, scale)
             return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
-                return station.newModel(model, m, coor.scaleY(0.5 * scale), mPlace(obj, rad1, rad2))
+                return station.newModel(model, m, coor.scaleY(scale), mPlace(obj, rad1, rad2))
             end)
         end
         return {

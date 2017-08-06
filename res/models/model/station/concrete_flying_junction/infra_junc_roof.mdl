@@ -14,12 +14,12 @@ return {
 		{
 			children = {
 				{
-					id = "station/concrete_flying_junction/infra_junc_roof.msh",
+					id = "flying_junction/concrete/roof.msh",
 					transf = {
-						0, 1, 0, 0,
-					   -1.05, 0, 0, 0,
+						1, 0, 0, 0,
+					    0, 2, 0, 0,
 						0, 0, 1, 0,
-						0, 0, -0.05, 1 
+						0, 0, 0, 1 
 					},
 					type = "MESH",
 				}, 

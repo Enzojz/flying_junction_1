@@ -13,12 +13,6 @@ local floor = math.floor
 local ceil = math.ceil
 local pi = math.pi
 
-local mSidePillar = "station/concrete_flying_junction/infra_junc_pillar_side.mdl"
-local mRoofFenceF = "station/concrete_flying_junction/infra_junc_roof_fence_front.mdl"
-local mRoofFenceS = "station/concrete_flying_junction/infra_junc_roof_fence_side.mdl"
-local mRoof = "station/concrete_flying_junction/infra_junc_roof.mdl"
-local bridgeType = "z_concrete_flying_junction.lua"
-
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
 local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
 
@@ -138,6 +132,7 @@ local retriveExt = function(protos)
                 height = extHeightList[proto.level],
                 radFactor = radFactorList[proto.part],
                 r = proto.rFn(g),
+                models = proto.models,
             }
             local fn = jA.retriveFn(config)
             return {
@@ -328,7 +323,7 @@ local function part(info, offsets)
     return func.with(result, {ext = ext})
 end
 
-local function generateStructure(lowerGroup, upperGroup, mDepth)
+local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     local function mPlace(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
         local pt = guideline:pt(rad)
@@ -339,11 +334,11 @@ local function generateStructure(lowerGroup, upperGroup, mDepth)
         return coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = -11}))
     end
     
-    local makeExtWall = junction.makeFn(mSidePillar, mPlaceD, coor.scaleY(1.05))
-    local makeExtWallFence = junction.makeFn(mRoofFenceS, mPlaceD, coor.scaleY(1.05))
-    local makeWall = junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))
-    local makeRoof = junction.makeFn(mRoof, mPlace, coor.scaleY(1.05) * coor.transZ(0.1))
-    local makeSideFence = junction.makeFn(mRoofFenceS, mPlace)
+    local makeExtWall = junction.makeFn(models.mSidePillar, mPlaceD, coor.scaleY(1.05))
+    local makeExtWallFence = junction.makeFn(models.mRoofFenceS, mPlaceD, coor.scaleY(1.05))
+    local makeWall = junction.makeFn(models.mSidePillar, mPlace, coor.scaleY(1.05))
+    local makeRoof = junction.makeFn(models.mRoof, mPlace, coor.scaleY(1.05) * coor.transZ(0.1))
+    local makeSideFence = junction.makeFn(models.mRoofFenceS, mPlace)
     
     
     local walls = lowerGroup.walls
@@ -365,16 +360,16 @@ local function generateStructure(lowerGroup, upperGroup, mDepth)
     
     local upperFences = func.map(upperGroup.tracks, function(t)
         return {
-            station.newModel(mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t, t.inf)),
-            station.newModel(mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t, t.sup)),
+            station.newModel(models.mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t, t.inf)),
+            station.newModel(models.mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t, t.sup)),
         }
     end)
     
     local fences = func.map(trackSets, function(t)
-        local m = coor.scaleX(1.091) * coor.transY(0.18) * coor.transZ(-1) * coor.centered(coor.scaleZ, 3.5 / 1.5, coor.xyz(0, 0, 10.75))
+        local m = coor.scaleX(1.091) * coor.transY(0.18)
         return {
-            station.newModel(mRoofFenceF, m, mPlace(t, t.inf)),
-            station.newModel(mRoofFenceF, m, coor.flipY(), mPlace(t, t.sup)),
+            station.newModel(models.mRoofFenceF, m, mPlace(t, t.inf)),
+            station.newModel(models.mRoofFenceF, m, coor.flipY(), mPlace(t, t.sup)),
         }
     end)
     
@@ -473,7 +468,7 @@ local function mergePoly(...)
     * pipe.filter(function(e) return #e.faces > 0 end)
 end
 
-local function params(paramFilter, defaultValue)
+local function params(paramFilter)
     return pipe.new *
         {
             paramsutil.makeTrackTypeParam(),
@@ -506,7 +501,7 @@ local function params(paramFilter, defaultValue)
                 key = "heightTunnel",
                 name = _("Tunnel Height") .. ("(m)"),
                 values = func.map(tunnelHeightList, tostring),
-                defaultIndex = 0
+                defaultIndex = #tunnelHeightList - 2
             },
             {
                 key = "xDegDec",
@@ -606,7 +601,7 @@ local function defaultParams(param, fParams)
     fParams(param)
 end
 
-local updateFn = function(fParams)
+local updateFn = function(fParams, models)
     return function(params)
             
             defaultParams(params, fParams)
@@ -631,7 +626,7 @@ local updateFn = function(fParams)
             local TLowerTracks = lowerTrackBuilder.nonAligned()
             local TUpperTracks = upperTrackBuilder.nonAligned()
             -- local TLowerExtTracks = lowerTrackBuilder.nonAligned()
-            local TUpperExtTracks = upperTrackBuilder.bridge(bridgeType)
+            local TUpperExtTracks = upperTrackBuilder.bridge(models.bridgeType)
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
             local info = {
@@ -694,6 +689,7 @@ local updateFn = function(fParams)
                         return function(part, level, type)
                             return {
                                 group = group[part].ext[level][type][extEndList[part]],
+                                models = models,
                                 radFn = function(g) return g.rad end,
                                 rFn = function(g) return info[part][level].rFactor * g.guideline.r end,
                                 guidelineFn = function(g) return g.guideline end,
@@ -705,7 +701,8 @@ local updateFn = function(fParams)
                     curve = function(equalLength)
                         return function(part, level, type) return {
                             group = group[part][level][type],
-                            radFn = function(g) return group[part][level].tracks[1][extEndList[part]] end,
+                            models = models,
+                            radFn = function(_) return group[part][level].tracks[1][extEndList[part]] end,
                             rFn = function(g) return info[part][level].rFactor * g.r end,
                             guidelineFn = function(g) return g end,
                             part = part,
@@ -806,8 +803,8 @@ local updateFn = function(fParams)
             }
             
             local structure = {
-                A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mDepth)[1],
-                B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mDepth)[2]
+                A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mDepth, models)[1],
+                B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mDepth, models)[2]
             }
             
             local slopeWalls = pipe.new
@@ -859,8 +856,8 @@ local updateFn = function(fParams)
                     local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight * heightFactor)
                     
                     return {
-                        junction.makeFn(mSidePillar, mPlace, coor.scaleY(1.05))(arc),
-                        junction.makeFn(mRoofFenceS, mPlace, coor.scaleY(1.05))(arc)
+                        junction.makeFn(models.mSidePillar, mPlace, coor.scaleY(1.05))(arc),
+                        junction.makeFn(models.mRoofFenceS, mPlace, coor.scaleY(1.05))(arc)
                     }
                 end)
                 * pipe.flatten()

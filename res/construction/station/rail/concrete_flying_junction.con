@@ -23,8 +23,8 @@ function data()
             params.transitionB = 3
             params.trSlopeA = 0
             params.trSlopeB = 0
-            params.typeSlopeA = 1
-            params.typeSlopeB = 1
+            params.typeSlopeA = 0
+            params.typeSlopeB = 0
             params.type = 1
             params.heightTunnel = 0
         end,

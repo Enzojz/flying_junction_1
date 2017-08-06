@@ -360,8 +360,8 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     
     local upperFences = func.map(upperGroup.tracks, function(t)
         return {
-            station.newModel(models.mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(-0.25), mPlace(t, t.inf)),
-            station.newModel(models.mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(0.55), coor.transY(0.25), mPlace(t, t.sup)),
+            station.newModel(models.mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(1.1), coor.transY(-0.25), mPlace(t, t.inf)),
+            station.newModel(models.mSidePillar, coor.rotZ(pi * 0.5), coor.scaleX(1.1), coor.transY(0.25), mPlace(t, t.sup)),
         }
     end)
     
@@ -472,13 +472,11 @@ local function params(paramFilter)
     return pipe.new *
         {
             paramsutil.makeTrackTypeParam(),
-            paramsutil.makeTrackCatenaryParam(),
+            func.with(paramsutil.makeTrackCatenaryParam(),
             {
-                key = "applyCatenary",
-                name = _("Catenary applied for"),
-                values = {_("Both"), _("Lower"), _("Upper")},
+                values = {_("None"), _("Both"), _("Lower"), _("Upper")},
                 defaultIndex = 0
-            },
+            }),
             {
                 key = "nbLowerTracks",
                 name = _("Number of lower tracks"),
@@ -496,12 +494,6 @@ local function params(paramFilter)
                 name = _("Tracks per group"),
                 values = {_("1"), _("2"), _("All")},
                 defaultIndex = 1
-            },
-            {
-                key = "heightTunnel",
-                name = _("Tunnel Height") .. ("(m)"),
-                values = func.map(tunnelHeightList, tostring),
-                defaultIndex = #tunnelHeightList - 2
             },
             {
                 key = "xDegDec",
@@ -540,15 +532,15 @@ local function params(paramFilter)
             },
             {
                 key = "trSlopeA",
-                name = _("Transition A slope") .. "(‰)",
+                name = _("Transition A slope") .. " (‰)",
                 values = func.map(trSlopeList, tostring),
                 defaultIndex = #trSlopeList * 0.5
             },
             {
                 key = "typeSlopeA",
                 name = _("Form of asc. tr. A"),
-                values = {_("Solid"), _("Bridge"), _("Terra")},
-                defaultIndex = 0
+                values = {_("Bridge"), _("Terra"), _("Solid")},
+                defaultIndex = 1
             },
             {
                 key = "transitionB",
@@ -558,15 +550,15 @@ local function params(paramFilter)
             },
             {
                 key = "trSlopeB",
-                name = _("Transition B slope") .. "(‰)",
+                name = _("Transition B slope") .. " (‰)",
                 values = func.map(trSlopeList, tostring),
                 defaultIndex = #trSlopeList * 0.5
             },
             {
                 key = "typeSlopeB",
                 name = _("Form of asc. tr. B"),
-                values = {_("Solid"), _("Bridge"), _("Terra")},
-                defaultIndex = 0
+                values = {_("Bridge"), _("Terra"), _("Solid")},
+                defaultIndex = 1
             },
             {
                 key = "isMir",
@@ -576,9 +568,15 @@ local function params(paramFilter)
             },
             {
                 key = "slope",
-                name = _("General Slope(‰)"),
+                name = _("General Slope").." (‰)",
                 values = func.map(slopeList, tostring),
                 defaultIndex = 0
+            },
+            {
+                key = "heightTunnel",
+                name = _("Tunnel Height") .. " (m)",
+                values = func.map(tunnelHeightList, tostring),
+                defaultIndex = #tunnelHeightList - 2
             },
             {
                 key = "height",
@@ -610,9 +608,8 @@ local updateFn = function(fParams, models)
             local rad = math.rad(deg)
             
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
-            local catenary = params.catenary == 1
-            local catenaryLower = func.contains({0, 1}, params.applyCatenary) and catenary
-            local catenaryUpper = func.contains({0, 2}, params.applyCatenary) and catenary
+            local catenaryLower = func.contains({1, 2}, params.catenary)-- and catenary
+            local catenaryUpper = func.contains({1, 3}, params.catenary)-- and catenary
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
             local heightFactor = heightList[params.height + 1]
@@ -646,8 +643,8 @@ local updateFn = function(fParams, models)
                         rFactor = params.fRUpperA,
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionA),
-                        isBridge = params.typeSlopeA == 1,
-                        isTerra = params.typeSlopeA == 2
+                        isBridge = params.typeSlopeA == 0,
+                        isTerra = params.typeSlopeA == 1
                     }
                 },
                 B = {
@@ -666,8 +663,8 @@ local updateFn = function(fParams, models)
                         rFactor = params.fRUpperB,
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionB),
-                        isBridge = params.typeSlopeB == 1,
-                        isTerra = params.typeSlopeB == 2
+                        isBridge = params.typeSlopeB == 0,
+                        isTerra = params.typeSlopeB == 1
                     }
                 }
             }
@@ -808,7 +805,7 @@ local updateFn = function(fParams, models)
             }
             
             local slopeWalls = pipe.new
-                / (info.A.upper.isTerra
+                / ((info.A.upper.isTerra and info.A.upper.used)
                 and {
                     {
                         lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
@@ -825,7 +822,7 @@ local updateFn = function(fParams, models)
                         from = "sup", to = "inf"
                     }
                 } or {})
-                / (info.B.upper.isTerra
+                / ((info.B.upper.isTerra and info.B.upper.used)
                 and {
                     {
                         lower = preparedExt.walls.lower.B[1].guidelines[1],

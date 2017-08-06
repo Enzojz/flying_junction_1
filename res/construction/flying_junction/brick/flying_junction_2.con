@@ -5,8 +5,8 @@ function data()
     return {
         type = "RAIL_STATION",
         description = {
-            name = _("Concrete Flying Junction"),
-            description = _("An European style flying junction")
+            name = _("Exchange Flying Junction in bricks"),
+            description = _("A flying junction that used to exchange the position of tracks, built in bricks")
         },
         availability = {
             yearFrom = 1892

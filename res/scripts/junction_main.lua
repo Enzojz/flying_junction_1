@@ -14,7 +14,7 @@ local ceil = math.ceil
 local pi = math.pi
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
-local rList = {junction.infi * 0.001, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
+local rList = {junction.infi * 0.001, 5, 3.5, 2, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100}
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}

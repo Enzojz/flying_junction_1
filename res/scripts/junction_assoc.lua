@@ -106,7 +106,7 @@ local function gmPlaceA(fz, r)
     return function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
         local p1, p2 = fz(rad1), fz(rad2)
-        return coor.shearZoY((p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+        return coor.shearZoY((r > 0 and -1 or 1) * (p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
     end
 end
 
@@ -208,7 +208,7 @@ local retriveFn = function(config)
         mPlaceA = mPlaceA,
         mPlaceD = function(guideline, rad1, rad2)
             local radc = (rad1 + rad2) * 0.5
-            return coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
+            return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
         end,
         isDesc = function(a, b) return config.height > 0 and a or b end
     }

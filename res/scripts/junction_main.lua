@@ -751,8 +751,8 @@ local updateFn = function(fParams, models)
             }
             
             local lowerPolys = {
-                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(10, 3.5),
-                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(10, 3.5)
+                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(4, 3.5),
+                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(4, 3.5)
             }
             
             local function selectEdge(level)

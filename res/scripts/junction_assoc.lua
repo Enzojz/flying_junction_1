@@ -246,7 +246,7 @@ end
 
 
 local retrivePolys = function(tracks, extLat)
-    extLat = extLat or 10
+    extLat = extLat or 4
     
     return tracks
         * pipe.map(function(tr)

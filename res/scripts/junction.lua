@@ -47,7 +47,6 @@ junction.generateArc = function(arc)
     local inf = toXyz(arc:pt(arc.inf))
     local mid = toXyz(arc:pt(arc.mid))
     
-    
     local vecSup = arc:tangent(arc.sup)
     local vecInf = arc:tangent(arc.inf)
     local vecMid = arc:tangent(arc.mid)
@@ -86,14 +85,14 @@ junction.makeFn = function(model, mPlace, m)
             end)
         end
         return {
-            makeModel(coordsGen(obj.inf, obj.mid)),
-            makeModel(coordsGen(obj.mid, obj.sup))
+            makeModel(coordsGen(junction.normalizeRad(obj.inf), junction.normalizeRad(obj.mid))),
+            makeModel(coordsGen(junction.normalizeRad(obj.mid), junction.normalizeRad(obj.sup)))
         }
     end
 end
 
 local generatePolyArcEdge = function(group, from, to)
-    return pipe.from(group[from], group[to])
+    return pipe.from(junction.normalizeRad(group[from]), junction.normalizeRad(group[to]))
         * arc.coords(group, 5)
         * pipe.map(function(rad) return func.with(group:pt(rad), {z = 0, rad = rad}) end)
 end

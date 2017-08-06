@@ -100,7 +100,7 @@ function arc.ptByPt(arc, pt)
 end
 
 function arc.tangent(arc, rad)
-    return coor.xyz(0, (arc.sup > arc.inf and 1 or -1), 0) .. coor.rotZ(rad)
+    return coor.xyz(0, (arc.mid > math.pi * 0.5 or arc.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad)
 end
 
 

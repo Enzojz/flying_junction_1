@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.7
+* Fixed crashes with small angles
 1.6
 * Raising or trenche transition tracks
 * Independent catenary options
@@ -50,6 +52,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.7
+* Correction de plantage lors l'angle passe en petit
 1.6
 * Voies de transition montant/désendant
 * Options de caténaire indépendantes
@@ -78,6 +82,8 @@ local descCN = [[欧式水泥疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.7
+* 修正了较小角度时的奔溃问题
 1.6
 * 上升/下降的过渡轨道
 * 不同层不同的接触网选项

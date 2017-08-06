@@ -3,14 +3,23 @@ local line = require "flyingjunction/coorline"
 local func = require "flyingjunction/func"
 local arc = {}
 
+local sin = math.sin
+local cos = math.cos
+local acos = math.acos
+local pi = math.pi
+local abs = math.abs
+local sqrt = math.sqrt
+local ceil = math.ceil
+local floor = math.floor
+
 -- The circle in form of (x - a)² + (y - b)² = r²
 function arc.new(a, b, r, limits)
     local result = {
         o = coor.xy(a, b),
         r = r,
-        inf = limits and limits.inf or -0.5 * math.pi,
-        mid = limits and limits.mid or 0.5 * math.pi,
-        sup = limits and limits.sup or 1.5 * math.pi,
+        inf = limits and limits.inf or -0.5 * pi,
+        mid = limits and limits.mid or 0.5 * pi,
+        sup = limits and limits.sup or 1.5 * pi,
         rad = arc.radByPt,
         pt = arc.ptByRad,
         limits = arc.limits,
@@ -86,13 +95,13 @@ end
 function arc.ptByRad(arc, rad)
     return
         coor.xy(
-            arc.o.x + arc.r * math.cos(rad),
-            arc.o.y + arc.r * math.sin(rad))
+            arc.o.x + arc.r * cos(rad),
+            arc.o.y + arc.r * sin(rad))
 end
 
 function arc.radByPt(arc, pt)
     local vec = (pt - arc.o):normalized()
-    return vec.y > 0 and math.acos(vec.x) or -math.acos(vec.x)
+    return vec.y > 0 and acos(vec.x) or -acos(vec.x)
 end
 
 function arc.ptByPt(arc, pt)
@@ -100,7 +109,7 @@ function arc.ptByPt(arc, pt)
 end
 
 function arc.tangent(arc, rad)
-    return coor.xyz(0, (arc.mid > math.pi * 0.5 or arc.mid < -math.pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad)
+    return coor.xyz(0, (arc.mid > pi * 0.5 or arc.mid < -pi * 0.5) and -1 or 1, 0) .. coor.rotZ(rad)
 end
 
 
@@ -126,13 +135,13 @@ function arc.intersectionLine(arc, line)
         -- oy² + p.y + q = 0;
         -- y = (-p ± Sqrt(p² - 4.o.q)) / 2.o
         local delta = p * p - 4 * o * q;
-        if (math.abs(delta) < 1e-10) then
+        if (abs(delta) < 1e-10) then
             local y = -p / (2 * o)
             local x = -l - m * y
             return {coor.xy(x, y)}
         elseif (delta > 0) then
-            local y0 = (-p + math.sqrt(delta)) / (2 * o)
-            local y1 = (-p - math.sqrt(delta)) / (2 * o)
+            local y0 = (-p + sqrt(delta)) / (2 * o)
+            local y1 = (-p - sqrt(delta)) / (2 * o)
             local x0 = -l - m * y0
             local x1 = -l - m * y1
             return {coor.xy(x0, y0), coor.xy(x1, y1)}
@@ -144,13 +153,13 @@ function arc.intersectionLine(arc, line)
         -- (x - a)² = r² - (y - b)²
         local y = -line.c / line.b;
         local delta = arc.r * arc.r - (y - arc.o.y) * (y - arc.o.y);
-        if (math.abs(delta) < 1e-10) then
+        if (abs(delta) < 1e-10) then
             return {coor.xy(arc.o.x, y)}
         elseif (delta > 0) then
             -- (x - a) = ± Sqrt(delta)
             -- x = ± Sqrt(delta) + a
-            local x0 = math.sqrt(delta) + arc.o.x;
-            local x1 = -math.sqrt(delta) + arc.o.x;
+            local x0 = sqrt(delta) + arc.o.x;
+            local x1 = -sqrt(delta) + arc.o.x;
             return {coor.xy(x0, y), coor.xy(x1, y)}
         else
             return {}
@@ -175,11 +184,11 @@ end
 
 function arc.coords(a, baseLength)
     return function(inf, sup)
-        local length = a.r * math.abs(sup - inf)
-        local nSeg = (function(x) return (x < 1 or (x % 1 > 0.5)) and math.ceil(x) or math.floor(x) end)(length / baseLength)
+        local length = a.r * abs(sup - inf)
+        local nSeg = (function(x) return (x < 1 or (x % 1 > 0.5)) and ceil(x) or floor(x) end)(length / baseLength)
         local scale = length / (nSeg * baseLength)
         local dRad = (sup - inf) / nSeg
-        local seq = math.abs(scale) < 1e-5 and {} or func.seqMap({0, nSeg}, function(n) return inf + n * dRad end)
+        local seq = abs(scale) < 1e-5 and {} or func.seqMap({0, nSeg}, function(n) return inf + n * dRad end)
         return seq, scale
     end
 end

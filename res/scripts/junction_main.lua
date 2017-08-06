@@ -95,7 +95,7 @@ local minimalR = function(offsets, info)
     local offsetUpper = {offsets.upper.walls[1], offsets.upper.walls[#offsets.upper.walls]}
     
     local function incr(r)
-        return r == 0 and 0 or (r > 0 and r + 0.1 or r - 0.1)
+        return r == 0 and 0 or (r > 0 and r + 1 or r - 1)
     end
     
     local function calculate(rLower, rUpper)
@@ -110,7 +110,7 @@ local minimalR = function(offsets, info)
             #(lowerGuideline[2] - upperGuideline[2]) > 1
         )
         if (resultTest) then
-            return rLower, rUpper
+            return (rLower > 0 and ceil or floor)(rLower), (rUpper > 0 and ceil or floor)(rUpper)
         else
             return calculate(incr(rLower), rLower == rUpper and rUpper or incr(rUpper))-- if else to prevent infinit loop
         end
@@ -197,7 +197,7 @@ end
 
 local function part(info, offsets)
     info.lower.r, info.upper.r = minimalR(offsets, info)
-    
+
     local sort = pipe.sort(function(l, r) return l:pt(l:rad(coor.xy(0, 0))).x < r:pt(l:rad(coor.xy(0, 0))).x end)
     
     local gRef = {
@@ -211,6 +211,7 @@ local function part(info, offsets)
         }
     }
     
+
     local wallExt = {
         lower = {L = gRef.lower.walls[1], R = gRef.lower.walls[#gRef.lower.walls]},
         upper = {L = gRef.upper.walls[1], R = gRef.upper.walls[#gRef.upper.walls]}

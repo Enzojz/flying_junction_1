@@ -13,8 +13,6 @@ local slopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
 local heightList = {11, 10, 9, 8, 7, 6, 5, 4, 3}
 local wallHeight = 11
 
-local pi = math.pi
-
 local function params()
     return {
         paramsutil.makeTrackTypeParam(),

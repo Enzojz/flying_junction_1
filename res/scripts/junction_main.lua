@@ -644,7 +644,7 @@ local updateFn = function(fParams, models)
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionA),
                         isBridge = params.typeSlopeA == 0 or not func.contains({0, 2}, params.transitionA),
-                        isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA)
+                        isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA) and params.type ~= 2
                     }
                 },
                 B = {
@@ -664,7 +664,7 @@ local updateFn = function(fParams, models)
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionB),
                         isBridge = params.typeSlopeB == 0 or not func.contains({0, 2}, params.transitionB),
-                        isTerra = params.typeSlopeB == 1 and (func.contains({0, 2}, params.transitionB))
+                        isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type ~= 2
                     }
                 }
             }

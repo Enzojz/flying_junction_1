@@ -9,9 +9,9 @@ function data()
             description = _("A flying junction that used to exchange the position of tracks, built in concrete")
         },
         availability = {
-            yearFrom = 1892
+            yearFrom = 1950
         },
-        order = 27220,
+        order = 27223,
         params = jMain.params({"rLower", "rUpper"}),
         
         updateFn = jMain.updateFn(function(params)

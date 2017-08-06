@@ -8,9 +8,9 @@ function data()
             description = _("A flying junction that used to bifurcate two lines, built in concrete")
         },
         availability = {
-            yearFrom = 1892
+            yearFrom = 1950
         },
-        order = 27221,
+        order = 27224,
         params = jMain.params({"curvedLevel"}),
         
         updateFn = jMain.updateFn(function(params)

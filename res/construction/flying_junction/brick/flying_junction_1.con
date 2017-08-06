@@ -8,7 +8,7 @@ function data()
             description = _("A flying junction that used to cross two lines, built in bricks")
         },
         availability = {
-            yearFrom = 1892
+            yearFrom = 1870
         },
         order = 27219,
         params = jMain.params({"curvedLevel"}),
@@ -19,7 +19,7 @@ function data()
             params.fRUpperA = 1
             params.fRUpperB = 1
             params.type = 1
-        end, 
+        end,
         {
             mSidePillar = "flying_junction/brick/pillar_side.mdl",
             mRoofFenceF = "flying_junction/brick/roof_fence_front.mdl",

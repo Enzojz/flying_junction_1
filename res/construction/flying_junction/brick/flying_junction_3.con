@@ -8,7 +8,7 @@ function data()
             description = _("A flying junction that used to bifurcate two lines, built in bricks")
         },
         availability = {
-            yearFrom = 1892
+            yearFrom = 1870
         },
         order = 27221,
         params = jMain.params({"curvedLevel"}),
@@ -20,7 +20,7 @@ function data()
             params.fRUpperB = 1
             params.type = 3
         end
-        ),
+        ,
         {
             mSidePillar = "flying_junction/brick/pillar_side.mdl",
             mRoofFenceF = "flying_junction/brick/roof_fence_front.mdl",
@@ -28,5 +28,6 @@ function data()
             mRoof = "flying_junction/brick/roof.mdl",
             bridgeType = "z_brick_flying_junction.lua",
         }
+        )
     }
 end

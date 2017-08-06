@@ -643,8 +643,8 @@ local updateFn = function(fParams, models)
                         rFactor = params.fRUpperA,
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionA),
-                        isBridge = params.typeSlopeA == 0,
-                        isTerra = params.typeSlopeA == 1
+                        isBridge = params.typeSlopeA == 0 or not func.contains({0, 2}, params.transitionA),
+                        isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA)
                     }
                 },
                 B = {
@@ -663,8 +663,8 @@ local updateFn = function(fParams, models)
                         rFactor = params.fRUpperB,
                         rad = 0.5 * rad,
                         used = func.contains({0, 2}, params.transitionB),
-                        isBridge = params.typeSlopeB == 0,
-                        isTerra = params.typeSlopeB == 1
+                        isBridge = params.typeSlopeB == 0 or not func.contains({0, 2}, params.transitionB),
+                        isTerra = params.typeSlopeB == 1 and (func.contains({0, 2}, params.transitionB))
                     }
                 }
             }
@@ -805,7 +805,7 @@ local updateFn = function(fParams, models)
             }
             
             local slopeWalls = pipe.new
-                / ((info.A.upper.isTerra and info.A.upper.used)
+                / (info.A.upper.isTerra
                 and {
                     {
                         lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
@@ -822,7 +822,7 @@ local updateFn = function(fParams, models)
                         from = "sup", to = "inf"
                     }
                 } or {})
-                / ((info.B.upper.isTerra and info.B.upper.used)
+                / (info.B.upper.isTerra
                 and {
                     {
                         lower = preparedExt.walls.lower.B[1].guidelines[1],

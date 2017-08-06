@@ -9,7 +9,7 @@ function data()
             description = _("A flying junction that used to exchange the position of tracks, built in bricks")
         },
         availability = {
-            yearFrom = 1892
+            yearFrom = 1870
         },
         order = 27220,
         params = jMain.params({"rLower", "rUpper"}),
@@ -23,7 +23,7 @@ function data()
             params.fRUpperB = 1
             params.type = 2
         end
-        ),
+        ,
         {
             mSidePillar = "flying_junction/brick/pillar_side.mdl",
             mRoofFenceF = "flying_junction/brick/roof_fence_front.mdl",
@@ -31,5 +31,6 @@ function data()
             mRoof = "flying_junction/brick/roof.mdl",
             bridgeType = "z_brick_flying_junction.lua",
         }
+        )
     }
 end

@@ -7,7 +7,7 @@ local pipe = require "flyingjunction/pipe"
 local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
-local dump = require "datadumper"
+
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
@@ -438,10 +438,10 @@ end
 local function mergePoly(...)
     local polys = pipe.new * {...}
     local p = {
-        equal = polys * pipe.map(pipe.select("equal")) * pipe.filter(pipe.noop()) * pipe.flatten(),
-        less = polys * pipe.map(pipe.select("less")) * pipe.filter(pipe.noop()) * pipe.flatten(),
-        greater = polys * pipe.map(pipe.select("greater")) * pipe.filter(pipe.noop()) * pipe.flatten(),
-        slot = polys * pipe.map(pipe.select("slot")) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        equal = polys * pipe.map(pipe.select("equal", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        less = polys * pipe.map(pipe.select("less", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        greater = polys * pipe.map(pipe.select("greater", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        slot = polys * pipe.map(pipe.select("slot", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
     }
     
     return pipe.new * {
@@ -811,53 +811,43 @@ local updateFn = function(fParams)
             }
             
             local slopeWalls = pipe.new
-                + (info.A.upper.isTerra
+                / (info.A.upper.isTerra
                 and {
                     {
                         lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
+                        another = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[1],
                         upper = preparedExt.walls.upper.A[1].guidelines[1],
                         fz = preparedExt.walls.upper.A[1].fn.fz,
                         from = "sup", to = "inf"
                     },
                     {
                         lower = preparedExt.walls.lower.A[1].guidelines[2],
+                        another = preparedExt.walls.lower.A[1].guidelines[1],
                         upper = preparedExt.walls.upper.A[1].guidelines[1],
                         fz = preparedExt.walls.upper.A[1].fn.fz,
                         from = "sup", to = "inf"
                     }
                 } or {})
-                + (info.B.upper.isTerra
+                / (info.B.upper.isTerra
                 and {
                     {
                         lower = preparedExt.walls.lower.B[1].guidelines[1],
+                        another = preparedExt.walls.lower.B[1].guidelines[2],
                         upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
                         fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
                         from = "inf", to = "sup"
                     },
                     {
                         lower = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[1],
+                        another = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[2],
                         upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
                         fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
                         from = "inf", to = "sup"
                     },
                 } or {}
             )
-            dump.dump(slopeWalls)
-            -- local slopeWallArcs = slopeWalls
-            --     * pipe.map(function(sw)
-            --         local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
-                    
-            --         return sw.lower:withLimits({
-            --             [sw.from] = loc,
-            --             [sw.to] = sw.lower[sw.to],
-            --             mid = loc
-            --         })
-                
-            --     end)
-            --     * pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end)
-            --     * function(ls) return {A = ls[1] + ls[2], B = ls[3] + ls[4]} end
-            
             local slopeWallModels = slopeWalls
+                * pipe.flatten()
                 * pipe.mapFlatten(function(sw)
                     local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
                     local arc = sw.lower:withLimits({
@@ -907,13 +897,30 @@ local updateFn = function(fParams)
             )
             end
             
+            local slopeWallArcs = slopeWalls
+                * pipe.map(pipe.map(function(sw)
+                    local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
+                    return {
+                        sw.lower:withLimits({
+                        [sw.from] = loc,
+                        [sw.to] = sw.lower[sw.to],
+                        mid = loc
+                    }), 
+                    sw.another}
+                
+                end))
+                * pipe.map(pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end)))
+                * pipe.map(pipe.map(pipe.flatten()))
+                * function(ls) return {A = func.flatten(ls[1]), B = func.flatten(ls[2])} end
+            
+            
             local lPolys = function(part)
                 local i = info[part].lower
                 local polySet = ext.polys.lower[part]
                 return (not i.used)
                     and {}
                     or {
-                        less = projectPolys(coor.I())(polySet.polys),
+                        less = projectPolys(coor.I())(info[part].upper.isTerra and slopeWallArcs[part] or polySet.polys),
                         slot = projectPolys(coor.I())(polySet.trackPolys),
                         greater = projectPolys(coor.I())(polySet.trackPolys)
                     }
@@ -932,12 +939,8 @@ local updateFn = function(fParams)
                 + (info.B.upper.isTerra and {} or projectPolys(mDepth)(upperPolys.B))
             }
             
-            
-            
-            
-            
             local lXPolys = {
-                -- less = projectPolys(coor.I())(slopeWallArcs.A, slopeWallArcs.B),
+                less = projectPolys(coor.I())(info.A.upper.isTerra and {} or lowerPolys.A, info.B.upper.isTerra and {} or lowerPolys.B),
                 slot = projectPolys(mDepth * coor.transZ(-0.1))(lowerPolys.A, lowerPolys.B),
                 greater = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
             }

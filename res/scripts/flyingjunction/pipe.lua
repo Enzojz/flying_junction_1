@@ -187,9 +187,9 @@ function pipe.zip(ls2, name)
     end
 end
 
-function pipe.select(name)
+function pipe.select(name, def)
     return function(el)
-        return el[name]
+        return el[name] or def
     end
 end
 

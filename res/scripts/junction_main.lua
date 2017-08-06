@@ -902,11 +902,11 @@ local updateFn = function(fParams)
                     local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
                     return {
                         sw.lower:withLimits({
-                        [sw.from] = loc,
-                        [sw.to] = sw.lower[sw.to],
-                        mid = loc
-                    }), 
-                    sw.another}
+                            [sw.from] = loc,
+                            [sw.to] = sw.lower[sw.to],
+                            mid = loc
+                        }),
+                        sw.another}
                 
                 end))
                 * pipe.map(pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end)))
@@ -972,18 +972,16 @@ local updateFn = function(fParams)
                 ,
                 terrainAlignmentLists = mergePoly(uXPolys, uPolys("A"), uPolys("B")) + mergePoly(lXPolys, lPolys("A"), lPolys("B"))
                 ,
-                groundFaces = pipe.new
-                * {
-                    upperPolys.A,
-                    upperPolys.B,
-                    lowerPolys.A,
-                    lowerPolys.B,
-                    ext.polys.lower.A.polys,
-                    ext.polys.lower.B.polys,
-                    ext.polys.upper.A.polys,
-                    ext.polys.upper.B.polys
-                }
-                * pipe.flatten()
+                groundFaces = (pipe.new
+                + upperPolys.A
+                + upperPolys.B
+                + lowerPolys.A
+                + lowerPolys.B
+                + ((info.A.lower.used and not info.A.lower.isBridge) and ext.polys.lower.A.polys or {})
+                + ((info.B.lower.used and not info.B.lower.isBridge) and ext.polys.lower.B.polys or {})
+                + ((info.A.upper.used and not info.A.upper.isBridge) and ext.polys.upper.A.polys or {})
+                + ((info.B.upper.used and not info.B.upper.isBridge) and ext.polys.upper.B.polys or {})
+                )
                 * pipe.mapFlatten(function(p)
                     return {
                         {face = func.map(p, coor.vec2Tuple), modes = {{type = "FILL", key = "building_paving_fill"}}},

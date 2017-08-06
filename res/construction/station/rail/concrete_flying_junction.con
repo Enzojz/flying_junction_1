@@ -12,15 +12,19 @@ function data()
             yearTo = 1800
         },
         order = 27219,
-        params = jMain.params({"rLower", "rUpper", "params.curvedLevel"}),
+        params = jMain.params({"curvedLevel", "transitionA", "transitionB", "trSlopeA", "trSlopeB", "typeSlopeA", "typeSlopeB" }),
         
         updateFn = jMain.updateFn(function(params)
-            params.rLower = 0
-            params.rUpper = 0
-            params.fRLowerA = 1
+            params.fRLowerA = -1
             params.fRLowerB = -1
-            params.fRUpperA = -1
+            params.fRUpperA = 1
             params.fRUpperB = 1
+            params.transitionA = 3
+            params.transitionB = 3
+            params.trSlopeA = 0
+            params.trSlopeB = 0
+            params.typeSlopeA = 1
+            params.typeSlopeB = 1
             params.type = 1
         end)
     }

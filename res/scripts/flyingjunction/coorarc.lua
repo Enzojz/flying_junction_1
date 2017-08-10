@@ -21,6 +21,7 @@ function arc.new(a, b, r, limits)
         mid = limits and limits.mid or 0.5 * pi,
         sup = limits and limits.sup or 1.5 * pi,
         rad = arc.radByPt,
+        length = arc.length,
         pt = arc.ptByRad,
         limits = arc.limits,
         withLimits = arc.withLimits,
@@ -56,6 +57,10 @@ function arc.extendLimitsRad(arc, dInf, dSup)
         mid = arc.mid,
         sup = arc.sup + (arc.sup > arc.mid and dSup or -dSup)
     })
+end
+
+function arc.length(arc)
+    return abs(arc.sup - arc.inf) * arc.r
 end
 
 function arc.extendLimits(arc, dInf, dSup)

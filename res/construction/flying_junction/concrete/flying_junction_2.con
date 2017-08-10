@@ -12,7 +12,7 @@ function data()
             yearFrom = 1950
         },
         order = 27223,
-        params = jMain.params({"rLower", "rUpper"}),
+        params = jMain.params({"rLower", "rUpper", "sLower", "sUpper"}),
         
         updateFn = jMain.updateFn(function(params)
             params.rLower = func.contains({0, 1}, params.curvedLevel) and #jMain.rList - 1 or 0
@@ -21,6 +21,8 @@ function data()
             params.fRLowerB = -1
             params.fRUpperA = -1
             params.fRUpperB = 1
+            params.sLower = 1
+            params.sUpper = 1
             params.type = 2
         end,
         {

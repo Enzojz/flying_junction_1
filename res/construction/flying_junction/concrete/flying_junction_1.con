@@ -14,10 +14,10 @@ function data()
         params = jMain.params({"curvedLevel"}),
         
         updateFn = jMain.updateFn(function(params)
-            params.fRLowerA = -1
-            params.fRLowerB = -1
-            params.fRUpperA = 1
-            params.fRUpperB = 1
+            params.fRLowerA = params.fRLowerA or -1
+            params.fRLowerB = params.fRLowerB or -1
+            params.fRUpperA = params.fRUpperA or 1
+            params.fRUpperB = params.fRUpperB or 1
             params.type = 1
         end,
         {

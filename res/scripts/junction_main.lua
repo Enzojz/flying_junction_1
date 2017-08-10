@@ -470,6 +470,7 @@ local function mergePoly(...)
 end
 
 local function params(paramFilter)
+    local sp = "\n--------------------\n\n"
     return pipe.new *
         {
             paramsutil.makeTrackTypeParam(),
@@ -514,68 +515,92 @@ local function params(paramFilter)
                 defaultIndex = 0
             },
             {
-                key = "rLower",
+                key = "sLower",
                 name = _("Radius of lower tracks"),
+                values = {"+", "-"},
+                defaultIndex = 0
+            },
+            {
+                key = "rLower",
+                name = nil,
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = 0
             },
             {
-                key = "rUpper",
+                key = "sUpper",
                 name = _("Radius of upper tracks"),
+                values = {"+", "-"},
+                defaultIndex = 0
+            },
+            {
+                key = "rUpper",
+                name = nil,
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = 0
             },
             {
                 key = "transitionA",
-                name = _("Transition A"),
+                name = sp.._("Transition A"),
                 values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
             {
                 key = "trSlopeA",
-                name = _("Transition A slope") .. " (‰)",
+                name = _("Slope") .. " (‰)",
                 values = func.map(trSlopeList, tostring),
                 defaultIndex = #trSlopeList * 0.5
             },
             {
                 key = "typeSlopeA",
-                name = _("Form of asc. tr. A"),
+                name = _("Form"),
                 values = {_("Bridge"), _("Terra"), _("Solid")},
                 defaultIndex = 1
             },
             {
                 key = "transitionB",
-                name = _("Transition B"),
+                name = sp.._("Transition B"),
                 values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
             {
                 key = "trSlopeB",
-                name = _("Transition B slope") .. " (‰)",
+                name = _("Slope") .. " (‰)",
                 values = func.map(trSlopeList, tostring),
                 defaultIndex = #trSlopeList * 0.5
             },
             {
                 key = "typeSlopeB",
-                name = _("Form of asc. tr. B"),
+                name = _("Form"),
                 values = {_("Bridge"), _("Terra"), _("Solid")},
                 defaultIndex = 1
             },
             {
                 key = "isMir",
-                name = _("Mirrored"),
+                name = sp.._("Mirrored"),
                 values = {_("No"), _("Yes")},
                 defaultIndex = 0
             },
             {
+                key = "slopeSign",
+                name = sp.._("General Slope").." (‰)",
+                values = {"+", "-"},
+                defaultIndex = 0
+            },
+            {
                 key = "slope",
-                name = _("General Slope").." (‰)",
+                name = nil,
                 values = func.map(slopeList, tostring),
                 defaultIndex = 0
             },
             {
+                key = "slopeLevel",
+                name = _("Axe"),
+                values = {_("Lower"), _("Upper")},
+                defaultIndex = 0
+            },
+            {
                 key = "heightTunnel",
-                name = _("Tunnel Height") .. " (m)",
+                name = sp.._("Tunnel Height") .. " (m)",
                 values = func.map(tunnelHeightList, tostring),
                 defaultIndex = #tunnelHeightList - 2
             },
@@ -631,18 +656,18 @@ local updateFn = function(fParams, models)
                 A = {
                     lower = {
                         nbTracks = params.nbLowerTracks + 1,
-                        r = retriveR(params.rLower) * params.fRLowerA,
-                        rFactor = params.fRLowerA,
-                        rad = -0.5 * rad,
+                        r = retriveR(params.rLower) * params.fRLowerA * (params.sLower == 0 and 1 or -1),
+                        rFactor = params.fRLowerA * (params.sLower == 0 and 1 or -1),
+                        rad = 0,
                         used = func.contains({0, 1}, params.transitionA),
                         isBridge = false,
                         isTerra = false,
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
-                        r = retriveR(params.rUpper) * params.fRUpperA,
-                        rFactor = params.fRUpperA,
-                        rad = 0.5 * rad,
+                        r = retriveR(params.rUpper) * params.fRUpperA * (params.sUpper == 0 and 1 or -1),
+                        rFactor = params.fRUpperA * (params.sUpper == 0 and 1 or -1),
+                        rad = rad,
                         used = func.contains({0, 2}, params.transitionA),
                         isBridge = params.typeSlopeA == 0 or not func.contains({0, 2}, params.transitionA),
                         isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA) and params.type ~= 2
@@ -651,18 +676,18 @@ local updateFn = function(fParams, models)
                 B = {
                     lower = {
                         nbTracks = params.nbLowerTracks + 1,
-                        r = retriveR(params.rLower) * params.fRLowerB,
-                        rFactor = params.fRLowerB,
-                        rad = -0.5 * rad,
+                        r = retriveR(params.rLower) * params.fRLowerB * (params.sLower == 0 and 1 or -1),
+                        rFactor = params.fRLowerB * (params.sLower == 0 and 1 or -1),
+                        rad = 0,
                         used = func.contains({0, 1}, params.transitionB),
                         isBridge = false,
                         isTerra = false,
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
-                        r = retriveR(params.rUpper) * params.fRUpperB,
-                        rFactor = params.fRUpperB,
-                        rad = 0.5 * rad,
+                        r = retriveR(params.rUpper) * params.fRUpperB * (params.sUpper == 0 and 1 or -1),
+                        rFactor = params.fRUpperB * (params.sUpper == 0 and 1 or -1),
+                        rad = rad,
                         used = func.contains({0, 2}, params.transitionB),
                         isBridge = params.typeSlopeB == 0 or not func.contains({0, 2}, params.transitionB),
                         isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type ~= 2
@@ -989,14 +1014,18 @@ local updateFn = function(fParams, models)
             -- Slope, Height, Mirror treatment
             return pipe.new
                 * result
-                * station.setMirror(params.isMir == 1)
-                * station.setSlope(slopeList[params.slope + 1])
+                * station.setRotation(params.slopeLevel * rad)
+                * station.setSlope((params.slopeSign == 0 and 1 or -1) * (slopeList[params.slope + 1]))
+                * station.setRotation(-params.slopeLevel * rad)
                 * station.setHeight(extraZ)
+                * station.setMirror(params.isMir == 1)
     end
 end
 
 return {
     updateFn = updateFn,
     params = params,
-    rList = rList
+    rList = rList,
+    projectPolys = projectPolys,
+    mergePoly = mergePoly,
 }

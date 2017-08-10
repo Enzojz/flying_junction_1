@@ -1,61 +1,12 @@
-local paramsutil = require "paramsutil"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
-local trackEdge = require "flyingjunction/trackedge"
 local line = require "flyingjunction/coorline"
 local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = require "junction"
 
-local rList = {junction.infi * 0.001, 5, 3, 2, 1.5, 1, 0.75, 0.5, 2 / 3, 0.4, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 0.1}
-local slopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}
-local heightList = {11, 10, 9, 8, 7, 6, 5, 4, 3}
 local wallHeight = 11
-
-local function params()
-    return {
-        paramsutil.makeTrackTypeParam(),
-        paramsutil.makeTrackCatenaryParam(),
-        {
-            key = "nbTracks",
-            name = _("Number of tracks"),
-            values = {_("1"), _("2"), _("3"), _("4"), _("5"), _("6"), },
-            defaultIndex = 1
-        },
-        {
-            key = "radius",
-            name = _("Radius") .. ("(m)"),
-            values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(math.floor(r * 1000 + 0.5)) end),
-            defaultIndex = #rList - 1
-        },
-        {
-            key = "isMir",
-            name = _("Mirrored"),
-            values = {_("No"), _("Yes")},
-            defaultIndex = 0
-        },
-        {
-            key = "slope",
-            name = _("Slope(‰)"),
-            values = func.map(slopeList, tostring),
-            defaultIndex = #slopeList - 1
-        },
-        {
-            key = "isDescding",
-            name = _("Direction"),
-            values = {"↗", "↘"},
-            defaultIndex = 0
-        },
-        {
-            key = "dz",
-            name = _("ΔHeight") .. ("(m)"),
-            values = func.map(heightList, tostring),
-            defaultIndex = 3
-        }
-    }
-
-end
 
 local retriveGeometry = function(config, slope)
     local rad = config.radFactor * slope.length / config.r
@@ -116,7 +67,6 @@ local function generateSlope(slope, height, dz)
     return {
         slope = slope,
         rad = rad,
-        dz = dz or 0,
         factor = sFactor,
         length = math.abs(height == 0 and 40 or (height - 2 * trans.dz) / slope + 2 * trans.length),
         trans = trans,
@@ -137,7 +87,7 @@ local slopeProfile = function(slope)
     local flatProfile = function()
         return {
             {
-                pt = function(x) return coor.xy(x, slope.height + slope.dz) end,
+                pt = function(x) return coor.xy(x, slope.height) end,
                 slope = function(_) return 0 end,
                 pred = function(_) return true end,
             },
@@ -146,8 +96,8 @@ local slopeProfile = function(slope)
     local normalProfile = function()
         local ref1 = slope.factor * math.pi * 0.5
         local ref2 = -ref1
-        local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + (slope.height + slope.dz)), slope.trans.r)
-        local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r + slope.dz), slope.trans.r)
+        local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + (slope.height)), slope.trans.r)
+        local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r), slope.trans.r)
         local pTr1 = arc1:pt(ref1 - slope.rad)
         local pTr2 = arc2:pt(ref2 - slope.rad)
         local lineSlope = line.byPtPt(pTr1, pTr2)
@@ -156,10 +106,9 @@ local slopeProfile = function(slope)
             {
                 pred = function(x) return x <= 0 end,
                 slope = function(_) return 0 end,
-                pt = function(x) return coor.xy(x, slope.height + slope.dz) end
+                pt = function(x) return coor.xy(x, slope.height) end
             },
             {
-                ref = slope.height > 0 and func.max or func.min,
                 pred = function(x) return x > 0 and x < pTr1.x end,
                 slope = function(pt) return math.tan(arc1:rad(pt) - math.pi * 0.5) end,
                 pt = intersection(arc1, slope.height > 0 and func.max or func.min)
@@ -177,7 +126,7 @@ local slopeProfile = function(slope)
             {
                 pred = function(x) return x >= slope.length end,
                 slope = function(_) return 0 end,
-                pt = function(x) return coor.xy(x, slope.dz) end
+                pt = function(x) return coor.xy(x, 0) end
             },
         }
     end
@@ -186,14 +135,13 @@ end
 
 local retriveFn = function(config)
     local retriveArc, retrivefZ = retriveGeometry(config, config.slope)
-    local profile = slopeProfile(config.slope)
+    local profile = config.slopeProfile or slopeProfile(config.slope)
     local fz, zsList = retrivefZ(profile)
     local mPlaceA = gmPlaceA(fz, config.r)
     
     return {
         retriveArc = retriveArc,
         fz = fz,
-        slope = config.slope,
         zsList = func.map2(
             func.range(zsList, 1, #zsList - 1),
             func.range(zsList, 2, #zsList),
@@ -281,101 +229,12 @@ local retriveWalls = function(walls)
         * pipe.map(pipe.flatten())
 end
 
-local composite = function(config)
-    local offsets = junction.buildCoors(config.nbTracks, config.nbTracks)
-    local guideline = arc.byOR(coor.xyz(config.r, 0, 0), math.abs(config.r))
-    
-    local tracks = offsets.tracks * pipe.map(function(o) return guideline + o end)
-        * pipe.map(function(tr)
-            local fn = retriveFn(config)
-            return {
-                guidelines = fn.retriveArc(tr),
-                fn = fn,
-                config = config,
-            }
-        end)
-    
-    local walls = offsets.walls * pipe.map(function(o) return guideline + o end)
-        * pipe.map(function(wa)
-            local fn = retriveFn(config)
-            return {
-                guidelines = fn.retriveArc(wa),
-                fn = fn,
-                config = config,
-            }
-        end)
-    
-    return {
-        edges = retriveTracks(tracks),
-        polys = retrivePolys(tracks, 1),
-        surface = retriveTrackSurfaces(tracks),
-        walls = retriveWalls(walls)
-    }
-end
-
-local function defaultParams(param)
-    local function limiter(d, u)
-        return function(v) return v and v < u and v or d end
-    end
-    
-    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
-end
-
-local updateFn = function(params)
-    defaultParams(params)
-    
-    local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
-    local catenary = params.catenary == 1
-    local trackBuilder = trackEdge.builder(catenary, trackType)
-    local sFactor = params.isDescding == 1 and 1 or -1
-    local height = sFactor * heightList[params.dz + 1]
-    
-    local nbTracks = params.nbTracks + 1
-    local r = (params.isMir == 0 and 1 or -1) * rList[params.radius + 1] * 1000
-    
-    local surface = composite({
-        initRad = r > 0 and math.pi or 0,
-        slope = generateSlope(sFactor * slopeList[params.slope + 1] * 0.001, height),
-        height = height,
-        r = r,
-        nbTracks = nbTracks,
-        radFactor = 1
-    })
-    
-    local underground = composite({
-        initRad = r > 0 and math.pi or 0,
-        slope = generateSlope(-sFactor * slopeList[params.slope + 1] * 0.001, -height, 2 * height),
-        height = height,
-        r = r,
-        nbTracks = nbTracks,
-        radFactor = -1
-    })
-    return
-        {
-            edgeLists = {
-                station.fusionEdges(
-                    surface.edges.inf,
-                    surface.edges.main
-                ) * station.prepareEdges * trackBuilder.nonAligned(),
-                station.fusionEdges(
-                    underground.edges.main,
-                    underground.edges.sup
-                ) * station.prepareEdges * trackBuilder.tunnel()
-            },
-            models = (surface.walls + surface.surface) * pipe.flatten(),
-            terrainAlignmentLists = surface.polys
-        }
-end
-
-
 return {
-    updateFn = updateFn,
     retriveFn = retriveFn,
     retriveTracks = retriveTracks,
     retriveTrackSurfaces = retriveTrackSurfaces,
     retrivePolys = retrivePolys,
     retriveWalls = retriveWalls,
     solveSlope = solveSlope,
-    generateSlope = generateSlope,
-    params = params,
+    generateSlope = generateSlope
 }

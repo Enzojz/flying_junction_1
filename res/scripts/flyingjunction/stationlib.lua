@@ -321,6 +321,13 @@ local applyResult = function(mpt, mvec, mirrored)
     end
 end
 
+stationlib.setRotation = function(rad)
+    return function(result)
+        local mr = coor.rotZ(rad)
+        return applyResult(mr, mr)(result)
+    end
+end
+
 stationlib.setSlope = function(slope)
     return function(result)
         local mr = coor.rotX(math.atan(slope * 0.001))

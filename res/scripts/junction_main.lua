@@ -20,6 +20,7 @@ local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100
 local slopeList = {0, 10, 20, 25, 30, 35, 40, 50, 60}
 local heightList = {0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1, 1.1, 1.2, 1.25, 1.5}
 local tunnelHeightList = {11, 10, 9.5, 8.7}
+local lengthPercentList = {1, 4 / 5, 3 / 4, 3 / 5, 1 / 2, 2 / 5, 1 / 4, 1 / 5}
 
 local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
 
@@ -123,13 +124,13 @@ local retriveExt = function(protos)
     local extHeightList = {upper = protos.info.tunnelHeight + protos.info.height, lower = protos.info.height}
     local extSlopeList = {upper = 1, lower = -1, A = protos.info.slopeA, B = protos.info.slopeB}
     
-    
     local prepareArc = function(proto, slope)
         return function(g)
             local config = {
                 initRad = proto.radFn(g),
                 slope = slope,
                 height = extHeightList[proto.level],
+                frac = protos.info.frac[proto.level][proto.part],
                 radFactor = radFactorList[proto.part],
                 r = proto.rFn(g),
                 models = proto.models,
@@ -197,7 +198,7 @@ end
 
 local function part(info, offsets)
     info.lower.r, info.upper.r = minimalR(offsets, info)
-
+    
     local sort = pipe.sort(function(l, r) return l:pt(l:rad(coor.xy(0, 0))).x < r:pt(l:rad(coor.xy(0, 0))).x end)
     
     local gRef = {
@@ -211,7 +212,7 @@ local function part(info, offsets)
         }
     }
     
-
+    
     local wallExt = {
         lower = {L = gRef.lower.walls[1], R = gRef.lower.walls[#gRef.lower.walls]},
         upper = {L = gRef.upper.walls[1], R = gRef.upper.walls[#gRef.upper.walls]}
@@ -475,10 +476,10 @@ local function params(paramFilter)
         {
             paramsutil.makeTrackTypeParam(),
             func.with(paramsutil.makeTrackCatenaryParam(),
-            {
-                values = {_("None"), _("Both"), _("Lower"), _("Upper")},
-                defaultIndex = 0
-            }),
+                {
+                    values = {_("None"), _("Both"), _("Lower"), _("Upper")},
+                    defaultIndex = 0
+                }),
             {
                 key = "nbLowerTracks",
                 name = _("Number of lower tracks"),
@@ -540,7 +541,7 @@ local function params(paramFilter)
             },
             {
                 key = "transitionA",
-                name = sp.._("Transition A"),
+                name = sp .. _("Transition A"),
                 values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
@@ -551,6 +552,18 @@ local function params(paramFilter)
                 defaultIndex = #trSlopeList * 0.5
             },
             {
+                key = "trLengthUpperA",
+                name = _("Upper Length") .. " (%)",
+                values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
+                defaultIndex = 0
+            },
+            {
+                key = "trLengthLowerA",
+                name = _("Lower Length") .. " (%)",
+                values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
+                defaultIndex = 0
+            },
+            {
                 key = "typeSlopeA",
                 name = _("Form"),
                 values = {_("Bridge"), _("Terra"), _("Solid")},
@@ -558,7 +571,7 @@ local function params(paramFilter)
             },
             {
                 key = "transitionB",
-                name = sp.._("Transition B"),
+                name = sp .. _("Transition B"),
                 values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
@@ -569,6 +582,18 @@ local function params(paramFilter)
                 defaultIndex = #trSlopeList * 0.5
             },
             {
+                key = "trLengthUpperB",
+                name = _("Upper Length") .. " (%)",
+                values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
+                defaultIndex = 0
+            },
+            {
+                key = "trLengthLowerB",
+                name = _("Lower Length") .. " (%)",
+                values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
+                defaultIndex = 0
+            },
+            {
                 key = "typeSlopeB",
                 name = _("Form"),
                 values = {_("Bridge"), _("Terra"), _("Solid")},
@@ -576,13 +601,13 @@ local function params(paramFilter)
             },
             {
                 key = "isMir",
-                name = sp.._("Mirrored"),
+                name = sp .. _("Mirrored"),
                 values = {_("No"), _("Yes")},
                 defaultIndex = 0
             },
             {
                 key = "slopeSign",
-                name = sp.._("General Slope").." (‰)",
+                name = sp .. _("General Slope") .. " (‰)",
                 values = {"+", "-"},
                 defaultIndex = 0
             },
@@ -600,7 +625,7 @@ local function params(paramFilter)
             },
             {
                 key = "heightTunnel",
-                name = sp.._("Tunnel Height") .. " (m)",
+                name = sp .. _("Tunnel Height") .. " (m)",
                 values = func.map(tunnelHeightList, tostring),
                 defaultIndex = #tunnelHeightList - 2
             },
@@ -748,7 +773,17 @@ local updateFn = function(fParams, models)
                         height = depth,
                         tunnelHeight = tunnelHeight,
                         slopeA = trSlopeList[params.trSlopeA + 1] * 0.001,
-                        slopeB = trSlopeList[params.trSlopeB + 1] * 0.001
+                        slopeB = trSlopeList[params.trSlopeB + 1] * 0.001,
+                        frac = {
+                            lower = {
+                                A = lengthPercentList[params.trLengthLowerA + 1],
+                                B = lengthPercentList[params.trLengthLowerB + 1]
+                            },
+                            upper = {
+                                A = lengthPercentList[params.trLengthUpperA + 1],
+                                B = lengthPercentList[params.trLengthUpperB + 1]
+                            }
+                        }
                     }
                 }
                 end

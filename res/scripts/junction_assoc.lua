@@ -10,10 +10,12 @@ local wallHeight = 11
 
 local retriveGeometry = function(config, slope)
     local rad = config.radFactor * slope.length / config.r
+    local radF =  rad * config.frac
     local radT = slope.trans.length / slope.length * rad
     local radRef = junction.normalizeRad(config.initRad)
+    local extRad = config.radFactor * 5 / config.r
     local radList = pipe.new
-        * {0, 0, radT, rad * 0.5, rad - radT, rad, rad}
+        * {-extRad, 0, radT, radF * 0.5, radF - radT, radF, radF + extRad}
         * (config.radFactor < 0 and pipe.noop() or pipe.rev())
         * pipe.map(pipe.plus(radRef))
     
@@ -55,7 +57,7 @@ local function gmPlaceA(fz, r)
     end
 end
 
-local function generateSlope(slope, height, dz)
+local function generateSlope(slope, height)
     local sFactor = slope > 0 and 1 or -1
     local rad = math.atan(slope)
     local rTrans = 300
@@ -74,13 +76,13 @@ local function generateSlope(slope, height, dz)
     }
 end
 
-local function solveSlope(refSlope, height, dz)
+local function solveSlope(refSlope, height)
     local function solver(slope)
-        local x = generateSlope(slope, height, dz)
+        local x = generateSlope(slope, height)
         return math.abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
     end
     
-    return height == 0 and func.with(generateSlope(-refSlope.slope, height, dz), {length = refSlope.length}) or solver(-refSlope.slope)
+    return height == 0 and func.with(generateSlope(-refSlope.slope, height), {length = refSlope.length}) or solver(-refSlope.slope)
 end
 
 local slopeProfile = function(slope)

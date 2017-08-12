@@ -282,11 +282,11 @@ local function part(info, offsets)
         }
     }
     
-    local inferExt = function(guidelines, fnRad)
+    local inferExt = function(guidelines, fnRad, r)
         return pipe.new * func.map(guidelines,
             function(g)
                 local p = g:pt(fnRad(g))
-                local guideline = arc.byOR(p + (g.o - p):normalized() * (junction.infi - g.xOffset), (junction.infi - g.xOffset))
+                local guideline = arc.byOR(p + (g.o - p):normalized() * (abs(r) - g.xOffset), (abs(r) - g.xOffset))
                 
                 return {
                     guideline = guideline,
@@ -299,25 +299,25 @@ local function part(info, offsets)
     local ext = {
         lower = {
             tracks = {
-                inf = inferExt(result.lower.tracks, function(g) return g.inf end),
-                sup = inferExt(result.lower.tracks, function(g) return g.sup end)
+                inf = inferExt(result.lower.tracks, function(g) return g.inf end, info.lower.extR),
+                sup = inferExt(result.lower.tracks, function(g) return g.sup end, info.lower.extR)
             },
             walls = {
-                inf = inferExt(result.lower.walls, function(_) return limitRads.lower.inf end)
+                inf = inferExt(result.lower.walls, function(_) return limitRads.lower.inf end, info.lower.extR)
                 * function(ls) return {ls[1], ls[#ls]} end
                 ,
-                sup = inferExt(result.lower.walls, function(_) return limitRads.lower.sup end)
+                sup = inferExt(result.lower.walls, function(_) return limitRads.lower.sup end, info.lower.extR)
                 * function(ls) return {ls[1], ls[#ls]} end
             }
         },
         upper = {
             tracks = {
-                inf = inferExt(result.upper.tracks, function(g) return g.inf end),
-                sup = inferExt(result.upper.tracks, function(g) return g.sup end)
+                inf = inferExt(result.upper.tracks, function(g) return g.inf end, info.upper.extR),
+                sup = inferExt(result.upper.tracks, function(g) return g.sup end, info.upper.extR)
             },
             walls = {
-                inf = inferExt(result.upper.walls, function(g) return g.inf end),
-                sup = inferExt(result.upper.walls, function(g) return g.sup end)
+                inf = inferExt(result.upper.walls, function(g) return g.inf end, info.upper.extR),
+                sup = inferExt(result.upper.walls, function(g) return g.sup end, info.upper.extR)
             }
         }
     }
@@ -552,6 +552,12 @@ local function params(paramFilter)
                 defaultIndex = #trSlopeList * 0.5
             },
             {
+                key = "trRadiusA",
+                name = _("Radius") .. " (m)",
+                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
+                defaultIndex = 0
+            },
+            {
                 key = "trLengthUpperA",
                 name = _("Upper Length") .. " (%)",
                 values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
@@ -580,6 +586,12 @@ local function params(paramFilter)
                 name = _("Slope") .. " (‰)",
                 values = func.map(trSlopeList, tostring),
                 defaultIndex = #trSlopeList * 0.5
+            },
+            {
+                key = "trRadiusB",
+                name = _("Radius") .. " (m)",
+                values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
+                defaultIndex = 0
             },
             {
                 key = "trLengthUpperB",
@@ -687,6 +699,7 @@ local updateFn = function(fParams, models)
                         used = func.contains({0, 1}, params.transitionA),
                         isBridge = false,
                         isTerra = false,
+                        extR = retriveR(params.trRadiusA) * params.fRLowerA,
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
@@ -695,7 +708,8 @@ local updateFn = function(fParams, models)
                         rad = rad,
                         used = func.contains({0, 2}, params.transitionA),
                         isBridge = params.typeSlopeA == 0 or not func.contains({0, 2}, params.transitionA),
-                        isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA) and params.type ~= 2
+                        isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA) and params.type ~= 2,
+                        extR = retriveR(params.trRadiusA) * params.fRLowerA,
                     }
                 },
                 B = {
@@ -707,6 +721,7 @@ local updateFn = function(fParams, models)
                         used = func.contains({0, 1}, params.transitionB),
                         isBridge = false,
                         isTerra = false,
+                        extR = retriveR(params.trRadiusB) * params.fRLowerB,
                     },
                     upper = {
                         nbTracks = params.nbUpperTracks + 1,
@@ -715,7 +730,8 @@ local updateFn = function(fParams, models)
                         rad = rad,
                         used = func.contains({0, 2}, params.transitionB),
                         isBridge = params.typeSlopeB == 0 or not func.contains({0, 2}, params.transitionB),
-                        isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type ~= 2
+                        isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type ~= 2,
+                        extR = retriveR(params.trRadiusB) * params.fRLowerB,
                     }
                 }
             }

@@ -553,13 +553,13 @@ local function params(paramFilter)
             },
             {
                 key = "trLengthUpperA",
-                name = _("Upper Length") .. " (%)",
+                name = _("Upper tracks length") .. " (%)",
                 values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
                 defaultIndex = 0
             },
             {
                 key = "trLengthLowerA",
-                name = _("Lower Length") .. " (%)",
+                name = _("Lower tracks length") .. " (%)",
                 values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
                 defaultIndex = 0
             },
@@ -583,13 +583,13 @@ local function params(paramFilter)
             },
             {
                 key = "trLengthUpperB",
-                name = _("Upper Length") .. " (%)",
+                name = _("Upper tracks length") .. " (%)",
                 values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
                 defaultIndex = 0
             },
             {
                 key = "trLengthLowerB",
-                name = _("Lower Length") .. " (%)",
+                name = _("Lower tracks length") .. " (%)",
                 values = func.map(lengthPercentList, function(l) return tostring(l * 100) end),
                 defaultIndex = 0
             },
@@ -619,7 +619,7 @@ local function params(paramFilter)
             },
             {
                 key = "slopeLevel",
-                name = _("Axe"),
+                name = _("Axis"),
                 values = {_("Lower"), _("Upper")},
                 defaultIndex = 0
             },

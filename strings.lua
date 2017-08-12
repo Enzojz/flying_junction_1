@@ -14,6 +14,10 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.8
+* Added option to adjust transition length
+* Improved slope option
+* Improved menu
 1.7
 * Fixed crashes with small angles
 1.6
@@ -52,6 +56,10 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.8
+* Ajoute des options pour modifier le longueur des transitions
+* Amélioration d'option de pente
+* Amélioration de menu
 1.7
 * Correction de plantage lors l'angle passe en petit
 1.6
@@ -82,6 +90,10 @@ local descCN = [[欧式水泥疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.8
+* 增加了过渡区段长度的选项
+* 改进了坡度选项
+* 改进了菜单的布置
 1.7
 * 修正了较小角度时的奔溃问题
 1.6
@@ -109,12 +121,13 @@ function data()
             ["Curved levels"] = "Niveaux avec courbes",
             ["Crossing angles"] = "Angle de croisement",
             ["Tracks per group"] = "Nombre de voie par groupe",
-            ["Radius of lower tracks"] = "Rayon au niveau bas",
-            ["Radius of upper tracks"] = "Rayon au niveau haut",
-            ["Transition A slope"] = "Pente de la transition A",
-            ["Transition B slope"] = "Pente de la transition B",
-            ["Form of asc. tr. A"] = "Fome de la montée tr. A",
-            ["Form of asc. tr. B"] = "Fome de la montée tr B",
+            ["Radius of lower tracks"] = "Rayon du niveau bas",
+            ["Radius of upper tracks"] = "Rayon du niveau haut",
+            ["Lower tracks length"] = "Longueur du niveau bas",
+            ["Upper tracks length"] = "Longueur du niveau haut",
+            ["Form"] = "Forme",
+            ["Axis"] = "Axe",
+            ["Slope"] = "Pente",
             ["Mirrored"] = "En miroir",
             ["General Slope"] = "Pente générale",
             ["Tunnel Height"] = "Hauteur de tunnel",
@@ -147,12 +160,15 @@ function data()
             ["Number of lower tracks"] = "下层轨道数量",
             ["Number of upper tracks"] = "上层轨道数量",
             ["Curved levels"] = "曲线部分",
-            ["Radius of lower tracks"] = "下层半径",
-            ["Radius of upper tracks"] = "上层半径",
-            ["Transition A slope"] = "A过渡区段坡度",
-            ["Transition B slope"] = "B过渡区段坡度",
-            ["Form of asc. tr. A"] = "A过渡区段形式",
-            ["Form of asc. tr. B"] = "B过渡区段形式",
+            ["Radius of lower tracks"] = "下层轨道半径",
+            ["Radius of upper tracks"] = "上层轨道半径",
+            ["Transition A"] = "A过渡区段",
+            ["Transition B"] = "B过渡区段",
+            ["Lower tracks length"] = "下层轨道长度",
+            ["Upper tracks length"] = "上层轨道长度",
+            ["Form"] = "形式",
+            ["Axis"] = "倾斜轴",
+            ["Slope"] = "坡度",
             ["Crossing angles"] = "交汇角",
             ["Tracks per group"] = "每组轨道数量",
             ["Mirrored"] = "镜像",

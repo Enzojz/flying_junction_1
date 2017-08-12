@@ -681,8 +681,8 @@ local updateFn = function(fParams, models)
                 A = {
                     lower = {
                         nbTracks = params.nbLowerTracks + 1,
-                        r = retriveR(params.rLower) * params.fRLowerA * (params.sLower == 0 and 1 or -1),
-                        rFactor = params.fRLowerA * (params.sLower == 0 and 1 or -1),
+                        r = retriveR(params.rLower) * params.fRLowerA * (params.sLower == 1 and 1 or -1),
+                        rFactor = params.fRLowerA * (params.sLower == 1 and 1 or -1),
                         rad = 0,
                         used = func.contains({0, 1}, params.transitionA),
                         isBridge = false,
@@ -701,8 +701,8 @@ local updateFn = function(fParams, models)
                 B = {
                     lower = {
                         nbTracks = params.nbLowerTracks + 1,
-                        r = retriveR(params.rLower) * params.fRLowerB * (params.sLower == 0 and 1 or -1),
-                        rFactor = params.fRLowerB * (params.sLower == 0 and 1 or -1),
+                        r = retriveR(params.rLower) * params.fRLowerB * (params.sLower == 1 and 1 or -1),
+                        rFactor = params.fRLowerB * (params.sLower == 1 and 1 or -1),
                         rad = 0,
                         used = func.contains({0, 1}, params.transitionB),
                         isBridge = false,

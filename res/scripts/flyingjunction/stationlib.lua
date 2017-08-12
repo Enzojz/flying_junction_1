@@ -234,7 +234,7 @@ stationlib.joinEdges = function(edges)
                     or nil
             end)
             * pipe.filter(pipe.noop())
-            * function(ls) return #ls == 0 and {l, r} or #ls[1] end
+            * function(ls) return #ls == 0 and {l, r} or ls[1] end
     end
     
     local function join(result, fst, snd, ...)

@@ -22,7 +22,7 @@ function data()
             params.fRUpperA = -1
             params.fRUpperB = 1
             params.sLower = 1
-            params.sUpper = 1
+            params.sUpper = 0
             params.type = 2
         end,
         {

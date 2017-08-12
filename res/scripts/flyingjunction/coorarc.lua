@@ -16,7 +16,7 @@ local floor = math.floor
 function arc.new(a, b, r, limits)
     local result = {
         o = coor.xy(a, b),
-        r = r,
+        r = abs(r),
         inf = limits and limits.inf or -0.5 * pi,
         mid = limits and limits.mid or 0.5 * pi,
         sup = limits and limits.sup or 1.5 * pi,

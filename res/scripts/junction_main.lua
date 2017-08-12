@@ -471,7 +471,7 @@ local function mergePoly(...)
 end
 
 local function params(paramFilter)
-    local sp = "\n--------------------\n\n"
+    local sp = "·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·\n\n"
     return pipe.new *
         {
             paramsutil.makeTrackTypeParam(),
@@ -517,25 +517,25 @@ local function params(paramFilter)
             },
             {
                 key = "sLower",
-                name = _("Radius of lower tracks"),
+                name = sp,
                 values = {"+", "-"},
                 defaultIndex = 0
             },
             {
                 key = "rLower",
-                name = nil,
+                name = _("Radius of lower tracks"),
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = 0
             },
             {
                 key = "sUpper",
-                name = _("Radius of upper tracks"),
+                name = sp,
                 values = {"+", "-"},
                 defaultIndex = 0
             },
             {
                 key = "rUpper",
-                name = nil,
+                name = _("Radius of upper tracks"),
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = 0
             },
@@ -607,13 +607,13 @@ local function params(paramFilter)
             },
             {
                 key = "slopeSign",
-                name = sp .. _("General Slope") .. " (‰)",
+                name = sp,
                 values = {"+", "-"},
                 defaultIndex = 0
             },
             {
                 key = "slope",
-                name = nil,
+                name = _("General Slope") .. " (‰)",
                 values = func.map(slopeList, tostring),
                 defaultIndex = 0
             },

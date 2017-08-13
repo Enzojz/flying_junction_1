@@ -36,7 +36,7 @@ local mPlaceSlopeWall = function(sw, arc, upperHeight)
         local h1 = upperHeight * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
         local h = upperHeight * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
         local pt = guideline:pt(rad)
-        return coor.shearZoY(h1 / math.abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
+        return coor.shearZoY(h1 / abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
     end
 end
 
@@ -220,14 +220,14 @@ local function part(info, offsets)
     
     local limitRads = {
         lower = {
-            inf = wallExt.lower.R:rad(func.min(wallExt.lower.R - wallExt.upper.L, ptXSelector)),
-            mid = wallExt.lower.R:rad(coor.xy(0, 0)),
-            sup = wallExt.lower.L:rad(func.min(wallExt.lower.L - wallExt.upper.R, ptXSelector)),
+            inf = junction.normalizeRad(wallExt.lower.R:rad(func.min(wallExt.lower.R - wallExt.upper.L, ptXSelector))),
+            mid = junction.normalizeRad(wallExt.lower.R:rad(coor.xy(0, 0))),
+            sup = junction.normalizeRad(wallExt.lower.L:rad(func.min(wallExt.lower.L - wallExt.upper.R, ptXSelector))),
         },
         upper = {
-            sup = wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.L, ptXSelector)),
-            mid = wallExt.upper.R:rad(coor.xy(0, 0)),
-            inf = wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.R, ptXSelector)),
+            sup = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.L, ptXSelector))),
+            mid = junction.normalizeRad(wallExt.upper.R:rad(coor.xy(0, 0))),
+            inf = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.R, ptXSelector))),
         }
     }
     
@@ -238,9 +238,9 @@ local function part(info, offsets)
             * func.map(gRef.lower.walls, function(l)
                 return l:withLimits(
                     {
-                        inf = l:rad(func.min(l - wallExt.upper.L, ptXSelector)),
-                        mid = l:rad(coor.xy(0, 0)),
-                        sup = l:rad(func.min(l - wallExt.upper.R, ptXSelector)),
+                        inf = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.L, ptXSelector))),
+                        mid = junction.normalizeRad(l:rad(coor.xy(0, 0))),
+                        sup = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.R, ptXSelector))),
                     }) end)
             * function(walls)
                 for i = 1, #walls - 1 do walls[i].inf = walls[i + 1].inf end
@@ -270,12 +270,12 @@ local function part(info, offsets)
             walls = {
                 wallExt.upper.L:withLimits({
                     inf = limitRads.upper.inf,
-                    mid = wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector)),
+                    mid = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector))),
                     sup = limitRads.upper.sup,
                 }),
                 wallExt.upper.R:withLimits({
                     inf = limitRads.upper.inf,
-                    mid = wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector)),
+                    mid = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector))),
                     sup = limitRads.upper.sup,
                 })
             },
@@ -993,7 +993,6 @@ local updateFn = function(fParams, models)
                             mid = loc
                         }),
                         sw.another}
-                
                 end))
                 * pipe.map(pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end)))
                 * pipe.map(pipe.map(pipe.flatten()))

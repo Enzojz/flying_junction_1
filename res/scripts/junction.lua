@@ -4,7 +4,7 @@ local arc = require "flyingjunction/coorarc"
 local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = {}
-
+local dump = require "datadumper"
 local pi = math.pi
 local abs = math.abs
 
@@ -42,7 +42,20 @@ junction.generateArc = function(arc)
     local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
     
     local extArc = arc:extendLimits(5)
-
+    dump.dump(
+        {
+            arc = {
+                l = arc:limits(),
+                r = arc.r,
+                o = arc.o
+            },
+            arcext = {
+                l = extArc:limits(),
+                r = extArc.r,
+                o = extArc.o
+            },
+        }
+    )
     local sup = toXyz(arc:pt(arc.sup))
     local inf = toXyz(arc:pt(arc.inf))
     local mid = toXyz(arc:pt(arc.mid))

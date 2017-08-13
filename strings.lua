@@ -14,6 +14,10 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.10
+* Colission bugfix on crossing layout
+* Retaining wall form bugfix on crossing layout
+* Terrain alignement on lower level improved
 1.9
 * Added option to have curves on transitions
 * Added common axis for general slope
@@ -59,6 +63,10 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.10
+* Correction de erreur de colission sur disposition de croisement
+* Correction de forme de mur sur la disposition de croisement
+* Amélioration de alignement du terrain
 1.9
 * Ajoute des options pour avoir transitions en courbes
 * Ajoute d'une axe commue pour la pente générale
@@ -96,6 +104,10 @@ local descCN = [[欧式水泥疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.10
+* 修正了交叉布局下的一个冲突错误
+* 修正了交叉布局下挡土墙的形状
+* 优化了底层轨道的地形修整算法
 1.9
 * 增加了过渡区段的曲线选项
 * 增加了一个新的整体坡度倾斜轴选项

@@ -33,10 +33,10 @@ end
 local mPlaceSlopeWall = function(sw, arc, upperHeight)
     return function(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
-        local h1 = upperHeight * (rad2 - rad1) / (arc[sw.from] - arc[sw.to])
+        local t = upperHeight / (arc[sw.from] - arc[sw.to]) / guideline.r
         local h = upperHeight * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
         local pt = guideline:pt(rad)
-        return coor.shearZoY(h1 / abs(rad2 - rad1) / guideline.r) * coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = h - 11}))
+        return coor.shearZoY(t) * coor.rotZ(rad) * coor.trans(func.with(pt, {z = h - 11}))
     end
 end
 
@@ -330,11 +330,11 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     local function mPlace(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
         local pt = guideline:pt(rad)
-        return coor.rotZ(junction.regularizeRad(rad)) * coor.trans(func.with(pt, {z = -11})) * mDepth
+        return coor.rotZ(rad) * coor.trans(func.with(pt, {z = -11})) * mDepth
     end
     local mPlaceD = function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
-        return coor.rotZ(junction.regularizeRad(radc)) * coor.trans(func.with(guideline:pt(radc), {z = -11}))
+        return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -11}))
     end
     
     local makeExtWall = junction.makeFn(models.mSidePillar, mPlaceD, coor.scaleY(1.05))
@@ -941,7 +941,6 @@ local updateFn = function(fParams, models)
                         [sw.to] = loc,
                         mid = (sw.lower[sw.from] + loc) * 0.5
                     })
-                    
                     local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight * heightFactor)
                     
                     return {
@@ -986,16 +985,14 @@ local updateFn = function(fParams, models)
             local slopeWallArcs = slopeWalls
                 * pipe.map(pipe.map(function(sw)
                     local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
-                    return {
-                        sw.lower:withLimits({
+                    return sw.lower:withLimits({
                             [sw.from] = loc,
-                            [sw.to] = sw.lower[sw.to],
+                            [sw.to] = sw.another:extendLimits(4)[sw.to],
                             mid = loc
-                        }),
-                        sw.another}
-                end))
-                * pipe.map(pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end)))
-                * pipe.map(pipe.map(pipe.flatten()))
+                        })
+                     end
+                ))
+                * pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end))
                 * function(ls) return {A = func.flatten(ls[1]), B = func.flatten(ls[2])} end
             
             

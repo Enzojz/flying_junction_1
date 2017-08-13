@@ -131,7 +131,7 @@ local retriveExt = function(protos)
                 slope = slope,
                 height = extHeightList[proto.level],
                 frac = protos.info.frac[proto.level][proto.part],
-                radFactor = proto.radFactor,
+                radFactor = radFactorList[proto.part],
                 r = proto.rFn(g),
                 models = proto.models,
             }
@@ -282,16 +282,17 @@ local function part(info, offsets)
         }
     }
     
-    local inferExt = function(guidelines, fnRad, r)
+    local inferExt = function(guidelines, fnRad, r, rFactor)
         return pipe.new * func.map(guidelines,
             function(g)
                 local p = g:pt(fnRad(g))
-                local guideline = arc.byOR(p + (g.o - p):normalized() * (r - g.xOffset), r - g.xOffset)
+                local guideline = arc.byOR(p + (g.o - p):normalized() * (rFactor * r - g.xOffset), r - g.xOffset)
                 
                 return {
                     guideline = guideline,
                     rad = guideline:rad(p),
-                    pt = p
+                    pt = p,
+                    r = r
                 }
             end)
     end
@@ -299,25 +300,25 @@ local function part(info, offsets)
     local ext = {
         lower = {
             tracks = {
-                inf = inferExt(result.lower.tracks, function(g) return g.inf end, info.lower.extR),
-                sup = inferExt(result.lower.tracks, function(g) return g.sup end, info.lower.extR)
+                inf = inferExt(result.lower.tracks, function(g) return g.inf end, info.lower.extR, info.lower.rFactor),
+                sup = inferExt(result.lower.tracks, function(g) return g.sup end, info.lower.extR, info.lower.rFactor)
             },
             walls = {
-                inf = inferExt(result.lower.walls, function(_) return limitRads.lower.inf end, info.lower.extR)
+                inf = inferExt(result.lower.walls, function(_) return limitRads.lower.inf end, info.lower.extR, info.lower.rFactor)
                 * function(ls) return {ls[1], ls[#ls]} end
                 ,
-                sup = inferExt(result.lower.walls, function(_) return limitRads.lower.sup end, info.lower.extR)
+                sup = inferExt(result.lower.walls, function(_) return limitRads.lower.sup end, info.lower.extR, info.lower.rFactor)
                 * function(ls) return {ls[1], ls[#ls]} end
             }
         },
         upper = {
             tracks = {
-                inf = inferExt(result.upper.tracks, function(g) return g.inf end, info.upper.extR),
-                sup = inferExt(result.upper.tracks, function(g) return g.sup end, info.upper.extR)
+                inf = inferExt(result.upper.tracks, function(g) return g.inf end, info.upper.extR, info.upper.rFactor),
+                sup = inferExt(result.upper.tracks, function(g) return g.sup end, info.upper.extR, info.upper.rFactor)
             },
             walls = {
-                inf = inferExt(result.upper.walls, function(g) return g.inf end, info.upper.extR),
-                sup = inferExt(result.upper.walls, function(g) return g.sup end, info.upper.extR)
+                inf = inferExt(result.upper.walls, function(g) return g.inf end, info.upper.extR, info.upper.rFactor),
+                sup = inferExt(result.upper.walls, function(g) return g.sup end, info.upper.extR, info.upper.rFactor)
             }
         }
     }
@@ -559,7 +560,7 @@ local function params(paramFilter)
             },
             {
                 key = "trRadiusA",
-                name = _("Radius").."(m)",
+                name = _("Radius") .. "(m)",
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = 0
             },
@@ -601,7 +602,7 @@ local function params(paramFilter)
             },
             {
                 key = "trRadiusB",
-                name = _("Radius").."(m)",
+                name = _("Radius") .. "(m)",
                 values = pipe.from("∞") + func.map(func.range(rList, 2, #rList), function(r) return tostring(floor(r * 1000 + 0.5)) end),
                 defaultIndex = 0
             },
@@ -705,8 +706,8 @@ local updateFn = function(fParams, models)
                 A = {
                     lower = {
                         nbTracks = params.nbLowerTracks + 1,
-                        r = retriveR(params.rLower) * params.fRLowerA * (params.sLower == 1 and 1 or -1),
-                        rFactor = params.fRLowerA * (params.sLower == 1 and 1 or -1),
+                        r = retriveR(params.rLower) * params.fRLowerA * (params.sLower == 1 and 1 or -1) * (params.type == 3 and -1 or 1),
+                        rFactor = params.fRLowerA * (params.sLower == 1 and 1 or -1) * (params.type == 3 and -1 or 1),
                         rad = 0,
                         used = func.contains({0, 1}, params.transitionA),
                         isBridge = false,
@@ -721,14 +722,14 @@ local updateFn = function(fParams, models)
                         used = func.contains({0, 2}, params.transitionA),
                         isBridge = params.typeSlopeA == 0 or not func.contains({0, 2}, params.transitionA),
                         isTerra = params.typeSlopeA == 1 and func.contains({0, 2}, params.transitionA) and params.type ~= 2,
-                        extR = -(params.trSRadiusA == 0 and 1 or -1) * retriveR(params.trRadiusA)
+                        extR = (params.trSRadiusA == 0 and 1 or -1) * retriveR(params.trRadiusA)
                     }
                 },
                 B = {
                     lower = {
                         nbTracks = params.nbLowerTracks + 1,
-                        r = retriveR(params.rLower) * params.fRLowerB * (params.sLower == 1 and 1 or -1),
-                        rFactor = params.fRLowerB * (params.sLower == 1 and 1 or -1),
+                        r = retriveR(params.rLower) * params.fRLowerB * (params.sLower == 1 and 1 or -1) * (params.type == 3 and -1 or 1),
+                        rFactor = params.fRLowerB * (params.sLower == 1 and 1 or -1) * (params.type == 3 and -1 or 1),
                         rad = 0,
                         used = func.contains({0, 1}, params.transitionB),
                         isBridge = false,
@@ -743,7 +744,7 @@ local updateFn = function(fParams, models)
                         used = func.contains({0, 2}, params.transitionB),
                         isBridge = params.typeSlopeB == 0 or not func.contains({0, 2}, params.transitionB),
                         isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type ~= 2,
-                        extR = -(params.trSRadiusB == 0 and 1 or -1) * retriveR(params.trRadiusB)
+                        extR = (params.trSRadiusB == 0 and 1 or -1) * retriveR(params.trRadiusB)
                     }
                 }
             }
@@ -760,7 +761,6 @@ local updateFn = function(fParams, models)
             
             local ext, preparedExt = (function()
                 local extEndList = {A = "inf", B = "sup"}
-                local radFactorList = {A = 1, B = -1}
                 local extConfig = {
                     straight = function(equalLength)
                         return function(part, level, type)
@@ -768,12 +768,11 @@ local updateFn = function(fParams, models)
                                 group = group[part].ext[level][type][extEndList[part]],
                                 models = models,
                                 radFn = function(g) return g.rad end,
-                                rFn = function(g) return info[part][level].rFactor * g.guideline.r end,
+                                rFn = function(g) return g.r end,
                                 guidelineFn = function(g) return g.guideline end,
                                 part = part,
                                 level = level,
                                 equalLength = equalLength or false,
-                                radFactor = (info[part][level].extR > 0 and 1 or -1) * radFactorList[part]
                             } end
                     end,
                     curve = function(equalLength)
@@ -786,7 +785,6 @@ local updateFn = function(fParams, models)
                             part = part,
                             level = level,
                             equalLength = equalLength or false,
-                            radFactor = radFactorList[part],
                         } end
                     end
                 }
@@ -848,7 +846,7 @@ local updateFn = function(fParams, models)
             }
             
             local function selectEdge(level)
-                return station.fusionEdges(pipe.new
+                return (pipe.new
                     + (
                     info.A[level].used
                     and {
@@ -865,11 +863,13 @@ local updateFn = function(fParams, models)
                         ext.edges[level].B.sup
                     }
                     or {trackEdges[level].sup}
-                )),
-                pipe.new
-                + (info.A[level].used and (info.A[level].isBridge and {true, true} or {false, false}) or {true})
-                + {false}
-                + (info.B[level].used and (info.B[level].isBridge and {true, true} or {false, false}) or {true})
+                    ))
+                    * station.fusionEdges
+                    ,
+                    pipe.new
+                    + (info.A[level].used and (info.A[level].isBridge and {true, true} or {false, false}) or {true})
+                    + {false}
+                    + (info.B[level].used and (info.B[level].isBridge and {true, true} or {false, false}) or {true})
             end
             
             local lowerEdges, _ = selectEdge("lower")

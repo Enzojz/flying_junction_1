@@ -11,13 +11,15 @@ function data()
             yearFrom = 1870
         },
         order = 27221,
-        params = jMain.params({"curvedLevel"}),
+        params = jMain.params({"curvedLevel", "trRadiusA", "trSRadiusA"}),
         
         updateFn = jMain.updateFn(function(params)
             params.fRLowerA = -1
             params.fRLowerB = -1
             params.fRUpperA = 1
             params.fRUpperB = 1
+            params.trRadiusA = 0
+            params.trSRadiusA = 0
             params.type = 3
         end
         ,

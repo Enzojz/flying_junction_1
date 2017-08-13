@@ -12,7 +12,7 @@ function data()
             yearTo = 1800
         },
         order = 27219,
-        params = jMain.params({"curvedLevel", "transitionA", "transitionB", "trSlopeA", "trSlopeB", "typeSlopeA", "typeSlopeB", "heightTunnel"}),
+        params = jMain.params({"curvedLevel", "transitionA", "transitionB", "trSlopeA", "trSlopeB", "typeSlopeA", "typeSlopeB", "heightTunnel", "trRadiusA", "trRadiusB", "trSRadiusA", "trSRadiusB"}),
         
         updateFn = jMain.updateFn(function(params)
             params.fRLowerA = -1
@@ -25,6 +25,10 @@ function data()
             params.trSlopeB = 0
             params.typeSlopeA = 0
             params.typeSlopeB = 0
+            params.trRadiusA = 0
+            params.trSRadiusA = 0
+            params.trRadiusB = 0
+            params.trSRadiusB = 0
             params.type = 1
             params.heightTunnel = 0
         end,

@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.9
+* Added option to have curves on transitions
 1.8
 * Added option to adjust transition length
 * Improved slope option
@@ -27,11 +29,11 @@ Changelog:
 * Reworked materials
 * Backward compatibility
 1.5
-* Totally rewritten with curves options.
+* Totally rewritten with curves options
 1.2
-* Fixed issue with change of original in-game bridges in saved games.
+* Fixed issue with change of original in-game bridges in saved games
 1.1
-* Changed altitude options for a more accurate adjustment, and avoid brdige failure by default 
+* Changed altitude options for a more accurate adjustment, and avoid brdige failure by default
 
 --------------- 
 * Planned projects 
@@ -56,6 +58,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.9
+* Ajoute des options pour avoir transitions en courbes
 1.8
 * Ajoute des options pour modifier le longueur des transitions
 * Amélioration d'option de pente
@@ -69,7 +73,7 @@ Changelog:
 * Matériels refaites
 * Compatibilité arrière
 1.5
-* Refactorisation totalle avec options des courbes.
+* Refactorisation totalle avec options des courbes
 1.2
 * Correction de problem avec gamesaves existants.]]
 
@@ -90,6 +94,8 @@ local descCN = [[欧式水泥疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.9
+* 增加了过渡区段的曲线选项
 1.8
 * 增加了过渡区段长度的选项
 * 改进了坡度选项
@@ -105,7 +111,7 @@ Changelog:
 1.5
 * 完全重写，并且增加了曲线选项
 1.2
-* 修正了和既有存档的冲突.]]
+* 修正了和既有存档的冲突]]
 
 function data()
     return {
@@ -127,6 +133,7 @@ function data()
             ["Upper tracks length"] = "Longueur du niveau haut",
             ["Form"] = "Forme",
             ["Axis"] = "Axe",
+            ["Radius"] = "Rayon",
             ["Slope"] = "Pente",
             ["Mirrored"] = "En miroir",
             ["General Slope"] = "Pente générale",
@@ -168,6 +175,7 @@ function data()
             ["Upper tracks length"] = "上层轨道长度",
             ["Form"] = "形式",
             ["Axis"] = "倾斜轴",
+            ["Radius"] = "半径",
             ["Slope"] = "坡度",
             ["Crossing angles"] = "交汇角",
             ["Tracks per group"] = "每组轨道数量",

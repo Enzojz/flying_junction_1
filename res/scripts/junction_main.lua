@@ -472,7 +472,7 @@ local function mergePoly(...)
 end
 
 local function params(paramFilter)
-    local sp = "·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·\n\n"
+    local sp = "·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·\n"
     return pipe.new *
         {
             paramsutil.makeTrackTypeParam(),
@@ -542,7 +542,7 @@ local function params(paramFilter)
             },
             {
                 key = "transitionA",
-                name = sp .. _("Transition A"),
+                name = sp .. "\n" .. _("Transition A"),
                 values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
@@ -584,7 +584,7 @@ local function params(paramFilter)
             },
             {
                 key = "transitionB",
-                name = sp .. _("Transition B"),
+                name = sp .. "\n" .. _("Transition B"),
                 values = {_("Both"), _("Lower"), _("Upper"), _("None")},
                 defaultIndex = 0
             },
@@ -626,7 +626,7 @@ local function params(paramFilter)
             },
             {
                 key = "isMir",
-                name = sp .. _("Mirrored"),
+                name = sp .. "\n" .. _("Mirrored"),
                 values = {_("No"), _("Yes")},
                 defaultIndex = 0
             },
@@ -645,12 +645,12 @@ local function params(paramFilter)
             {
                 key = "slopeLevel",
                 name = _("Axis"),
-                values = {_("Lower"), _("Upper")},
+                values = {_("Lower"), _("Upper"), _("Common")},
                 defaultIndex = 0
             },
             {
                 key = "heightTunnel",
-                name = sp .. _("Tunnel Height") .. " (m)",
+                name = sp .. "\n" .. _("Tunnel Height") .. " (m)",
                 values = func.map(tunnelHeightList, tostring),
                 defaultIndex = #tunnelHeightList - 2
             },
@@ -1080,9 +1080,9 @@ local updateFn = function(fParams, models)
             -- Slope, Height, Mirror treatment
             return pipe.new
                 * result
-                * station.setRotation(params.slopeLevel * rad)
+                * station.setRotation(({0, 1, 0.5})[params.slopeLevel + 1] * rad)
                 * station.setSlope((params.slopeSign == 0 and 1 or -1) * (slopeList[params.slope + 1]))
-                * station.setRotation(-params.slopeLevel * rad)
+                * station.setRotation(({0, -1, -0.5})[params.slopeLevel + 1] * rad)
                 * station.setHeight(extraZ)
                 * station.setMirror(params.isMir == 1)
     end

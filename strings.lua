@@ -16,6 +16,7 @@ Implemented functions:
 Changelog:
 1.9
 * Added option to have curves on transitions
+* Added common axis for general slope
 1.8
 * Added option to adjust transition length
 * Improved slope option
@@ -148,6 +149,7 @@ function data()
             ["Upper"] = "Haut",
             ["None"] = "Aucun",
             ["All"] = "Toutes",
+            ["Common"] = "Commune",
             ["Bifurcation Flying Junction in concrete"] = "Saut de mouton de bifurcation en concrete",
             ["Crossing Flying Junction in concrete"] = "Saut de mouton de croisement en concrete",
             ["Exchange Flying Junction in concrete"] = "Saut de mouton d'échange en concrete",
@@ -191,6 +193,7 @@ function data()
             ["Upper"] = "上层",
             ["None"] = "无",
             ["All"] = "所有",
+            ["Common"] = "共轴",
             
             ["Bifurcation Flying Junction in concrete"] = "水泥制联络疏解",
             ["Crossing Flying Junction in concrete"] = "水泥制交叉疏解",

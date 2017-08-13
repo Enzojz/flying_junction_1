@@ -61,6 +61,7 @@ Caractéristiques:
 Changelog:
 1.9
 * Ajoute des options pour avoir transitions en courbes
+* Ajoute d'une axe commue pour la pente générale
 1.8
 * Ajoute des options pour modifier le longueur des transitions
 * Amélioration d'option de pente
@@ -97,6 +98,7 @@ local descCN = [[欧式水泥疏解桥.
 Changelog:
 1.9
 * 增加了过渡区段的曲线选项
+* 增加了一个新的整体坡度倾斜轴选项
 1.8
 * 增加了过渡区段长度的选项
 * 改进了坡度选项

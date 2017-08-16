@@ -9,17 +9,21 @@ local pi = math.pi
 local abs = math.abs
 
 junction.infi = 1e8
-junction.buildCoors = function(numTracks, groupSize)
+junction.buildCoors = function(numTracks, groupSize, config)
+    config = config or {
+        trackWidth = station.trackWidth,
+        wallWidth = 0.5
+    }
     local function builder(xOffsets, uOffsets, baseX, nbTracks)
         local function caller(n)
             return builder(
-                xOffsets + func.seqMap({1, n}, function(n) return baseX - 0.5 * station.trackWidth + n * station.trackWidth end),
-                uOffsets + {baseX + n * station.trackWidth + 0.25},
-                baseX + n * station.trackWidth + 0.5,
+                xOffsets + func.seqMap({1, n}, function(n) return baseX - 0.5 * config.trackWidth + n * config.trackWidth end),
+                uOffsets + {baseX + n * config.trackWidth + 0.5 * config.wallWidth},
+                baseX + n * config.trackWidth + config.wallWidth,
                 nbTracks - n)
         end
         if (nbTracks == 0) then
-            local offset = function(o) return o - baseX * 0.5 end
+            local offset = function(o) return o - baseX * config.wallWidth end
             return
                 {
                     tracks = xOffsets * pipe.map(offset),
@@ -31,7 +35,7 @@ junction.buildCoors = function(numTracks, groupSize)
             return caller(groupSize)
         end
     end
-    return builder(pipe.new, pipe.new * {0.25}, 0.5, numTracks)
+    return builder(pipe.new, pipe.new * {0.5 * config.wallWidth}, config.wallWidth, numTracks)
 end
 
 junction.normalizeRad = function(rad)

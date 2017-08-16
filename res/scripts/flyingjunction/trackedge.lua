@@ -30,12 +30,12 @@ trackEdge.bridge = function(c, t, typeName)
     end
 end
 
-trackEdge.tunnel = function(c, t)
+trackEdge.tunnel = function(c, t, typeName)
     return function(p)
         return func.with(p, {
             type = "TRACK",
             edgeType = "TUNNEL",
-            edgeTypeName = "railroad_old.lua",
+            edgeTypeName = typeName,
             params = {
                 type = t,
                 catenary = c,
@@ -44,7 +44,8 @@ trackEdge.tunnel = function(c, t)
     end
 end
 
-trackEdge.builder = function(c, t)
+trackEdge.builder = function(c, t, isStreet)
+    local targetType = isStreet
     return {
         normal = func.bind(trackEdge.normal, c, t, true),
         nonAligned = func.bind(trackEdge.normal, c, t, false),

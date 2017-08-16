@@ -172,6 +172,12 @@ function pipe.plus(n)
     end
 end
 
+function pipe.mul(n)
+    return function(e)
+        return e * n
+    end
+end
+
 function pipe.neg()
     return function(e)
         return -e

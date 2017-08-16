@@ -31,17 +31,18 @@ local projectPolys = function(mDepth)
 end
 
 local mPlaceSlopeWall = function(sw, arc, upperHeight)
+    local heightVar = upperHeight * (arc.t - arc.f)
+    local heightBase = upperHeight * (1 - arc.t)
     return function(guideline, rad1, rad2)
         local rad = rad2 and (rad1 + rad2) * 0.5 or rad1
-        local t = upperHeight / (arc[sw.from] - arc[sw.to]) / guideline.r
-        local h = upperHeight * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to])
+        local t = heightVar / (arc[sw.from] - arc[sw.to]) / guideline.r
+        local h = heightVar * (rad - arc[sw.to]) / (arc[sw.from] - arc[sw.to]) + heightBase
         local pt = guideline:pt(rad)
         return coor.shearZoY(t) * coor.rotZ(rad) * coor.trans(func.with(pt, {z = h - 11}))
     end
 end
-
 local function detectSlopeIntersection(lower, upper, fz, currentRad, s)
-    local step = 1 / lower.r
+    local step = 0.25 / lower.r
     local ptL = lower:pt(currentRad)
     local ptRad = junction.normalizeRad(upper:rad(ptL))
     local ptR = upper:pt(ptRad)
@@ -196,7 +197,7 @@ local function retriveX(fn, prepared)
     }
 end
 
-local function part(info, offsets)
+local function trackGroup(info, offsets)
     info.lower.r, info.upper.r = minimalR(offsets, info)
     
     local sort = pipe.sort(function(l, r) return l:pt(l:rad(coor.xy(0, 0))).x < r:pt(l:rad(coor.xy(0, 0))).x end)
@@ -419,6 +420,8 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
             + func.map(fences, function(f) return f[2] end)
             + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
             + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
+            + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[2] end)
+            + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
             ,
             upper = pipe.new
             + makeSideFence(sideFencesR[#sideFencesR])[2]
@@ -755,8 +758,8 @@ local updateFn = function(fParams, models)
             }
             
             local group = {
-                A = part(info.A, offsets),
-                B = part(info.B, offsets)
+                A = trackGroup(info.A, offsets),
+                B = trackGroup(info.B, offsets)
             }
             
             local ext, preparedExt = (function()
@@ -824,7 +827,7 @@ local updateFn = function(fParams, models)
                 
                 return {
                     edges = retriveX(jA.retriveTracks, preparedExt.tracks),
-                    polys = retriveX(jA.retrivePolys, preparedExt.tracks),
+                    polys = retriveX(jA.retrivePolys(), preparedExt.tracks),
                     surface = retriveX(jA.retriveTrackSurfaces, preparedExt.tracks),
                     walls = retriveX(jA.retriveWalls, preparedExt.walls)
                 }, preparedExt
@@ -896,62 +899,74 @@ local updateFn = function(fParams, models)
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mDepth, models)[2]
             }
             
-            local slopeWalls = pipe.new
-                / (info.A.upper.isTerra
-                and {
-                    {
-                        lower = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[2],
-                        another = preparedExt.walls.lower.A[#preparedExt.walls.lower.A].guidelines[1],
-                        upper = preparedExt.walls.upper.A[1].guidelines[1],
-                        fz = preparedExt.walls.upper.A[1].fn.fz,
-                        from = "sup", to = "inf"
-                    },
-                    {
-                        lower = preparedExt.walls.lower.A[1].guidelines[2],
-                        another = preparedExt.walls.lower.A[1].guidelines[1],
+            local slopeWallModels = pipe.new
+                / func.map2(info.A.upper.isTerra and preparedExt.walls.lower.A or {}, group.A.lower.walls,
+                function(w, cw)
+                    return {
+                        guidelines = func.filter({
+                            cw:withLimits({sup = cw.inf, inf = group.A.lower.walls[#group.A.lower.walls].inf}),
+                            w.guidelines[2],
+                            w.guidelines[1]
+                        }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
+                        lower = w.guidelines[2],
+                        another = w.guidelines[1],
                         upper = preparedExt.walls.upper.A[1].guidelines[1],
                         fz = preparedExt.walls.upper.A[1].fn.fz,
                         from = "sup", to = "inf"
                     }
-                } or {})
-                / (info.B.upper.isTerra
-                and {
-                    {
-                        lower = preparedExt.walls.lower.B[1].guidelines[1],
-                        another = preparedExt.walls.lower.B[1].guidelines[2],
+                end)
+                / func.map2(info.B.upper.isTerra and preparedExt.walls.lower.B or {}, group.B.lower.walls,
+                function(w, cw)
+                    return {
+                        guidelines = func.filter({
+                            cw:withLimits({inf = cw.sup, sup = group.B.lower.walls[1].sup}),
+                            w.guidelines[1],
+                            w.guidelines[2]
+                        }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
+                        lower = w.guidelines[1],
+                        another = w.guidelines[2],
                         upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
                         fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
                         from = "inf", to = "sup"
-                    },
-                    {
-                        lower = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[1],
-                        another = preparedExt.walls.lower.B[#preparedExt.walls.lower.B].guidelines[2],
-                        upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
-                        fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
-                        from = "inf", to = "sup"
-                    },
-                } or {}
-            )
-            local slopeWallModels = slopeWalls
+                    }
+                end)
+                * pipe.map(function(ws) return {ws[1], ws[#ws]} end)
                 * pipe.flatten()
                 * pipe.mapFlatten(function(sw)
-                    local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
-                    local arc = sw.lower:withLimits({
-                        [sw.from] = sw.lower[sw.from],
-                        [sw.to] = loc,
-                        mid = (sw.lower[sw.from] + loc) * 0.5
-                    })
-                    local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight * heightFactor)
+                    local arcs = pipe.new
+                    * sw.guidelines
+                    * pipe.map(function(g)
+                        local loc = detectSlopeIntersection(g, sw.upper, sw.fz, g[sw.from], g[sw.to] - g[sw.from])
+                        local floc = abs(loc - g[sw.from]) < abs(g[sw.from] - g[sw.to]) and loc or g[sw.to]
+                        return g:withLimits({
+                            [sw.from] = g[sw.from],
+                            [sw.to] = floc,
+                            mid = (g[sw.from] + floc) * 0.5
+                            })
+                    end
+                    )
+                    * pipe.filter(function(ar) return abs(ar.inf - ar.sup) * ar.r > 0.01 end)
                     
-                    return {
-                        junction.makeFn(models.mSidePillar, mPlace, coor.scaleY(1.05))(arc),
-                        junction.makeFn(models.mRoofFenceS, mPlace, coor.scaleY(1.05))(arc)
-                    }
+                    local function retriveRef(result, arc, ...)
+                        return arc
+                        and retriveRef(result / (result[#result] + abs(arc.inf - arc.sup) * arc.r), ...)
+                        or result
+                    end
+
+                    return retriveRef(pipe.new * {0}, table.unpack(arcs))
+                        * function(ls) return ls * pipe.map(pipe.mul(1 / ls[#ls])) end
+                        * function(ls) return func.zip(ls * pipe.range(1, #ls - 1), ls * pipe.range(2, #ls), {"f", "t"}) end
+                        * pipe.map2(arcs, function(r, ar) return func.with(ar, r) end)
+                        * pipe.mapFlatten(function(arc)
+                            local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight * heightFactor)
+                            return {
+                                junction.makeFn(models.mSidePillar, mPlace, coor.scaleY(1.05))(arc),
+                                junction.makeFn(models.mRoofFenceS, mPlace, coor.scaleY(1.05))(arc)
+                            }
+                        end)
                 end)
                 * pipe.flatten()
                 * pipe.flatten()
-            
-            
             
             local function withIf(level, part)
                 return function(c)
@@ -982,19 +997,36 @@ local updateFn = function(fParams, models)
             )
             end
             
-            local slopeWallArcs = slopeWalls
+            local slopeWallArcs = pipe.new
+                / func.map(info.A.upper.isTerra and preparedExt.tracks.lower.A or {},
+                function(w)
+                    return {
+                        lower = w.guidelines[2]:withLimits({inf = w.guidelines[1]:extendLimits(4).inf}),
+                        upper = preparedExt.walls.upper.A[1].guidelines[1],
+                        fz = preparedExt.walls.upper.A[1].fn.fz,
+                        from = "sup", to = "inf"
+                    }
+                end)
+                / func.map(info.B.upper.isTerra and preparedExt.tracks.lower.B or {},
+                function(w)
+                    return {
+                        lower = w.guidelines[1]:withLimits({sup = w.guidelines[2]:extendLimits(4).sup}),
+                        another = w.guidelines[2],
+                        upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                        fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                        from = "inf", to = "sup"
+                    }
+                end)
                 * pipe.map(pipe.map(function(sw)
                     local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
                     return sw.lower:withLimits({
-                            [sw.from] = loc,
-                            [sw.to] = sw.another:extendLimits(4)[sw.to],
-                            mid = loc
-                        })
-                     end
+                        [sw.from] = loc,
+                        [sw.to] = sw[sw.to],
+                    })
+                end
                 ))
                 * pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end))
                 * function(ls) return {A = func.flatten(ls[1]), B = func.flatten(ls[2])} end
-            
             
             local lPolys = function(part)
                 local i = info[part].lower
@@ -1023,7 +1055,7 @@ local updateFn = function(fParams, models)
             
             local lXPolys = {
                 less = projectPolys(coor.I())(info.A.upper.isTerra and {} or lowerPolys.A, info.B.upper.isTerra and {} or lowerPolys.B),
-                slot = projectPolys(mDepth * coor.transZ(-0.1))(lowerPolys.A, lowerPolys.B),
+                slot = projectPolys(mDepth * coor.transZ(-0.2))(lowerPolys.A, lowerPolys.B),
                 greater = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
             }
             local result = {
@@ -1090,4 +1122,11 @@ return {
     rList = rList,
     projectPolys = projectPolys,
     mergePoly = mergePoly,
+    generateTrackGroups = generateTrackGroups,
+    detectSlopeIntersection = detectSlopeIntersection,
+    mPlaceSlopeWall = mPlaceSlopeWall,
+    generateStructure = generateStructure,
+    retriveX = retriveX,
+    retriveExt = retriveExt,
+    trackGroup = trackGroup
 }

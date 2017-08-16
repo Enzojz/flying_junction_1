@@ -77,10 +77,10 @@ local function gmPlaceA(fz, r)
     end
 end
 
-local function generateSlope(slope, height)
+local function generateSlope(slope, height, rTrans)
+    rTrans = rTrans or 300
     local sFactor = slope > 0 and 1 or -1
     local rad = atan(slope)
-    local rTrans = 300
     local trans = {
         r = rTrans,
         dz = sFactor * rTrans * (1 - cos(rad)),
@@ -96,13 +96,13 @@ local function generateSlope(slope, height)
     }
 end
 
-local function solveSlope(refSlope, height)
+local function solveSlope(refSlope, height, rTrans)
     local function solver(slope)
-        local x = generateSlope(slope, height)
+        local x = generateSlope(slope, height, rTrans)
         return abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
     end
     
-    return height == 0 and func.with(generateSlope(-refSlope.slope, height), {length = refSlope.length}) or solver(-refSlope.slope)
+    return height == 0 and func.with(generateSlope(-refSlope.slope, height, rTrans), {length = refSlope.length}) or solver(-refSlope.slope)
 end
 
 local slopeProfile = function(slope)

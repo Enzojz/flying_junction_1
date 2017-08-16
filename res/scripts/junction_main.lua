@@ -124,7 +124,10 @@ end
 local retriveExt = function(protos)
     local radFactorList = {A = 1, B = -1}
     local extHeightList = {upper = protos.info.tunnelHeight + protos.info.height, lower = protos.info.height}
-    local extSlopeList = {upper = 1, lower = -1, A = protos.info.slopeA, B = protos.info.slopeB}
+    local extSlopeList = {upper = 1, lower = -1}
+    local extSlope = protos.info.slope
+    local extSlopeFactor = protos.info.slopeFactor or {upper = 1, lower = 1}
+    local vRadius = protos.info.vRadius or {upper = 300, lower = 300}
     
     local prepareArc = function(proto, slope)
         return function(g)
@@ -153,8 +156,8 @@ local retriveExt = function(protos)
         }
         
         local oppositeSlope = {
-            lower = extSlopeList["upper"] * extSlopeList[proto.part],
-            upper = extSlopeList["lower"] * extSlopeList[proto.part],
+            lower = extSlopeList["upper"] * extSlope[proto.part] * extSlopeFactor[proto.level],
+            upper = extSlopeList["lower"] * extSlope[proto.part] * extSlopeFactor[proto.level],
         }
         
         local opposite = {
@@ -165,8 +168,8 @@ local retriveExt = function(protos)
         local height = extHeightList[proto.level]
         
         local slope = (abs(height) < abs(opposite.height) and proto.equalLength)
-            and jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height)
-            or jA.generateSlope(extSlopeList[proto.level] * extSlopeList[proto.part], height)
+            and jA.solveSlope(jA.generateSlope(opposite.slope, opposite.height), height, vRadius[proto.level])
+            or jA.generateSlope(extSlopeList[proto.level] * extSlope[proto.part] * extSlopeFactor[proto.level], height, vRadius[proto.level])
         
         return pipe.new
             * proto.group
@@ -881,8 +884,10 @@ local updateFn = function(fParams, models)
                     info = {
                         height = depth,
                         tunnelHeight = tunnelHeight,
-                        slopeA = trSlopeList[params.trSlopeA + 1] * 0.001,
-                        slopeB = trSlopeList[params.trSlopeB + 1] * 0.001,
+                        slope = {
+                            A = trSlopeList[params.trSlopeA + 1] * 0.001,
+                            B = trSlopeList[params.trSlopeB + 1] * 0.001
+                        },
                         frac = {
                             lower = {
                                 A = lengthPercentList[params.trLengthLowerA + 1],

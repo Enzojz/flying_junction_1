@@ -68,15 +68,17 @@ end
 
 
 junction.fArcs = function(offsets, rad, r)
-    return func.map(offsets, function(x)
-        local newArc = arc.byOR(
-            coor.xyz(r, 0, 0) .. coor.rotZ(rad),
-            abs(r) - x
-        )
-        newArc.xOffset = x
-        return newArc
-    end
-)
+    return pipe.new
+        * offsets
+        * function(o) return r > 0 and o or o * pipe.map(pipe.neg()) * pipe.rev() end
+        * pipe.map(function(x) return
+            func.with(
+                arc.byOR(
+                    coor.xyz(r, 0, 0) .. coor.rotZ(rad),
+                    abs(r) - x
+                ), {xOffset = r > 0 and x or -x})
+        end)
+        * function(a) return r > 0 and a or a * pipe.rev() end
 end
 
 junction.makeFn = function(model, mPlace, m)

@@ -22,14 +22,18 @@ local retriveGeometry = function(config, slope)
     local radRef = junction.normalizeRad(config.initRad)
     local extRad = config.radFactor * 5 / config.r
     
-    local radList = pipe.new 
+    local radList = pipe.new
         * {0, radT, rad * 0.5, rad - radT, rad}
         * pipe.filter(function(r) return abs(r) < abs(radF) end)
-        * function(rawList)
-            local nbMissing = 5 - #rawList
-            local distance = radF - rawList[#rawList]
-            local avg = distance / nbMissing
-            return rawList + func.seqMap({1, nbMissing}, function(n) return n * avg + rawList[#rawList] end)
+        * function(rawList) return pipe.new
+            * {
+                function() return {0, 0.25 * radF, 0.5 * radF, 0.75 * radF, radF} end,
+                function() return {0, 0.5 * radT, radT, 0.5 * (radT + radF), radF} end,
+                function() return {0, radT, rad * 0.25, rad * 0.5, radF} end,
+                function() return {0, radT, rad * 0.5, rad - radT, radF} end,
+                function() return {0, radT, rad * 0.5, rad - radT, rad} end,
+            }
+            * function(case) return case[#rawList]() end
         end
         * function(ls) return pipe.new + {-extRad} + ls + {ls[#ls] + extRad} end
         * (config.radFactor < 0 and pipe.noop() or pipe.rev())
@@ -82,13 +86,11 @@ local function generateSlope(slope, height)
         dz = sFactor * rTrans * (1 - cos(rad)),
         length = height == 0 and 10 or sFactor * rTrans * sin(rad)
     }
-    local minLength = trans.length * 2 + 10
     return {
         slope = slope,
         rad = rad,
         factor = sFactor,
-        length = (function(l) return l < minLength and minLength or l end)(abs(height == 0 and 40 or (height - 2 * trans.dz) / slope + 2 * trans.length)),
-        minLength = minLength,
+        length = abs(height == 0 and 40 or (height - 2 * trans.dz) / slope + 2 * trans.length),
         trans = trans,
         height = height
     }

@@ -214,7 +214,6 @@ local function trackGroup(info, offsets)
         }
     }
     
-    
     local wallExt = {
         lower = {L = gRef.lower.walls[1], R = gRef.lower.walls[#gRef.lower.walls]},
         upper = {L = gRef.upper.walls[1], R = gRef.upper.walls[#gRef.upper.walls]}
@@ -288,8 +287,8 @@ local function trackGroup(info, offsets)
         return pipe.new * func.map(guidelines,
             function(g)
                 local p = g:pt(fnRad(g))
-                local guideline = arc.byOR(p + (g.o - p):normalized() * (rFactor * r - g.xOffset), r - g.xOffset)
-                
+                local offset = r > 0 and g.xOffset or -g.xOffset
+                local guideline = arc.byOR(p + (g.o - p):normalized() * (rFactor * (r - offset)), r - offset)
                 return {
                     guideline = guideline,
                     rad = guideline:rad(p),
@@ -342,7 +341,7 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     local makeExtWall = junction.makeFn(models.mSidePillar, mPlaceD, coor.scaleY(1.05))
     local makeExtWallFence = junction.makeFn(models.mRoofFenceS, mPlaceD, coor.scaleY(1.05))
     local makeWall = junction.makeFn(models.mSidePillar, mPlace, coor.scaleY(1.05))
-    local makeRoof = junction.makeFn(models.mRoof, mPlace, coor.scaleY(1.05) * coor.transZ(0.1))
+    local makeRoof = junction.makeFn(models.mRoof, mPlace, coor.scaleY(1.05) * coor.transZ(0.05))
     local makeSideFence = junction.makeFn(models.mRoofFenceS, mPlace)
     
     
@@ -767,8 +766,8 @@ local updateFn = function(fParams, models)
             local rad = math.rad(deg)
             
             local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
-            local catenaryLower = func.contains({1, 2}, params.catenary)-- and catenary
-            local catenaryUpper = func.contains({1, 3}, params.catenary)-- and catenary
+            local catenaryLower = func.contains({1, 2}, params.catenary)
+            local catenaryUpper = func.contains({1, 3}, params.catenary)
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
             local tunnelHeight = tunnelHeightList[params.heightTunnel + 1]
             local heightFactor = heightList[params.height + 1]

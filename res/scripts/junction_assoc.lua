@@ -8,14 +8,30 @@ local junction = require "junction"
 
 local wallHeight = 11
 
+local abs = math.abs
+local atan = math.atan
+local cos = math.cos
+local sin = math.sin
+local tan = math.tan
+local pi = math.pi
+
 local retriveGeometry = function(config, slope)
     local rad = config.radFactor * slope.length / config.r
-    local radF = rad * config.frac
+    local radF = rad * (config.frac < 1 and config.frac or 1)
     local radT = slope.trans.length / slope.length * rad
     local radRef = junction.normalizeRad(config.initRad)
     local extRad = config.radFactor * 5 / config.r
-    local radList = pipe.new
-        * {-extRad, 0, radT, radF * 0.5, radF - radT, radF, radF + extRad}
+    
+    local radList = pipe.new 
+        * {0, radT, rad * 0.5, rad - radT, rad}
+        * pipe.filter(function(r) return abs(r) < abs(radF) end)
+        * function(rawList)
+            local nbMissing = 5 - #rawList
+            local distance = radF - rawList[#rawList]
+            local avg = distance / nbMissing
+            return rawList + func.seqMap({1, nbMissing}, function(n) return n * avg + rawList[#rawList] end)
+        end
+        * function(ls) return pipe.new + {-extRad} + ls + {ls[#ls] + extRad} end
         * (config.radFactor < 0 and pipe.noop() or pipe.rev())
         * pipe.map(pipe.plus(radRef))
     
@@ -31,7 +47,7 @@ local retriveGeometry = function(config, slope)
     
     local retrivefZ = function(profile)
         local fz = function(rx)
-            local x = slope.length * math.abs((rx - radRef) / rad)
+            local x = slope.length * abs((rx - radRef) / rad)
             local pf = func.filter(profile, function(s) return s.pred(x) end)[1]
             return pf.pt(x), pf
         end
@@ -53,24 +69,26 @@ local function gmPlaceA(fz, r)
     return function(guideline, rad1, rad2)
         local radc = (rad1 + rad2) * 0.5
         local p1, p2 = fz(rad1), fz(rad2)
-        return coor.shearZoY((r > 0 and -1 or 1) * (p2.y - p1.y) / math.abs(p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+        return coor.shearZoY((r > 0 and -1 or 1) * (p2.y - p1.y) / abs(p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
     end
 end
 
 local function generateSlope(slope, height)
     local sFactor = slope > 0 and 1 or -1
-    local rad = math.atan(slope)
+    local rad = atan(slope)
     local rTrans = 300
     local trans = {
         r = rTrans,
-        dz = sFactor * rTrans * (1 - math.cos(rad)),
-        length = height == 0 and 10 or sFactor * rTrans * math.sin(rad)
+        dz = sFactor * rTrans * (1 - cos(rad)),
+        length = height == 0 and 10 or sFactor * rTrans * sin(rad)
     }
+    local minLength = trans.length * 2 + 10
     return {
         slope = slope,
         rad = rad,
         factor = sFactor,
-        length = math.abs(height == 0 and 40 or (height - 2 * trans.dz) / slope + 2 * trans.length),
+        length = (function(l) return l < minLength and minLength or l end)(abs(height == 0 and 40 or (height - 2 * trans.dz) / slope + 2 * trans.length)),
+        minLength = minLength,
         trans = trans,
         height = height
     }
@@ -79,7 +97,7 @@ end
 local function solveSlope(refSlope, height)
     local function solver(slope)
         local x = generateSlope(slope, height)
-        return math.abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
+        return abs(x.length - refSlope.length) < 0.25 and x or solver(slope * x.length / refSlope.length)
     end
     
     return height == 0 and func.with(generateSlope(-refSlope.slope, height), {length = refSlope.length}) or solver(-refSlope.slope)
@@ -96,7 +114,7 @@ local slopeProfile = function(slope)
         }
     end
     local normalProfile = function()
-        local ref1 = slope.factor * math.pi * 0.5
+        local ref1 = slope.factor * pi * 0.5
         local ref2 = -ref1
         local arc1 = arc.byOR(coor.xy(0, -slope.factor * slope.trans.r + (slope.height)), slope.trans.r)
         local arc2 = arc.byOR(coor.xy(slope.length, slope.factor * slope.trans.r), slope.trans.r)
@@ -112,7 +130,7 @@ local slopeProfile = function(slope)
             },
             {
                 pred = function(x) return x > 0 and x < pTr1.x end,
-                slope = function(pt) return math.tan(arc1:rad(pt) - math.pi * 0.5) end,
+                slope = function(pt) return tan(arc1:rad(pt) - pi * 0.5) end,
                 pt = intersection(arc1, slope.height > 0 and func.max or func.min)
             },
             {
@@ -122,7 +140,7 @@ local slopeProfile = function(slope)
             },
             {
                 pred = function(x) return x > pTr2.x and x < slope.length end,
-                slope = function(pt) return math.tan(arc2:rad(pt) - math.pi * 0.5) end,
+                slope = function(pt) return tan(arc2:rad(pt) - pi * 0.5) end,
                 pt = intersection(arc2, slope.height < 0 and func.max or func.min)
             },
             {

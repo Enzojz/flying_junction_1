@@ -41,6 +41,7 @@ local mPlaceSlopeWall = function(sw, arc, upperHeight)
         return coor.shearZoY(t) * coor.rotZ(rad) * coor.trans(func.with(pt, {z = h - 11}))
     end
 end
+
 local function detectSlopeIntersection(lower, upper, fz, currentRad, s)
     local step = 0.25 / lower.r
     local ptL = lower:pt(currentRad)
@@ -778,10 +779,8 @@ local updateFn = function(fParams, models)
             
             local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
             local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
-            local TLowerTracks = lowerTrackBuilder.nonAligned()
-            local TUpperTracks = upperTrackBuilder.nonAligned()
-            -- local TLowerExtTracks = lowerTrackBuilder.nonAligned()
-            local TUpperExtTracks = upperTrackBuilder.bridge(models.bridgeType)
+            local buildTracks = lowerTrackBuilder.nonAligned()
+            local buildBridge = upperTrackBuilder.bridge(models.bridgeType)
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
             local info = {
@@ -968,9 +967,9 @@ local updateFn = function(fParams, models)
                 * pipe.map(pipe.select("e"))
             
             local edges = {
-                lowerEdges * pipe.map(station.mergeEdges) * station.prepareEdges * TLowerTracks,
-                solidEdges * pipe.map(station.mergeEdges) * station.prepareEdges * TUpperTracks,
-                bridgeEdges * pipe.map(station.mergeEdges) * station.prepareEdges * TUpperExtTracks,
+                lowerEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildTracks,
+                solidEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildTracks,
+                bridgeEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildBridge,
             }
             
             local structure = {

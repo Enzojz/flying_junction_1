@@ -19,6 +19,7 @@ Changelog:
 * Fixed error of position calculate for non crossing layout with grouped tracks
 * Fixed error of position and length calculate for side retaining walls for lower level
 * Fixed missing upper fences on side of transition B
+* Fixed terrain alignment error on some solid transition section.
 1.10
 * Colission bugfix on crossing layout
 * Retaining wall form bugfix on crossing layout
@@ -71,6 +72,7 @@ Changelog:
 * Correction de erreur de calcule des positions des voies groupées pour disponition non croisement simple
 * Correction de erreur de calcule du lengueur et de la position du mur de soutènement
 * Rajoute de clôture manquantes du côté transition B
+* Correct de erreur de calculs de alignment de terrain sur des transition solide.
 1.10
 * Correction de erreur de colission sur disposition de croisement
 * Correction de forme de mur sur la disposition de croisement
@@ -115,6 +117,7 @@ Changelog:
 * 修正了轨道分组时的轨道位置计算错误
 * 修正了下层挡土墙的长度和位置计算错误
 * 修复了B过渡区段上方消失的围栏
+* 修复了在一些实心过渡区段的地面计算错误
 1.10
 * 修正了交叉布局下的一个冲突错误
 * 修正了交叉布局下挡土墙的形状

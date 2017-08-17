@@ -223,12 +223,12 @@ local function trackGroup(info, offsets)
     }
     
     local limitRads = {
-        lower = {
+        lower = pipe.new * {
             inf = junction.normalizeRad(wallExt.lower.R:rad(func.min(wallExt.lower.R - wallExt.upper.L, ptXSelector))),
             mid = junction.normalizeRad(wallExt.lower.R:rad(coor.xy(0, 0))),
             sup = junction.normalizeRad(wallExt.lower.L:rad(func.min(wallExt.lower.L - wallExt.upper.R, ptXSelector))),
         },
-        upper = {
+        upper = pipe.new * {
             sup = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.L, ptXSelector))),
             mid = junction.normalizeRad(wallExt.upper.R:rad(coor.xy(0, 0))),
             inf = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.R, ptXSelector))),
@@ -238,6 +238,13 @@ local function trackGroup(info, offsets)
     local result = {
         lower = pipe.new * {
             tracks = func.map(gRef.lower.tracks, function(l) return l:withLimits(limitRads.lower) end),
+            simpleWalls = func.map(gRef.lower.walls, function(l)
+                return l:withLimits(
+                    {
+                        inf = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.L, ptXSelector))),
+                        mid = junction.normalizeRad(l:rad(coor.xy(0, 0))),
+                        sup = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.R, ptXSelector))),
+                    }) end),
             walls = pipe.new
             * func.map(gRef.lower.walls, function(l)
                 return l:withLimits(
@@ -255,33 +262,30 @@ local function trackGroup(info, offsets)
         * function(ls) return func.with(ls,
             {
                 extWalls = {
-                    ls.walls[1]:withLimits({
-                        inf = limitRads.lower.inf,
-                        mid = ls.walls[1].inf,
-                        sup = limitRads.lower.sup,
-                    }),
-                    ls.walls[#ls.walls]:withLimits({
-                        inf = limitRads.lower.inf,
-                        mid = ls.walls[#ls.walls].sup,
-                        sup = limitRads.lower.sup,
-                    }),
+                    ls.walls[1]:withLimits(limitRads.lower *
+                        pipe.with({mid = ls.walls[1].inf})),
+                    ls.walls[#ls.walls]:withLimits(limitRads.lower *
+                        pipe.with({mid = ls.walls[#ls.walls].sup})),
+                },
+                extSimpleWalls = {
+                    ls.simpleWalls[1]:withLimits(limitRads.lower *
+                        pipe.with({mid = ls.simpleWalls[1].inf})),
+                    ls.simpleWalls[#ls.simpleWalls]:withLimits(limitRads.lower *
+                        pipe.with({mid = ls.simpleWalls[#ls.simpleWalls].sup})),
                 }
             }
         )
         end,
         upper = {
             tracks = func.map(gRef.upper.tracks, function(l) return l:withLimits(limitRads.upper) end),
+            simpleWalls = func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end),
             walls = {
-                wallExt.upper.L:withLimits({
-                    inf = limitRads.upper.inf,
-                    mid = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector))),
-                    sup = limitRads.upper.sup,
-                }),
-                wallExt.upper.R:withLimits({
-                    inf = limitRads.upper.inf,
-                    mid = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector))),
-                    sup = limitRads.upper.sup,
-                })
+                wallExt.upper.L:withLimits(limitRads.upper
+                    * pipe.with({mid = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector)))})
+                ),
+                wallExt.upper.R:withLimits(limitRads.upper
+                    * pipe.with({mid = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector)))})
+            )
             },
         }
     }
@@ -407,10 +411,9 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
             + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[1] end)
             ,
             upper = pipe.new
-            + makeSideFence(sideFencesL[1])[1]
             + makeSideFence(upperGroup.walls[2])[1]
             + makeWall(upperGroup.walls[2])[1]
-            + func.map(upperFences, function(f) return f[1] end)
+            + func.map(upperFences, pipe.select(1))
             ,
             lower = pipe.new
             + makeExtWall(lowerGroup.extWalls[1])[1]
@@ -427,10 +430,9 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
             + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
             ,
             upper = pipe.new
-            + makeSideFence(sideFencesR[#sideFencesR])[2]
             + makeSideFence(upperGroup.walls[1])[2]
             + makeWall(upperGroup.walls[1])[2]
-            + func.map(upperFences, function(f) return f[2] end)
+            + func.map(upperFences, pipe.select(2))
             ,
             lower = pipe.new
             + makeExtWall(lowerGroup.extWalls[2])[2]
@@ -447,60 +449,60 @@ local slopeWalls = function(
     extA, mainA,
     extB, mainB,
     upperL, upperR
-)
+    )
     local function retriveRef(result, arc, ...)
         return arc
-        and retriveRef(result / (result[#result] + abs(arc.inf - arc.sup) * arc.r), ...)
-        or result
+            and retriveRef(result / (result[#result] + abs(arc.inf - arc.sup) * arc.r), ...)
+            or result
     end
-
+    
     return pipe.new
         / func.map2(info.A.upper.isTerra and extA or {}, mainA,
-        function(w, cw)
-            return {
-                guidelines = func.filter({
-                    cw:withLimits({sup = cw.inf, inf = mainA[#mainA].inf}),
-                    w.guidelines[2],
-                    w.guidelines[1]
-                }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
-                lower = w.guidelines[2],
-                another = w.guidelines[1],
-                upper = upperL.guidelines[1],
-                fz = upperL.fn.fz,
-                from = "sup", to = "inf"
-            }
-        end)
+            function(w, cw)
+                return {
+                    guidelines = func.filter({
+                        cw:withLimits({sup = cw.inf, inf = mainA[#mainA].inf}),
+                        w.guidelines[2],
+                        w.guidelines[1]
+                    }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
+                    lower = w.guidelines[2],
+                    another = w.guidelines[1],
+                    upper = upperL.guidelines[1],
+                    fz = upperL.fn.fz,
+                    from = "sup", to = "inf"
+                }
+            end)
         / func.map2(info.B.upper.isTerra and extB or {}, mainB,
-        function(w, cw)
-            return {
-                guidelines = func.filter({
-                    cw:withLimits({inf = cw.sup, sup = mainB[1].sup}),
-                    w.guidelines[1],
-                    w.guidelines[2]
-                }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
-                lower = w.guidelines[1],
-                another = w.guidelines[2],
-                upper = upperR.guidelines[1],
-                fz = upperR.fn.fz,
-                from = "inf", to = "sup"
-            }
-        end)
+            function(w, cw)
+                return {
+                    guidelines = func.filter({
+                        cw:withLimits({inf = cw.sup, sup = mainB[1].sup}),
+                        w.guidelines[1],
+                        w.guidelines[2]
+                    }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
+                    lower = w.guidelines[1],
+                    another = w.guidelines[2],
+                    upper = upperR.guidelines[1],
+                    fz = upperR.fn.fz,
+                    from = "inf", to = "sup"
+                }
+            end)
         * pipe.map(function(ws) return {ws[1], ws[#ws]} end)
         * pipe.flatten()
         * pipe.mapFlatten(function(sw)
             local arcs = pipe.new
-            * sw.guidelines
-            * pipe.map(function(g)
-                local loc = detectSlopeIntersection(g, sw.upper, sw.fz, g[sw.from], g[sw.to] - g[sw.from])
-                local floc = abs(loc - g[sw.from]) < abs(g[sw.from] - g[sw.to]) and loc or g[sw.to]
-                return g:withLimits({
-                    [sw.from] = g[sw.from],
-                    [sw.to] = floc,
-                    mid = (g[sw.from] + floc) * 0.5
+                * sw.guidelines
+                * pipe.map(function(g)
+                    local loc = detectSlopeIntersection(g, sw.upper, sw.fz, g[sw.from], g[sw.to] - g[sw.from])
+                    local floc = abs(loc - g[sw.from]) < abs(g[sw.from] - g[sw.to]) and loc or g[sw.to]
+                    return g:withLimits({
+                        [sw.from] = g[sw.from],
+                        [sw.to] = floc,
+                        mid = (g[sw.from] + floc) * 0.5
                     })
-            end
-            )
-            * pipe.filter(function(ar) return abs(ar.inf - ar.sup) * ar.r > 0.01 end)
+                end
+                )
+                * pipe.filter(function(ar) return abs(ar.inf - ar.sup) * ar.r > 0.01 end)
             
             return retriveRef(pipe.new * {0}, table.unpack(arcs))
                 * function(ls) return ls * pipe.map(pipe.mul(1 / ls[#ls])) end
@@ -980,7 +982,7 @@ local updateFn = function(fParams, models)
                 A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mDepth, models)[1],
                 B = generateStructure(group.B.lower, group.B.upper, mTunnelZ * mDepth, models)[2]
             }
-
+            
             local slopeWallModels =
                 slopeWalls(
                     info,
@@ -990,19 +992,7 @@ local updateFn = function(fParams, models)
                     preparedExt.walls.lower.B, group.B.lower.walls,
                     preparedExt.walls.upper.A[1],
                     preparedExt.walls.upper.B[#preparedExt.walls.upper.B]
-                )
-            
-            local function withIf(level, part)
-                return function(c)
-                    return (info[part][level].used and not info[part][level].isBridge) and c or {}
-                end
-            end
-            
-            local function withIf2(level, part)
-                return function(c)
-                    return (info[part][level].used and not info[part][level].isTerra and not info[part][level].isBridge) and c or {}
-                end
-            end
+            )
             
             local uPolys = function(part)
                 local i = info[part].upper
@@ -1023,30 +1013,30 @@ local updateFn = function(fParams, models)
             
             local slopeWallArcs = pipe.new
                 / func.map(info.A.upper.isTerra and preparedExt.tracks.lower.A or {},
-                function(w)
-                    return {
-                        lower = w.guidelines[2]:withLimits({inf = w.guidelines[1]:extendLimits(4).inf}),
-                        upper = preparedExt.walls.upper.A[1].guidelines[1],
-                        fz = preparedExt.walls.upper.A[1].fn.fz,
-                        from = "sup", to = "inf"
-                    }
-                end)
+                    function(w)
+                        return {
+                            lower = w.guidelines[2]:withLimits({inf = w.guidelines[1]:extendLimits(4).inf}),
+                            upper = preparedExt.walls.upper.A[1].guidelines[1],
+                            fz = preparedExt.walls.upper.A[1].fn.fz,
+                            from = "sup", to = "inf"
+                        }
+                    end)
                 / func.map(info.B.upper.isTerra and preparedExt.tracks.lower.B or {},
-                function(w)
-                    return {
-                        lower = w.guidelines[1]:withLimits({sup = w.guidelines[2]:extendLimits(4).sup}),
-                        upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
-                        fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
-                        from = "inf", to = "sup"
-                    }
-                end)
+                    function(w)
+                        return {
+                            lower = w.guidelines[1]:withLimits({sup = w.guidelines[2]:extendLimits(4).sup}),
+                            upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                            fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                            from = "inf", to = "sup"
+                        }
+                    end)
                 * pipe.map(pipe.map(function(sw)
                     local loc = func.min(
                         func.map(
-                            { sw.lower + 2.5, sw.lower + (-2.5) },
+                            {sw.lower + 2.5, sw.lower + (-2.5)},
                             function(a) return detectSlopeIntersection(a, sw.upper, sw.fz, a[sw.from], a[sw.to] - a[sw.from]) end),
                         function(l, r) return abs(l - sw.lower[sw.to]) < abs(r - sw.lower[sw.to]) end)
-
+                    
                     return sw.lower:withLimits({
                         [sw.from] = loc,
                         [sw.to] = sw[sw.to],
@@ -1086,29 +1076,42 @@ local updateFn = function(fParams, models)
                 slot = projectPolys(mDepth * coor.transZ(-0.2))(lowerPolys.A, lowerPolys.B),
                 greater = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
             }
+
+            local function withIfNotBridge(level, part)
+                return function(c)
+                    return (info[part][level].used and not info[part][level].isBridge) and c or {}
+                end
+            end
+            
+            local function withIfSolid(level, part)
+                return function(c)
+                    return (info[part][level].used and not info[part][level].isTerra and not info[part][level].isBridge) and c or {}
+                end
+            end
+
             local result = {
                 edgeLists = edges,
                 models = pipe.new
                 + structure.A.fixed
                 + structure.B.fixed
-                + withIf2("upper", "A")(ext.surface.upper.A)
-                + withIf2("upper", "B")(ext.surface.upper.B)
+                + withIfSolid("upper", "A")(ext.surface.upper.A)
+                + withIfSolid("upper", "B")(ext.surface.upper.B)
                 + (heightFactor > 0
                 and pipe.new
                 + structure.A.upper
                 + structure.B.upper
-                + withIf2("upper", "A")(ext.walls.upper.A * pipe.flatten())
-                + withIf2("upper", "B")(ext.walls.upper.B * pipe.flatten())
+                + withIfSolid("upper", "A")(ext.walls.upper.A * pipe.flatten())
+                + withIfSolid("upper", "B")(ext.walls.upper.B * pipe.flatten())
                 or {}
                 )
                 + (heightFactor < 1
                 and pipe.new
                 + structure.A.lower
                 + structure.B.lower
-                + withIf("lower", "A")(ext.walls.lower.A[1])
-                + withIf("lower", "A")(ext.walls.lower.A[#ext.walls.lower.A])
-                + withIf("lower", "B")(ext.walls.lower.B[1])
-                + withIf("lower", "B")(ext.walls.lower.B[#ext.walls.lower.B])
+                + withIfNotBridge("lower", "A")(ext.walls.lower.A[1])
+                + withIfNotBridge("lower", "A")(ext.walls.lower.A[#ext.walls.lower.A])
+                + withIfNotBridge("lower", "B")(ext.walls.lower.B[1])
+                + withIfNotBridge("lower", "B")(ext.walls.lower.B[#ext.walls.lower.B])
                 or {})
                 + slopeWallModels
                 ,

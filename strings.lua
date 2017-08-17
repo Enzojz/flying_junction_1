@@ -1,4 +1,4 @@
-local descEN = [[Flying junctions in Europe.
+local descEN = [[Flying junctions.
 * Available via Passenger station menu
 
 Implemented functions:
@@ -14,6 +14,11 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.11
+* Fixed crash when lower length equals to 50% and shorter
+* Fixed error of position calculate for non crossing layout with grouped tracks
+* Fixed error of position and length calculate for side retaining walls for lower level
+* Fixed missing upper fences on side of transition B
 1.10
 * Colission bugfix on crossing layout
 * Retaining wall form bugfix on crossing layout
@@ -40,15 +45,13 @@ Changelog:
 1.1
 * Changed altitude options for a more accurate adjustment, and avoid brdige failure by default
 
---------------- 
-* Planned projects 
-- Crossing station 
+---------------
+* Planned projects
+- Crossing station
 - Better Curved station]]
 
 local descFR = [[Saut de mouton.
-
 * Disponible via menu de gare de voyageurs
-* Attention: ce MOD pourrait changer l'ordre des ponts, veuillez utilise avec prudent avec les gamesaves existants.
 
 Caractéristiques:
 * 1 ~ 6 voies pour le niveau supérieur et inférieur
@@ -63,6 +66,11 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.11
+* Correction de plantage lors longueur du niveau bas est équal à 50%
+* Correction de erreur de calcule des positions des voies groupées pour disponition non croisement simple
+* Correction de erreur de calcule du lengueur et de la position du mur de soutènement
+* Rajoute de clôture manquantes du côté transition B
 1.10
 * Correction de erreur de colission sur disposition de croisement
 * Correction de forme de mur sur la disposition de croisement
@@ -87,23 +95,26 @@ Changelog:
 1.2
 * Correction de problem avec gamesaves existants.]]
 
-local descCN = [[欧式水泥疏解桥.
-
+local descCN = [[欧式疏解桥.
 * 通过旅客车站菜单建造
-* 注意: 该MOD包含一个新的桥类，可能会影响现有游戏存档.
 
 特点:
 * 上层和下层各可有 1 ~ 6 条股道
 * 5°到89°度的交汇角，调整幅度为1°
 * 隧道分组可为1条，2条或所有轨道
-* 四个独立的轨道曲线调整选项  
-* 坡度选项 
+* 四个独立的轨道曲线调整选项
+* 坡度选项
 * 高度选项
 * 水泥或石砖建造
 * 上升/下降的过渡轨道可以以桥、堆土或者实心形式展现
 * 不同层不同的接触网选项
 
 Changelog:
+1.11
+* 修正了下层长度为50%时的游戏崩溃
+* 修正了轨道分组时的轨道位置计算错误
+* 修正了下层挡土墙的长度和位置计算错误
+* 修复了B过渡区段上方消失的围栏
 1.10
 * 修正了交叉布局下的一个冲突错误
 * 修正了交叉布局下挡土墙的形状

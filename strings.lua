@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.12
+* Fixed crash when modifying lower level length when altitude equals to or greater than 100%, or higher level length when altitude is 0%
 1.11
 * Fixed crash when lower length equals to 50% and shorter
 * Fixed error of position calculate for non crossing layout with grouped tracks
@@ -67,6 +69,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.12
+* Correction de plantage lors modification du longueur du niveau bas, quand l'altitude est équal à ou superieur à 100%, ou pour le niveau haut quand l'altitude est à 0%.
 1.11
 * Correction de plantage lors longueur du niveau bas est équal à 50%
 * Correction de erreur de calcule des positions des voies groupées pour disponition non croisement simple
@@ -112,6 +116,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.12
+* 修复了在高度调整为100%或者更高的情况下，修改下层长度，以及在高度调整为0%修改上层长度时引发的游戏崩溃
 1.11
 * 修正了下层长度为50%时的游戏崩溃
 * 修正了轨道分组时的轨道位置计算错误
@@ -222,6 +228,7 @@ function data()
             ["None"] = "无",
             ["All"] = "所有",
             ["Common"] = "共轴",
+            ["Tunnel Height"] = "隧道净高",
             
             ["Bifurcation Flying Junction in concrete"] = "水泥制联络疏解",
             ["Crossing Flying Junction in concrete"] = "水泥制交叉疏解",

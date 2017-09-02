@@ -213,16 +213,16 @@ local retriveTracks = function(tracks)
 end
 
 
-local retrivePolys = function(extLat, extLon)
-    extLat = extLat or 4
-    extLon = extLon or 3.5
+local retrivePolys = function(extLon, extLat)
+    extLon = extLon or 4
+    extLat = extLat or 3.5
     
     return function(tracks)
         return tracks
             * pipe.map(function(tr)
                 local flat = pipe.new
-                    + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(extLat, extLon)
-                    + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(extLat, extLon)
+                    + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(extLon, extLat)
+                    + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(extLon, extLat)
                 return {flat * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end)), flat}
             end)
             * function(ls) return

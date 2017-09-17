@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.13
+* Fixed upper level catenary bug
 1.12
 * Fixed crash when modifying lower level length when altitude equals to or greater than 100%, or higher level length when altitude is 0%
 1.11
@@ -69,6 +71,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.13
+* Correction d'implémentation de caténaire du niveau superieur.
 1.12
 * Correction de plantage lors modification du longueur du niveau bas, quand l'altitude est équal à ou superieur à 100%, ou pour le niveau haut quand l'altitude est à 0%.
 1.11
@@ -116,6 +120,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.13
+* 修正了上层接触网选项的错误
 1.12
 * 修复了在高度调整为100%或者更高的情况下，修改下层长度，以及在高度调整为0%修改上层长度时引发的游戏崩溃
 1.11

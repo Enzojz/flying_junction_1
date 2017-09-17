@@ -24,12 +24,6 @@ local lengthPercentList = {1, 4 / 5, 3 / 4, 3 / 5, 1 / 2, 2 / 5, 1 / 4, 1 / 5}
 
 local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
 
-local projectPolys = function(mDepth)
-    return function(...)
-        return pipe.new * func.flatten({...}) * pipe.map(pipe.map(mDepth)) * pipe.map(pipe.map(coor.vec2Tuple))
-    end
-end
-
 local mPlaceSlopeWall = function(sw, arc, upperHeight)
     local heightVar = upperHeight * (arc.t - arc.f)
     local heightBase = upperHeight * (1 - arc.t)
@@ -520,44 +514,6 @@ local slopeWalls = function(
         * pipe.flatten()
 end
 
-local function mergePoly(...)
-    local polys = pipe.new * {...}
-    local p = {
-        equal = polys * pipe.map(pipe.select("equal", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
-        less = polys * pipe.map(pipe.select("less", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
-        greater = polys * pipe.map(pipe.select("greater", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
-        slot = polys * pipe.map(pipe.select("slot", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
-    }
-    
-    return pipe.new * {
-        {
-            type = "LESS",
-            faces = p.less,
-            slopeLow = 0.75,
-            slopeHigh = 0.75,
-        },
-        {
-            type = "GREATER",
-            faces = p.greater,
-            slopeLow = 0.75,
-            slopeHigh = 0.75,
-        },
-        {
-            type = "EQUAL",
-            faces = p.equal,
-            slopeLow = 0.75,
-            slopeHigh = 0.75,
-        },
-        {
-            type = "LESS",
-            faces = p.slot,
-            slopeLow = junction.infi,
-            slopeHigh = junction.infi,
-        },
-    }
-    * pipe.filter(function(e) return #e.faces > 0 end)
-end
-
 local function params(paramFilter)
     local sp = "·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·\n"
     return pipe.new *
@@ -1002,11 +958,11 @@ local updateFn = function(fParams, models)
                     or (
                     i.isTerra
                     and {
-                        equal = projectPolys(coor.I())(polySet.trackPolys)
+                        equal = station.projectPolys(coor.I())(polySet.trackPolys)
                     }
                     or {
-                        greater = projectPolys(coor.I())(polySet.polys),
-                        less = projectPolys(coor.I())(polySet.trackPolys)
+                        greater = station.projectPolys(coor.I())(polySet.polys),
+                        less = station.projectPolys(coor.I())(polySet.trackPolys)
                     }
             )
             end
@@ -1052,29 +1008,29 @@ local updateFn = function(fParams, models)
                 return (not i.used)
                     and {}
                     or {
-                        less = projectPolys(coor.I())(info[part].upper.isTerra and slopeWallArcs[part] or polySet.polys),
-                        slot = projectPolys(coor.I())(polySet.trackPolys),
-                        greater = projectPolys(coor.I())(polySet.trackPolys)
+                        less = station.projectPolys(coor.I())(info[part].upper.isTerra and slopeWallArcs[part] or polySet.polys),
+                        slot = station.projectPolys(coor.I())(polySet.trackPolys),
+                        greater = station.projectPolys(coor.I())(polySet.trackPolys)
                     }
             end
             
             local uXPolys = {
                 equal = pipe.new
-                + ((info.A.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.A) or {})
-                + ((info.B.upper.isTerra or heightFactor == 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.B) or {})
+                + ((info.A.upper.isTerra or heightFactor == 0) and station.projectPolys(mTunnelZ * mDepth)(upperPolys.A) or {})
+                + ((info.B.upper.isTerra or heightFactor == 0) and station.projectPolys(mTunnelZ * mDepth)(upperPolys.B) or {})
                 ,
                 less = pipe.new
-                + ((not info.A.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.A) or {})
-                + ((not info.B.upper.isTerra and heightFactor ~= 0) and projectPolys(mTunnelZ * mDepth)(upperPolys.B) or {})
+                + ((not info.A.upper.isTerra and heightFactor ~= 0) and station.projectPolys(mTunnelZ * mDepth)(upperPolys.A) or {})
+                + ((not info.B.upper.isTerra and heightFactor ~= 0) and station.projectPolys(mTunnelZ * mDepth)(upperPolys.B) or {})
                 ,
-                greater = pipe.new + (info.A.upper.isTerra and {} or projectPolys(mDepth)(upperPolys.A))
-                + (info.B.upper.isTerra and {} or projectPolys(mDepth)(upperPolys.B))
+                greater = pipe.new + (info.A.upper.isTerra and {} or station.projectPolys(mDepth)(upperPolys.A))
+                + (info.B.upper.isTerra and {} or station.projectPolys(mDepth)(upperPolys.B))
             }
             
             local lXPolys = {
-                less = projectPolys(coor.I())(info.A.upper.isTerra and {} or lowerPolys.A, info.B.upper.isTerra and {} or lowerPolys.B),
-                slot = projectPolys(mDepth * coor.transZ(-0.2))(lowerPolys.A, lowerPolys.B),
-                greater = projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
+                less = station.projectPolys(coor.I())(info.A.upper.isTerra and {} or lowerPolys.A, info.B.upper.isTerra and {} or lowerPolys.B),
+                slot = station.projectPolys(mDepth * coor.transZ(-0.2))(lowerPolys.A, lowerPolys.B),
+                greater = station.projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
             }
 
             local function withIfNotBridge(level, part)
@@ -1115,7 +1071,7 @@ local updateFn = function(fParams, models)
                 or {})
                 + slopeWallModels
                 ,
-                terrainAlignmentLists = mergePoly(uXPolys, uPolys("A"), uPolys("B")) + mergePoly(lXPolys, lPolys("A"), lPolys("B"))
+                terrainAlignmentLists = station.mergePoly(uXPolys, uPolys("A"), uPolys("B"))() + station.mergePoly(lXPolys, lPolys("A"), lPolys("B"))()
                 ,
                 groundFaces = (pipe.new
                 + upperPolys.A
@@ -1151,8 +1107,6 @@ return {
     updateFn = updateFn,
     params = params,
     rList = rList,
-    projectPolys = projectPolys,
-    mergePoly = mergePoly,
     generateTrackGroups = generateTrackGroups,
     detectSlopeIntersection = detectSlopeIntersection,
     mPlaceSlopeWall = mPlaceSlopeWall,

@@ -1,12 +1,12 @@
 local func = require "flyingjunction/func"
 local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
-local trackEdge = require "flyingjunction/trackedge"
 
 local stationlib = {
     platformWidth = 5,
     trackWidth = 5,
-    segmentLength = 20
+    segmentLength = 20,
+    infi = 1e8
 }
 
 stationlib.newModel = function(m, ...)
@@ -308,7 +308,7 @@ local applyResult = function(mpt, mvec, mirrored)
         end
         
         local mapGroundFaces = function(gf)
-            return func.with(gf, {face = func.map(mirrored and func.rev(gf.face) or gf.face, function(f) return (coor.tuple2Vec(f) .. mpt):toTuple() end) })
+            return func.with(gf, {face = func.map(mirrored and func.rev(gf.face) or gf.face, function(f) return (coor.tuple2Vec(f) .. mpt):toTuple() end)})
         end
         
         return func.with(result,
@@ -347,6 +347,65 @@ stationlib.setMirror = function(isMirror)
         local mf = isMirror and coor.flipX() or coor.I()
         return applyResult(mf, mf, isMirror)(result)
     end
+end
+
+
+
+function stationlib.projectPolys(mDepth)
+    return function(...)
+        return pipe.new * func.flatten({...}) * pipe.map(pipe.map(mDepth)) * pipe.map(pipe.map(coor.vec2Tuple))
+    end
+end
+
+
+function stationlib.mergePoly(...)
+    local polys = pipe.new * {...}
+    local p = {
+        equal = polys * pipe.map(pipe.select("equal", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        less = polys * pipe.map(pipe.select("less", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        greater = polys * pipe.map(pipe.select("greater", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        slot = polys * pipe.map(pipe.select("slot", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+        platform = polys * pipe.map(pipe.select("platform", {})) * pipe.filter(pipe.noop()) * pipe.flatten(),
+    }
+    
+    return
+        function(profile)
+            profile = profile or {}
+            
+            return pipe.new * {
+                {
+                    type = "LESS",
+                    faces = p.less,
+                    slopeLow = profile.less or 0.75,
+                    slopeHigh = profile.less or 0.75,
+                },
+                {
+                    type = "GREATER",
+                    faces = p.greater,
+                    slopeLow = profile.greater or 0.75,
+                    slopeHigh = profile.greater or 0.75,
+                },
+                {
+                    type = "EQUAL",
+                    faces = p.equal,
+                    slopeLow = profile.equal or 0.75,
+                    slopeHigh = profile.equal or 0.755,
+                },
+                {
+                    type = "LESS",
+                    faces = p.slot,
+                    slopeLow = profile.slot or stationlib.infi,
+                    slopeHigh = profile.slot or  stationlib.infi,
+                },
+                {
+                    type = "GREATER",
+                    faces = p.platform,
+                    slopeLow = profile.platform or stationlib.infi,
+                    slopeHigh = profile.platform or stationlib.infi,
+                },
+            }
+            * pipe.filter(function(e) return #e.faces > 0 end)
+        end
 end
 
 

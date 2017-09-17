@@ -81,10 +81,11 @@ junction.fArcs = function(offsets, rad, r)
         * function(a) return r > 0 and a or a * pipe.rev() end
 end
 
-junction.makeFn = function(model, mPlace, m)
+junction.makeFn = function(model, mPlace, m, length)
     m = m or coor.I()
+    length = length or 5
     return function(obj)
-        local coordsGen = arc.coords(obj, 5)
+        local coordsGen = arc.coords(obj, length)
         local function makeModel(seq, scale)
             return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
                 return station.newModel(model, m, coor.scaleY(scale), mPlace(obj, rad1, rad2))

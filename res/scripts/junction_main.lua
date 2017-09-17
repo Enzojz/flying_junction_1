@@ -739,7 +739,8 @@ local updateFn = function(fParams, models)
             
             local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
             local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
-            local buildTracks = lowerTrackBuilder.nonAligned()
+            local buildLowerTracks = lowerTrackBuilder.nonAligned()
+            local buildUpperTracks = upperTrackBuilder.nonAligned()
             local buildBridge = upperTrackBuilder.bridge(models.bridgeType)
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
@@ -929,8 +930,8 @@ local updateFn = function(fParams, models)
                 * pipe.map(pipe.select("e"))
             
             local edges = {
-                lowerEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildTracks,
-                solidEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildTracks,
+                lowerEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildLowerTracks,
+                solidEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildUpperTracks,
                 bridgeEdges * pipe.map(station.mergeEdges) * station.prepareEdges * buildBridge,
             }
             

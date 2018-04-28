@@ -14,6 +14,9 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.14
+* CommonAPI support
+* Seperation of upper/lower track types
 1.13
 * Fixed upper level catenary bug
 1.12
@@ -71,6 +74,9 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.14
+* Support de CommonAPI
+* Séparation d'option de type de voie du haut et du bas
 1.13
 * Correction d'implémentation de caténaire du niveau superieur.
 1.12
@@ -120,6 +126,9 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.14
+* 增加了CommonAPI支持
+* 增加了分离的上下层轨道类型选项
 1.13
 * 修正了上层接触网选项的错误
 1.12
@@ -163,6 +172,8 @@ function data()
         fr = {
             ["name"] = "Saut de mouton",
             ["desc"] = descFR,
+            ["Lower Track Type"] = "Type de voie en bas",
+            ["Upper Track Type"] = "Type de voie en haut",
             ["Number of lower tracks"] = "Nombre des voies en bas",
             ["Number of upper tracks"] = "Nombre des voies en haut",
             ["Curved levels"] = "Niveaux avec courbes",
@@ -206,6 +217,8 @@ function data()
         zh_CN = {
             ["name"] = "欧式疏解桥",
             ["desc"] = descCN,
+            ["Lower Track Type"] = "下层轨道类型",
+            ["Upper Track Type"] = "上层轨道类型",
             ["Number of lower tracks"] = "下层轨道数量",
             ["Number of upper tracks"] = "上层轨道数量",
             ["Curved levels"] = "曲线部分",

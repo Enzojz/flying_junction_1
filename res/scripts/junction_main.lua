@@ -516,9 +516,9 @@ end
 
 local function params(paramFilter)
     local sp = "·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·\n"
-    return pipe.new *
+    return (junction.trackType
+        + 
         {
-            paramsutil.makeTrackTypeParam(),
             func.with(paramsutil.makeTrackCatenaryParam(),
                 {
                     values = {_("None"), _("Both"), _("Lower"), _("Upper")},
@@ -704,8 +704,8 @@ local function params(paramFilter)
                 defaultIndex = 6
             }
         }
+        )
         * pipe.filter(function(p) return not func.contains(paramFilter, p.key) end)
-
 end
 
 local function defaultParams(param, fParams)
@@ -726,7 +726,8 @@ local updateFn = function(fParams, models)
             local deg = listDegree[params.xDegDec + 1] + params.xDegUni
             local rad = math.rad(deg)
             
-            local trackType = ({"standard.lua", "high_speed.lua"})[params.trackType + 1]
+            local trackTypeLower = junction.trackList[params.trackType + 1]
+            local trackTypeUpper = params.trackTypeUpper == 0 and trackTypeLower or junction.trackList[params.trackTypeUpper]
             local catenaryLower = func.contains({1, 2}, params.catenary)
             local catenaryUpper = func.contains({1, 3}, params.catenary)
             local nbPerGroup = ({1, 2, params.nbLowerTracks + 1})[params.nbPerGroup + 1]
@@ -737,8 +738,8 @@ local updateFn = function(fParams, models)
             local extraZ = heightFactor > 1 and ((heightFactor - 1) * tunnelHeight) or 0
             local mTunnelZ = coor.transZ(tunnelHeight)
             
-            local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackType)
-            local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackType)
+            local lowerTrackBuilder = trackEdge.builder(catenaryLower, trackTypeLower)
+            local upperTrackBuilder = trackEdge.builder(catenaryUpper, trackTypeUpper)
             local buildLowerTracks = lowerTrackBuilder.nonAligned()
             local buildUpperTracks = upperTrackBuilder.nonAligned()
             local buildBridge = upperTrackBuilder.bridge(models.bridgeType)

@@ -8,6 +8,39 @@ local junction = {}
 local pi = math.pi
 local abs = math.abs
 
+junction.trackList = {"standard.lua", "high_speed.lua"}
+junction.trackWidthList = {5, 5}
+junction.trackType = pipe.exec * function()
+    local list = {
+        {
+            key = "trackType",
+            name = _("Track type"),
+            values = {_("Standard"), _("High-speed")},
+            yearFrom = 1925,
+            yearTo = 0
+        },
+        {
+            key = "catenary",
+            name = _("Catenary"),
+            values = {_("None"), _("Both"), _("Lower"), _("Upper")},
+            defaultIndex = 1,
+            yearFrom = 1910,
+            yearTo = 0
+        }
+    }
+    if (commonapi and commonapi.uiparameter) then
+        commonapi.uiparameter.modifyTrackCatenary(list, {selectionlist = junction.trackList})
+        junction.trackWidthList = func.map(junction.trackList, function(e) return commonapi.repos.track.getByName(e).data.trackDistance end)
+    end
+    
+    local type = func.filter(list, function(i) return i.key == "trackType" end)
+    local typeLower = func.map(type, function(i) return func.with(i, {name = _("Lower Track Type")}) end)
+    local typeUpper = func.map(type, function(i) return func.with(i, {key = "trackTypeUpper", name = _("Upper Track Type"), values = func.concat({_("Sync")}, i.values)}) end)
+    local catenary = func.map(func.filter(list, function(i) return i.key == "catenary" end), function(i) return func.with(i, {values = {_("None"), _("Both"), _("Lower"), _("Upper")}}) end)
+
+    return pipe.new + type + typeUpper + catenary
+end
+
 junction.infi = 1e8
 junction.buildCoors = function(numTracks, groupSize, config)
     config = config or {

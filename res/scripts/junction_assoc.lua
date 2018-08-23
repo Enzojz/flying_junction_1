@@ -70,10 +70,16 @@ local retriveGeometry = function(config, slope)
 end
 
 local function gmPlaceA(fz, r)
-    return function(guideline, rad1, rad2)
-        local radc = (rad1 + rad2) * 0.5
+    return function(fitModel, arcL, arcR, rad1, rad2)
+        
         local p1, p2 = fz(rad1), fz(rad2)
-        return coor.shearZoY((r > 0 and -1 or 1) * (p2.y - p1.y) / abs(p2.x - p1.x)) * coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = ((p1 + p2) * 0.5).y - wallHeight}))
+        local size = {
+            lt = arcL:pt(rad1):withZ(wallHeight),
+            lb = arcL:pt(rad2):withZ(wallHeight),
+            rt = arcR:pt(rad1):withZ(wallHeight + p1.y),
+            rb = arcR:pt(rad2):withZ(wallHeight + p2.y)
+        }
+        return fitModel(size)
     end
 end
 
@@ -170,9 +176,14 @@ local retriveFn = function(config)
             function(a, b) return func.map({a.z, b.z, a.s, b.s}, coor.transZ) end
         ),
         mPlaceA = mPlaceA,
-        mPlaceD = function(guideline, rad1, rad2)
-            local radc = (rad1 + rad2) * 0.5
-            return coor.rotZ(radc) * coor.trans(func.with(guideline:pt(radc), {z = -wallHeight}))
+        mPlaceD = function(fitModel, arcL, arcR, rad1, rad2)
+            local size = {
+                lt = arcL:pt(rad1):withZ(wallHeight),
+                lb = arcL:pt(rad2):withZ(wallHeight),
+                rt = arcR:pt(rad1):withZ(wallHeight),
+                rb = arcR:pt(rad2):withZ(wallHeight)
+            }
+            return fitModel(size) * coor.transZ(-wallHeight)
         end,
         isDesc = function(a, b) return config.height > 0 and a or b end
     }
@@ -235,7 +246,7 @@ end
 
 local retriveTrackSurfaces = function(tracks)
     return tracks
-        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, tr.fn.mPlaceA, coor.scaleY(1.05))) end)
+        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, junction.fitModel2D(5, 5), 5, tr.fn.mPlaceA)) end)
         * pipe.flatten()
         * pipe.flatten()
         * pipe.flatten()
@@ -244,8 +255,8 @@ end
 local retriveWalls = function(walls)
     return walls
         * pipe.map(function(w) return
-            w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD), coor.scaleY(1.05)))
-            + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD), coor.scaleY(1.05)))
+            w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   junction.fitModel2D(1, 5), 1, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
+            + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, junction.fitModel2D(1, 5), 1, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
         end)
         * pipe.map(pipe.flatten())
         * pipe.map(pipe.flatten())

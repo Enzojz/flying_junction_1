@@ -120,6 +120,32 @@ function pipe.map2(ls2, fun)
     end
 end
 
+function pipe.mapn(...)
+    local ls = pipe.new * {...}
+    return function(fun)
+        local result = {}
+        for i = 1, #ls[1] do
+            params = ls * pipe.map(pipe.select(i)) 
+            result[i] = fun(table.unpack(params))
+        end
+        return result
+    end
+end
+
+function pipe.mapx(...)
+    local ls = pipe.new * {...}
+    return function(fun)
+        return function(l)
+            local result = {}
+            for i = 1, #l do
+                params = ls * pipe.map(pipe.select(i)) 
+                result[i] = fun(l[i], table.unpack(params))
+            end
+            return result
+        end
+    end
+end
+
 
 function pipe.range(from, to)
     return function(ls)
@@ -137,12 +163,14 @@ function pipe.contains(e)
 end
 
 function pipe.max(less)
+    local less = less or (function(x, y) return x < y end)
     return function(ls)
         return pipe.fold(ls[1], function(l, r) return less(l, r) and r or l end)(ls)
     end
 end
 
 function pipe.min(less)
+    local less = less or (function(x, y) return x < y end)
     return function(ls)
         return pipe.fold(ls[1], function(l, r) return less(l, r) and l or r end)(ls)
     end
@@ -202,9 +230,17 @@ function pipe.zip(ls2, name)
     end
 end
 
+function pipe.rep(n)
+    return function(content)
+        local result = {}
+        for i = 1, n do result[i] = content end
+        return result
+    end
+end
+
 function pipe.select(name, def)
     return function(el)
-        return el[name] or def
+        return (el[name] == nil) and def or el[name]
     end
 end
 
@@ -214,10 +250,19 @@ function pipe.noop()
     end
 end
 
+function pipe.interlace(name)
+    name = name or {1, 2}
+    return function(ls)
+        local result = {}
+        for i = 1, #ls - 1 do result[i] = {[name[1]] = ls[i], [name[2]] = ls[i + 1]} end
+        return result
+    end
+end
+
 local pipeMeta = {
     __mul = function(lhs, rhs)
         local result = rhs(lhs)
-        setmetatable(result, getmetatable(lhs))
+        if (type(result) == "table") then setmetatable(result, getmetatable(lhs)) end
         return result
     end
     ,

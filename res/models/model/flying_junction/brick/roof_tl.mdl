@@ -1,8 +1,8 @@
 function data()
 return {
 	boundingInfo = {
-		bbMax = { 2.5, -4.5, 12.5, },
-		bbMin = { -2.5, -5, 11, },
+		bbMax = { 2.5, 5, 11, },
+		bbMin = { -2.5, -5, 9, },
 	},
 	collider = {
 		params = {
@@ -14,7 +14,7 @@ return {
 		{
 			children = {
 				{
-					id = "flying_junction/brick/roof_fence_front.msh",
+					id = "flying_junction/brick/roof_tl.msh",
 					transf = {
 						1, 0, 0, 0,
 					    0, 1, 0, 0,

@@ -14,7 +14,7 @@ return {
 		{
 			children = {
 				{
-					id = "flying_junction/brick/roof_fence_front.msh",
+					id = "flying_junction/concrete/roof_fence_front_br.msh",
 					transf = {
 						1, 0, 0, 0,
 					    0, 1, 0, 0,

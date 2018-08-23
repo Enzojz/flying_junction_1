@@ -62,6 +62,11 @@ local vecXyMeta = {
 local vecXyLength = function(self) return sqrt(self:length2()) end
 local vecXyLength2 = function(self) return self.x * self.x + self.y * self.y end
 local vecXyNormalized = function(self) return self / self:length() end
+local vecXyZ = function(self, z) return coor.xyz(self.x, self.y, z) end
+local vecXyzAvg = function(self, ...)
+    local pts = {...}
+    return func.fold(pts, self, function(l, r) return l + r end) / (#pts + 1)
+end
 
 function coor.xy(x, y)
     local result = {
@@ -69,7 +74,10 @@ function coor.xy(x, y)
         y = y,
         length2 = vecXyLength2,
         length = vecXyLength,
-        normalized = vecXyNormalized
+        normalized = vecXyNormalized,
+        withZ = vecXyZ,
+        avg = vecXyAvg,
+        dot = function(self, other) return self.x * other.x + self.y * other.y end
     }
     setmetatable(result, vecXyMeta)
     return result
@@ -77,11 +85,11 @@ end
 
 local vecXyzMeta = {
     __add = function(lhs, rhs)
-        return coor.xyz(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z)
+        return rhs.z and coor.xyz(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z) or coor.xy(lhs.x + rhs.x, lhs.y + rhs.y)
     end
     ,
     __sub = function(lhs, rhs)
-        return coor.xyz(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z)
+        return rhs.z and coor.xyz(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z) or coor.xy(lhs.x - rhs.x, lhs.y - rhs.y)
     end
     ,
     __mul = function(lhs, rhs)
@@ -105,6 +113,16 @@ local vecXyzLength = function(self) return sqrt(self:length2()) end
 local vecXyzLength2 = function(self) return self.x * self.x + self.y * self.y + self.z * self.z end
 local vecXyzNormalized = function(self) return self / self:length() end
 local vecXyzToTuple = function(self) return {self.x, self.y, self.z} end
+local vecXyzDot = function(self, other) return self.x * other.x + self.y * other.y + self.z * other.z end
+local vecXyzCross = function(self, other) return coor.xyz(
+    self.y * other.z - self.z * other.y,
+    self.z * other.x - self.x * other.z,
+    self.x * other.y - self.y * other.x)
+end
+local vecXyzAvg = function(self, ...)
+    local pts = {...}
+    return func.fold(pts, self, function(l, r) return l + r end) / (#pts + 1)
+end
 
 function coor.xyz(x, y, z)
     local result = {
@@ -114,7 +132,11 @@ function coor.xyz(x, y, z)
         length = vecXyzLength,
         length2 = vecXyzLength2,
         normalized = vecXyzNormalized,
-        toTuple = vecXyzToTuple
+        toTuple = vecXyzToTuple,
+        dot = vecXyzDot,
+        cross = vecXyzCross,
+        withZ = function(self, z) return coor.xyz(self.x, self.y, z) end,
+        avg = vecXyzAvg
     }
     setmetatable(result, vecXyzMeta)
     return result
@@ -151,6 +173,29 @@ local function mul(m1, m2)
         m(3, 1), m(3, 2), m(3, 3), m(3, 4),
         m(4, 1), m(4, 2), m(4, 3), m(4, 4)
     }
+end
+
+function coor.minor(m)
+    local seq = func.seq(1, #m)
+    return function(row, col)
+        local seqL = func.filter(seq, function(l) return l ~= row end)
+        local seqC = func.filter(seq, function(c) return c ~= col end)
+        return func.map(seqL, function(l)
+            return func.map(seqC, function(c) return m[l][c] end)
+        end)
+    end
+end
+
+function coor.det(m)
+    if #m == 2 then
+        return m[1][1] * m[2][2] - m[1][2] * m[2][1]
+    else if #m == 1 then
+        return m[1][1]
+    else
+        local mi = coor.minor(m)
+        return func.fold(func.seq(1, #m), 0, function(r, c) return r + (c % 2 == 1 and 1 or -1) * m[1][c] * coor.det(mi(1, c)) end)
+    end
+    end
 end
 
 function coor.apply(vec, trans)

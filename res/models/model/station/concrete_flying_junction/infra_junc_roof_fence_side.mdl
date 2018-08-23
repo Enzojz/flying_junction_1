@@ -17,7 +17,7 @@ function data()
                 matConfigs = {},
                 static = false,
                 visibleFrom = 0,
-                visibleTo = 1000,
+                visibleTo = 5000,
             },
         },
         metadata = {},

@@ -21,10 +21,10 @@ function data()
             params.type = 1
         end,
         {
-            mSidePillar = "flying_junction/brick/pillar_side.mdl",
-            mRoofFenceF = "flying_junction/brick/roof_fence_front.mdl",
-            mRoofFenceS = "flying_junction/brick/roof_fence_side.mdl",
-            mRoof = "flying_junction/brick/roof.mdl",
+            mSidePillar = "flying_junction/brick/pillar_side",
+            mRoofFenceF = "flying_junction/brick/roof_fence_front",
+            mRoofFenceS = "flying_junction/brick/roof_fence_side",
+            mRoof = "flying_junction/brick/roof",
             bridgeType = "z_brick_flying_junction.lua",
         })
     }

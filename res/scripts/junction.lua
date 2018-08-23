@@ -42,6 +42,126 @@ junction.trackType = pipe.exec * function()
 end
 
 junction.infi = 1e8
+
+
+
+junction.fitModel2D = function(w, h)
+    return function(fitTop, fitLeft)
+        return function(size)
+            local s = {
+                coor.xyz(0, 0),
+                coor.xyz(fitLeft and w or -w, 0),
+                coor.xyz(0, fitTop and -h or h),
+            }
+            
+            local t = fitTop and
+                {
+                    fitLeft and size.lt or size.rt,
+                    fitLeft and size.rt or size.lt,
+                    fitLeft and size.lb or size.rb,
+                } or {
+                    fitLeft and size.lb or size.rb,
+                    fitLeft and size.rb or size.lb,
+                    fitLeft and size.lt or size.rt,
+                }
+            
+            local mX = {
+                {s[1].x, s[1].y, 1},
+                {s[2].x, s[2].y, 1},
+                {s[3].x, s[3].y, 1},
+            }
+            
+            local mU = {
+                t[1].x, t[1].y, 1,
+                t[2].x, t[2].y, 1,
+                t[3].x, t[3].y, 1,
+            }
+            
+            local dX = coor.det(mX)
+            
+            local miX = coor.minor(mX)
+            local mXI = func.mapFlatten(func.seq(1, 3),
+                function(l)
+                    return func.seqMap({1, 3}, function(c)
+                        return ((l + c) % 2 == 0 and 1 or -1) * coor.det(miX(c, l)) / dX
+                    end)
+                end)
+            
+            local function mul(m1, m2)
+                local m = function(line, col)
+                    local l = (line - 1) * 3
+                    return m1[l + 1] * m2[col + 0] + m1[l + 2] * m2[col + 3] + m1[l + 3] * m2[col + 6]
+                end
+                return {
+                    m(1, 1), m(1, 2), m(1, 3),
+                    m(2, 1), m(2, 2), m(2, 3),
+                    m(3, 1), m(3, 2), m(3, 3),
+                }
+            end
+            
+            local mXi = mul(mXI, mU)
+            
+            return coor.I() * {
+                mXi[1], mXi[2], 0, mXi[3],
+                mXi[4], mXi[5], 0, mXi[6],
+                0, 0, 1, 0,
+                mXi[7], mXi[8], 0, mXi[9]
+            }
+        end
+    end
+end
+
+junction.fitModel = function(w, h, d)
+    return function(fitTop, fitLeft)
+        return function(size)
+            local s = {
+                coor.xyz(0, 0, d),
+                coor.xyz(fitLeft and w or -w, 0, d),
+                coor.xyz(0, fitTop and -h or h, d),
+                coor.xyz(0, 0, 0)
+            }
+            
+            local t = fitTop and
+                {
+                    fitLeft and size.lt or size.rt,
+                    fitLeft and size.rt or size.lt,
+                    fitLeft and size.lb or size.rb,
+                } or {
+                    fitLeft and size.lb or size.rb,
+                    fitLeft and size.rb or size.lb,
+                    fitLeft and size.lt or size.rt,
+                }
+            
+            local mX = {
+                {s[1].x, s[1].y, s[1].z, 1},
+                {s[2].x, s[2].y, s[2].z, 1},
+                {s[3].x, s[3].y, s[3].z, 1},
+                {s[4].x, s[4].y, s[4].z, 1}
+            }
+            
+            local mU = {
+                t[1].x, t[1].y, t[1].z, 1,
+                t[2].x, t[2].y, t[2].z, 1,
+                t[3].x, t[3].y, t[3].z, 1,
+                t[1].x, t[1].y, t[1].z + d, 1
+            }
+            
+            local dX = coor.det(mX)
+            
+            local miX = coor.minor(mX)
+            local mXI = func.mapFlatten(func.seq(1, 4),
+                function(l)
+                    return func.seqMap({1, 4}, function(c)
+                        return ((l + c) % 2 == 0 and 1 or -1) * coor.det(miX(c, l)) / dX
+                    end)
+                end)
+            
+            return coor.I() * mXI * mU
+        end
+    end
+end
+
+
 junction.buildCoors = function(numTracks, groupSize, config)
     config = config or {
         trackWidth = station.trackWidth,
@@ -114,15 +234,32 @@ junction.fArcs = function(offsets, rad, r)
         * function(a) return r > 0 and a or a * pipe.rev() end
 end
 
-junction.makeFn = function(model, mPlace, m, length)
+junction.makeFn = function(model, fitModel, w, mPlace, length)
     m = m or coor.I()
     length = length or 5
+    local fitTopLeft = fitModel(true, true)
+    local fitBottomRight = fitModel(false, false)
     return function(obj)
         local coordsGen = arc.coords(obj, length)
+        local inner = obj + (- w * 0.5)
+        local outer = obj + (w * 0.5)
+        local arcL, arcR = table.unpack(
+            (inner:pt(inner.inf):withZ(0) - inner:pt(inner.sup):withZ(0)):cross(
+                outer:pt(outer.sup):withZ(0) - inner:pt(inner.sup):withZ(0)
+            ).z > 0 and {inner, outer} or {outer, inner}
+        )
         local function makeModel(seq, scale)
-            return func.map2(func.range(seq, 1, #seq - 1), func.range(seq, 2, #seq), function(rad1, rad2)
-                return station.newModel(model, m, coor.scaleY(scale), mPlace(obj, rad1, rad2))
-            end)
+            return pipe.new * func.map(func.interlace(seq, {"i", "s"}), 
+            function(rad)
+                return {
+                    station.newModel(model .. "_tl.mdl",
+                    mPlace(fitTopLeft, arcL, arcR, rad.i, rad.s)
+                ),
+                    station.newModel(model .. "_br.mdl",
+                    mPlace(fitBottomRight, arcL, arcR, rad.i, rad.s)
+                )
+            }
+            end) * pipe.flatten()
         end
         return {
             makeModel(coordsGen(junction.normalizeRad(obj.inf), junction.normalizeRad(obj.mid))),
@@ -166,5 +303,6 @@ function junction.regularizeRad(rad)
         and junction.regularizeRad(rad - pi)
         or (rad < -pi and junction.regularizeRad(rad + pi) or rad)
 end
+
 
 return junction

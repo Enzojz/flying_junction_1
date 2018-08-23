@@ -71,13 +71,12 @@ end
 
 local function gmPlaceA(fz, r)
     return function(fitModel, arcL, arcR, rad1, rad2)
-        
         local p1, p2 = fz(rad1), fz(rad2)
         local size = {
-            lt = arcL:pt(rad1):withZ(wallHeight),
-            lb = arcL:pt(rad2):withZ(wallHeight),
-            rt = arcR:pt(rad1):withZ(wallHeight + p1.y),
-            rb = arcR:pt(rad2):withZ(wallHeight + p2.y)
+            lt = arcL:pt(rad1):withZ(p1.y),
+            lb = arcL:pt(rad2):withZ(p2.y),
+            rt = arcR:pt(rad1):withZ(p1.y),
+            rb = arcR:pt(rad2):withZ(p2.y)
         }
         return fitModel(size)
     end
@@ -178,12 +177,12 @@ local retriveFn = function(config)
         mPlaceA = mPlaceA,
         mPlaceD = function(fitModel, arcL, arcR, rad1, rad2)
             local size = {
-                lt = arcL:pt(rad1):withZ(wallHeight),
-                lb = arcL:pt(rad2):withZ(wallHeight),
-                rt = arcR:pt(rad1):withZ(wallHeight),
-                rb = arcR:pt(rad2):withZ(wallHeight)
+                lt = arcL:pt(rad1):withZ(0),
+                lb = arcL:pt(rad2):withZ(0),
+                rt = arcR:pt(rad1):withZ(0),
+                rb = arcR:pt(rad2):withZ(0)
             }
-            return fitModel(size) * coor.transZ(-wallHeight)
+            return fitModel(size)
         end,
         isDesc = function(a, b) return config.height > 0 and a or b end
     }
@@ -246,7 +245,7 @@ end
 
 local retriveTrackSurfaces = function(tracks)
     return tracks
-        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, junction.fitModel2D(5, 5), 5, tr.fn.mPlaceA)) end)
+        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, junction.fitModel(5, 5, -1.3), 5, tr.fn.mPlaceA)) end)
         * pipe.flatten()
         * pipe.flatten()
         * pipe.flatten()
@@ -255,8 +254,12 @@ end
 local retriveWalls = function(walls)
     return walls
         * pipe.map(function(w) return
-            w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   junction.fitModel2D(1, 5), 1, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
-            + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, junction.fitModel2D(1, 5), 1, w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
+            w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   
+                w.fn.isDesc(junction.fitModel(0.5, 5, -11), junction.fitModel2D(0.5, 5)), 0.5, 
+                w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
+            + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, 
+                w.fn.isDesc(junction.fitModel(0.5, 5, 1.5), junction.fitModel2D(0.5, 5)), 0.5, 
+                w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
         end)
         * pipe.map(pipe.flatten())
         * pipe.map(pipe.flatten())

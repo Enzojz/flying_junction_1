@@ -43,11 +43,23 @@ end
 
 junction.infi = 1e8
 
+local normalizeSize = function(size)
+    return 
+        ((size.lt - size.lb):cross(size.rb - size.lb).z < 0 )
+        and size
+        or {
+            lt = size.rt,
+            lb = size.rb,
+            rt = size.lt,
+            rb = size.lb
+        }
+end
 
 
 junction.fitModel2D = function(w, h)
     return function(fitTop, fitLeft)
         return function(size)
+            local size = normalizeSize(size)
             local s = {
                 coor.xyz(0, 0),
                 coor.xyz(fitLeft and w or -w, 0),
@@ -111,14 +123,15 @@ junction.fitModel2D = function(w, h)
     end
 end
 
-junction.fitModel = function(w, h, d)
+junction.fitModel = function(w, h)
     return function(fitTop, fitLeft)
         return function(size)
+            local size = normalizeSize(size)
             local s = {
-                coor.xyz(0, 0, d),
-                coor.xyz(fitLeft and w or -w, 0, d),
-                coor.xyz(0, fitTop and -h or h, d),
-                coor.xyz(0, 0, 0)
+                coor.xyz(0, 0, 0),
+                coor.xyz(fitLeft and w or -w, 0, 0),
+                coor.xyz(0, fitTop and -h or h, 0),
+                coor.xyz(0, 0, -1)
             }
             
             local t = fitTop and
@@ -143,7 +156,7 @@ junction.fitModel = function(w, h, d)
                 t[1].x, t[1].y, t[1].z, 1,
                 t[2].x, t[2].y, t[2].z, 1,
                 t[3].x, t[3].y, t[3].z, 1,
-                t[1].x, t[1].y, t[1].z + d, 1
+                t[1].x, t[1].y, t[1].z - 1, 1
             }
             
             local dX = coor.det(mX)
@@ -243,20 +256,15 @@ junction.makeFn = function(model, fitModel, w, mPlace, length)
         local coordsGen = arc.coords(obj, length)
         local inner = obj + (- w * 0.5)
         local outer = obj + (w * 0.5)
-        local arcL, arcR = table.unpack(
-            (inner:pt(inner.inf):withZ(0) - inner:pt(inner.sup):withZ(0)):cross(
-                outer:pt(outer.sup):withZ(0) - inner:pt(inner.sup):withZ(0)
-            ).z > 0 and {inner, outer} or {outer, inner}
-        )
         local function makeModel(seq, scale)
             return pipe.new * func.map(func.interlace(seq, {"i", "s"}), 
             function(rad)
                 return {
                     station.newModel(model .. "_tl.mdl",
-                    mPlace(fitTopLeft, arcL, arcR, rad.i, rad.s)
+                    mPlace(fitTopLeft, inner, outer, rad.i, rad.s)
                 ),
                     station.newModel(model .. "_br.mdl",
-                    mPlace(fitBottomRight, arcL, arcR, rad.i, rad.s)
+                    mPlace(fitBottomRight, inner, outer, rad.i, rad.s)
                 )
             }
             end) * pipe.flatten()

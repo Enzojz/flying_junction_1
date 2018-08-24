@@ -28,7 +28,7 @@ return {
 			matConfigs = {
 				{ 0, }, 
 			},
-			static = false,
+			static = true,
 			visibleFrom = 0,
 			visibleTo = 5000,
 		}, 

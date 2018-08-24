@@ -375,34 +375,24 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     local upperFences = func.map(upperGroup.tracks, function(t)
         local inner = t + (-2.5)
         local outer = t + 2.5
-        local arcL, arcR = table.unpack(
-            (inner:pt(inner.inf):withZ(0) - inner:pt(inner.sup):withZ(0)):cross(
-                outer:pt(outer.sup):withZ(0) - inner:pt(inner.sup):withZ(0)
-            ).z > 0 and {inner, outer} or {outer, inner}
-        )
         local diff = 0.5 / t.r 
         return {
-            station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), arcL, arcR, t.inf, t.inf - diff)),
-            station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), arcL, arcR, t.inf, t.inf - diff)),
-            station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), arcL, arcR, t.sup, t.sup + diff)),
-            station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), arcL, arcR, t.sup, t.sup + diff))
+            station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), inner, outer, t.inf, t.inf - diff)),
+            station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), inner, outer, t.inf, t.inf - diff)),
+            station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), inner, outer, t.sup, t.sup + diff)),
+            station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), inner, outer, t.sup, t.sup + diff))
         }
     end)
     
     local fences = func.map(trackSets, function(t)
-        local inner = t + (-2.75)
-        local outer = t + 2.75
-        local arcL, arcR = table.unpack(
-            (inner:pt(inner.inf):withZ(0) - inner:pt(inner.sup):withZ(0)):cross(
-                outer:pt(outer.sup):withZ(0) - inner:pt(inner.sup):withZ(0)
-            ).z > 0 and {inner, outer} or {outer, inner}
-        )
+        local inner = t + (-3)
+        local outer = t + 3
         local diff = 0.5 / t.r 
         return {
-            station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(5.5, 0.5)(true, true), arcL, arcR, t.inf, t.inf - diff)),
-            station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(5.5, 0.5)(false, false), arcL, arcR, t.inf, t.inf - diff)),
-            station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(5.5, 0.5)(true, true), arcL, arcR, t.sup, t.sup + diff)),
-            station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(5.5, 0.5)(false, false), arcL, arcR, t.sup, t.sup + diff)),
+            station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(6, 0.5)(true, true),   inner, outer, t.inf, t.inf - diff)),
+            station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(6, 0.5)(false, false), inner, outer, t.inf, t.inf - diff)),
+            station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(6, 0.5)(true, true),   inner, outer, t.sup, t.sup + diff)),
+            station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(6, 0.5)(false, false), inner, outer, t.sup, t.sup + diff)),
         }
     end)
     
@@ -533,8 +523,8 @@ local slopeWalls = function(
                 * pipe.mapFlatten(function(arc)
                     local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight)
                     return {
-                        junction.makeFn(models.mSidePillar, junction.fitModel(0.5, 5, -11), 0.5, mPlace)(arc),
-                        junction.makeFn(models.mRoofFenceS, junction.fitModel(0.5, 5, 1.5), 0.5, mPlace)(arc)
+                        junction.makeFn(models.mSidePillar, junction.fitModel(0.5, 5), 0.5, mPlace)(arc),
+                        junction.makeFn(models.mRoofFenceS, junction.fitModel(0.5, 5), 0.5, mPlace)(arc)
                     }
                 end)
         end)

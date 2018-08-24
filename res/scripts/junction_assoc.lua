@@ -245,7 +245,7 @@ end
 
 local retriveTrackSurfaces = function(tracks)
     return tracks
-        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, junction.fitModel(5, 5, -1.3), 5, tr.fn.mPlaceA)) end)
+        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, junction.fitModel(5, 5), 5, tr.fn.mPlaceA)) end)
         * pipe.flatten()
         * pipe.flatten()
         * pipe.flatten()
@@ -255,10 +255,10 @@ local retriveWalls = function(walls)
     return walls
         * pipe.map(function(w) return
             w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   
-                w.fn.isDesc(junction.fitModel(0.5, 5, -11), junction.fitModel2D(0.5, 5)), 0.5, 
+                w.fn.isDesc(junction.fitModel(0.5, 5), junction.fitModel2D(0.5, 5)), 0.5, 
                 w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
             + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, 
-                w.fn.isDesc(junction.fitModel(0.5, 5, 1.5), junction.fitModel2D(0.5, 5)), 0.5, 
+                w.fn.isDesc(junction.fitModel(0.5, 5), junction.fitModel2D(0.5, 5)), 0.5, 
                 w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
         end)
         * pipe.map(pipe.flatten())

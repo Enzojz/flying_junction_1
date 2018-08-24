@@ -375,7 +375,7 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     local upperFences = func.map(upperGroup.tracks, function(t)
         local inner = t + (-2.5)
         local outer = t + 2.5
-        local diff = 0.5 / t.r 
+        local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
         return {
             station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), inner, outer, t.inf, t.inf - diff)),
             station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), inner, outer, t.inf, t.inf - diff)),
@@ -387,7 +387,7 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
     local fences = func.map(trackSets, function(t)
         local inner = t + (-3)
         local outer = t + 3
-        local diff = 0.5 / t.r 
+        local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
         return {
             station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(6, 0.5)(true, true),   inner, outer, t.inf, t.inf - diff)),
             station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(6, 0.5)(false, false), inner, outer, t.inf, t.inf - diff)),

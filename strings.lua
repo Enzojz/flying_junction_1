@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.15
+* Reimplementation of models and model positioning algorithm to have non-overlapping, non-flickering walls or bricks, 
 1.14
 * CommonAPI support
 * Seperation of upper/lower track types
@@ -74,6 +76,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.15
+* Reimplémentation de l'algorithme de positionement des maquettes pour éviter la superposition et scintillement entre des maquettes
 1.14
 * Support de CommonAPI
 * Séparation d'option de type de voie du haut et du bas
@@ -126,6 +130,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.15
+* 重写了模型和模型放置算法，消除了前后墙或者砖的模型之间的重叠和闪烁现象
 1.14
 * 增加了CommonAPI支持
 * 增加了分离的上下层轨道类型选项

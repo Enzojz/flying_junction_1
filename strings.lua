@@ -15,7 +15,7 @@ Implemented functions:
 
 Changelog:
 1.15
-* Reimplementation of models and model positioning algorithm to have non-overlapping, non-flickering walls or bricks, 
+* Reimplementation of models and model positioning algorithm to have non-overlapping, non-flickering walls or bricks
 1.14
 * CommonAPI support
 * Seperation of upper/lower track types

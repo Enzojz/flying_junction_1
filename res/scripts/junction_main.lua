@@ -334,7 +334,7 @@ local function trackGroup(info, offsets)
 end
 
 local function generateStructure(lowerGroup, upperGroup, mDepth, models)
-    local function mPlace(fitModel, arcL, arcR, rad1, rad2)
+    local function mPlaceD(fitModel, arcL, arcR, rad1, rad2)
         local size = {
             lt = arcL:pt(rad1):withZ(0),
             lb = arcL:pt(rad2):withZ(0),
@@ -342,10 +342,10 @@ local function generateStructure(lowerGroup, upperGroup, mDepth, models)
             rb = arcR:pt(rad2):withZ(0)
         }
 
-        return fitModel(size) * mDepth
+        return fitModel(size)
     end
-    local mPlaceD = function()
-        return coor.I()
+    local function mPlace(fitModel, arcL, arcR, rad1, rad2)
+        return mPlaceD(fitModel, arcL, arcR, rad1, rad2) * mDepth
     end
     
     local makeExtWall = junction.makeFn(models.mSidePillar, junction.fitModel2D(0.5, 5), 0.5, mPlaceD)

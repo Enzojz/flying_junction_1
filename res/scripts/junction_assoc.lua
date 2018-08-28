@@ -243,26 +243,30 @@ local retrivePolys = function(extLon, extLat)
     end
 end
 
-local retriveTrackSurfaces = function(tracks)
-    return tracks
-        * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, junction.fitModel(5, 5), 5, tr.fn.mPlaceA)) end)
-        * pipe.flatten()
-        * pipe.flatten()
-        * pipe.flatten()
+local retriveTrackSurfaces = function(fitModel, fitModel2D)
+    return function(tracks)
+        return tracks
+            * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, fitModel(5, 5), 5, tr.fn.mPlaceA)) end)
+            * pipe.flatten()
+            * pipe.flatten()
+            * pipe.flatten()
+    end
 end
 
-local retriveWalls = function(walls)
-    return walls
-        * pipe.map(function(w) return
-            w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   
-                w.fn.isDesc(junction.fitModel(0.5, 5), junction.fitModel2D(0.5, 5)), 0.5, 
-                w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
-            + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, 
-                w.fn.isDesc(junction.fitModel(0.5, 5), junction.fitModel2D(0.5, 5)), 0.5, 
-                w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
-        end)
-        * pipe.map(pipe.flatten())
-        * pipe.map(pipe.flatten())
+local retriveWalls = function(fitModel, fitModel2D)
+    return function(walls)
+        return walls
+            * pipe.map(function(w) return
+                w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   
+                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5, 
+                    w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
+                + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, 
+                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5, 
+                    w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
+            end)
+            * pipe.map(pipe.flatten())
+            * pipe.map(pipe.flatten())
+    end
 end
 
 return {

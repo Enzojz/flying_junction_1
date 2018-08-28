@@ -897,8 +897,8 @@ local updateFn = function(fParams, models)
                 return {
                     edges = retriveX(jA.retriveTracks, preparedExt.tracks),
                     polys = retriveX(jA.retrivePolys(), preparedExt.tracks),
-                    surface = retriveX(jA.retriveTrackSurfaces, preparedExt.tracks),
-                    walls = retriveX(jA.retriveWalls, preparedExt.walls)
+                    surface = retriveX(jA.retriveTrackSurfaces(fitModel, fitModel2D), preparedExt.tracks),
+                    walls = retriveX(jA.retriveWalls(fitModel, fitModel2D), preparedExt.walls)
                 }, preparedExt
             end)()
             

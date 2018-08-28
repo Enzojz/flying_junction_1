@@ -15,7 +15,7 @@ Implemented functions:
 
 Changelog:
 1.16
-* Fixed error on models when mirrored is set on
+* Model errors when mirrored is set on are fixed
 1.15
 * Reimplementation of models and model positioning algorithm to have non-overlapping, non-flickering walls or bricks
 1.14
@@ -78,6 +78,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.16
+* Correction des erreurs des maquettes lors l'infrastructure est en miroir 
 1.15
 * Reimplémentation de l'algorithme de positionement des maquettes pour éviter la superposition et scintillement entre des maquettes
 1.14
@@ -132,6 +134,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.16
+* 修正了镜像下的模型错误
 1.15
 * 重写了模型和模型放置算法，消除了前后墙或者砖的模型之间的重叠和闪烁现象
 1.14

@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.16
+* Fixed error on models when mirrored is set on
 1.15
 * Reimplementation of models and model positioning algorithm to have non-overlapping, non-flickering walls or bricks
 1.14

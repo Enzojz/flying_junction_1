@@ -43,9 +43,9 @@ end
 
 junction.infi = 1e8
 
-local normalizeSize = function(size)
+local normalizeSize = function(mirrored, size)
     return 
-        ((size.lt - size.lb):cross(size.rb - size.lb).z < 0 )
+        ((size.lt - size.lb):cross(size.rb - size.lb).z * (mirrored and -1 or 1) < 0)
         and size
         or {
             lt = size.rt,
@@ -56,120 +56,124 @@ local normalizeSize = function(size)
 end
 
 
-junction.fitModel2D = function(w, h)
-    return function(fitTop, fitLeft)
-        return function(size)
-            local size = normalizeSize(size)
-            local s = {
-                coor.xyz(0, 0),
-                coor.xyz(fitLeft and w or -w, 0),
-                coor.xyz(0, fitTop and -h or h),
-            }
-            
-            local t = fitTop and
-                {
-                    fitLeft and size.lt or size.rt,
-                    fitLeft and size.rt or size.lt,
-                    fitLeft and size.lb or size.rb,
-                } or {
-                    fitLeft and size.lb or size.rb,
-                    fitLeft and size.rb or size.lb,
-                    fitLeft and size.lt or size.rt,
+junction.fitModel2D = function(mirrored)
+    return function(w, h)
+        return function(fitTop, fitLeft)
+            return function(size)
+                local size = normalizeSize(mirrored, size)
+                local s = {
+                    coor.xyz(0, 0),
+                    coor.xyz(fitLeft and w or -w, 0),
+                    coor.xyz(0, fitTop and -h or h),
                 }
-            
-            local mX = {
-                {s[1].x, s[1].y, 1},
-                {s[2].x, s[2].y, 1},
-                {s[3].x, s[3].y, 1},
-            }
-            
-            local mU = {
-                t[1].x, t[1].y, 1,
-                t[2].x, t[2].y, 1,
-                t[3].x, t[3].y, 1,
-            }
-            
-            local dX = coor.det(mX)
-            
-            local miX = coor.minor(mX)
-            local mXI = func.mapFlatten(func.seq(1, 3),
-                function(l)
-                    return func.seqMap({1, 3}, function(c)
-                        return ((l + c) % 2 == 0 and 1 or -1) * coor.det(miX(c, l)) / dX
+                
+                local t = fitTop and
+                    {
+                        fitLeft and size.lt or size.rt,
+                        fitLeft and size.rt or size.lt,
+                        fitLeft and size.lb or size.rb,
+                    } or {
+                        fitLeft and size.lb or size.rb,
+                        fitLeft and size.rb or size.lb,
+                        fitLeft and size.lt or size.rt,
+                    }
+                
+                local mX = {
+                    {s[1].x, s[1].y, 1},
+                    {s[2].x, s[2].y, 1},
+                    {s[3].x, s[3].y, 1},
+                }
+                
+                local mU = {
+                    t[1].x, t[1].y, 1,
+                    t[2].x, t[2].y, 1,
+                    t[3].x, t[3].y, 1,
+                }
+                
+                local dX = coor.det(mX)
+                
+                local miX = coor.minor(mX)
+                local mXI = func.mapFlatten(func.seq(1, 3),
+                    function(l)
+                        return func.seqMap({1, 3}, function(c)
+                            return ((l + c) % 2 == 0 and 1 or -1) * coor.det(miX(c, l)) / dX
+                        end)
                     end)
-                end)
-            
-            local function mul(m1, m2)
-                local m = function(line, col)
-                    local l = (line - 1) * 3
-                    return m1[l + 1] * m2[col + 0] + m1[l + 2] * m2[col + 3] + m1[l + 3] * m2[col + 6]
+                
+                local function mul(m1, m2)
+                    local m = function(line, col)
+                        local l = (line - 1) * 3
+                        return m1[l + 1] * m2[col + 0] + m1[l + 2] * m2[col + 3] + m1[l + 3] * m2[col + 6]
+                    end
+                    return {
+                        m(1, 1), m(1, 2), m(1, 3),
+                        m(2, 1), m(2, 2), m(2, 3),
+                        m(3, 1), m(3, 2), m(3, 3),
+                    }
                 end
-                return {
-                    m(1, 1), m(1, 2), m(1, 3),
-                    m(2, 1), m(2, 2), m(2, 3),
-                    m(3, 1), m(3, 2), m(3, 3),
+                
+                local mXi = mul(mXI, mU)
+                
+                return coor.I() * {
+                    mXi[1], mXi[2], 0, mXi[3],
+                    mXi[4], mXi[5], 0, mXi[6],
+                    0, 0, 1, 0,
+                    mXi[7], mXi[8], 0, mXi[9]
                 }
             end
-            
-            local mXi = mul(mXI, mU)
-            
-            return coor.I() * {
-                mXi[1], mXi[2], 0, mXi[3],
-                mXi[4], mXi[5], 0, mXi[6],
-                0, 0, 1, 0,
-                mXi[7], mXi[8], 0, mXi[9]
-            }
         end
     end
 end
 
-junction.fitModel = function(w, h)
-    return function(fitTop, fitLeft)
-        return function(size)
-            local size = normalizeSize(size)
-            local s = {
-                coor.xyz(0, 0, 0),
-                coor.xyz(fitLeft and w or -w, 0, 0),
-                coor.xyz(0, fitTop and -h or h, 0),
-                coor.xyz(0, 0, -1)
-            }
-            
-            local t = fitTop and
-                {
-                    fitLeft and size.lt or size.rt,
-                    fitLeft and size.rt or size.lt,
-                    fitLeft and size.lb or size.rb,
-                } or {
-                    fitLeft and size.lb or size.rb,
-                    fitLeft and size.rb or size.lb,
-                    fitLeft and size.lt or size.rt,
+junction.fitModel = function(mirrored)
+    return function(w, h)
+        return function(fitTop, fitLeft)
+            return function(size)
+                local size = normalizeSize(mirrored, size)
+                local s = {
+                    coor.xyz(0, 0, 0),
+                    coor.xyz(fitLeft and w or -w, 0, 0),
+                    coor.xyz(0, fitTop and -h or h, 0),
+                    coor.xyz(0, 0, -1)
                 }
-            
-            local mX = {
-                {s[1].x, s[1].y, s[1].z, 1},
-                {s[2].x, s[2].y, s[2].z, 1},
-                {s[3].x, s[3].y, s[3].z, 1},
-                {s[4].x, s[4].y, s[4].z, 1}
-            }
-            
-            local mU = {
-                t[1].x, t[1].y, t[1].z, 1,
-                t[2].x, t[2].y, t[2].z, 1,
-                t[3].x, t[3].y, t[3].z, 1,
-                t[1].x, t[1].y, t[1].z - 1, 1
-            }
-            
-            local dX = coor.det(mX)
-            
-            local miX = coor.minor(mX)
-            local mXI = func.mapFlatten(func.seq(1, 4),
-                function(l)
-                    return func.seqMap({1, 4}, function(c)
-                        return ((l + c) % 2 == 0 and 1 or -1) * coor.det(miX(c, l)) / dX
+                
+                local t = fitTop and
+                    {
+                        fitLeft and size.lt or size.rt,
+                        fitLeft and size.rt or size.lt,
+                        fitLeft and size.lb or size.rb,
+                    } or {
+                        fitLeft and size.lb or size.rb,
+                        fitLeft and size.rb or size.lb,
+                        fitLeft and size.lt or size.rt,
+                    }
+                
+                local mX = {
+                    {s[1].x, s[1].y, s[1].z, 1},
+                    {s[2].x, s[2].y, s[2].z, 1},
+                    {s[3].x, s[3].y, s[3].z, 1},
+                    {s[4].x, s[4].y, s[4].z, 1}
+                }
+                
+                local mU = {
+                    t[1].x, t[1].y, t[1].z, 1,
+                    t[2].x, t[2].y, t[2].z, 1,
+                    t[3].x, t[3].y, t[3].z, 1,
+                    t[1].x, t[1].y, t[1].z - 1, 1
+                }
+                
+                local dX = coor.det(mX)
+                
+                local miX = coor.minor(mX)
+                local mXI = func.mapFlatten(func.seq(1, 4),
+                    function(l)
+                        return func.seqMap({1, 4}, function(c)
+                            return ((l + c) % 2 == 0 and 1 or -1) * coor.det(miX(c, l)) / dX
+                        end)
                     end)
-                end)
-            
-            return coor.I() * mXI * mU
+                
+                return coor.I() * mXI * mU
+            end
         end
     end
 end

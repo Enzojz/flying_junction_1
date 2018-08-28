@@ -333,203 +333,208 @@ local function trackGroup(info, offsets)
     return func.with(result, {ext = ext})
 end
 
-local function generateStructure(lowerGroup, upperGroup, mDepth, models)
-    local function mPlaceD(fitModel, arcL, arcR, rad1, rad2)
-        local size = {
-            lt = arcL:pt(rad1):withZ(0),
-            lb = arcL:pt(rad2):withZ(0),
-            rt = arcR:pt(rad1):withZ(0),
-            rb = arcR:pt(rad2):withZ(0)
-        }
+local function generateStructure(fitModel, fitModel2D)
+    return function(lowerGroup, upperGroup, mDepth, models, fitModels)
+        local function mPlaceD(fitModel, arcL, arcR, rad1, rad2)
+            local size = {
+                lt = arcL:pt(rad1):withZ(0),
+                lb = arcL:pt(rad2):withZ(0),
+                rt = arcR:pt(rad1):withZ(0),
+                rb = arcR:pt(rad2):withZ(0)
+            }
 
-        return fitModel(size)
-    end
-    local function mPlace(fitModel, arcL, arcR, rad1, rad2)
-        return mPlaceD(fitModel, arcL, arcR, rad1, rad2) * mDepth
-    end
-    
-    local makeExtWall = junction.makeFn(models.mSidePillar, junction.fitModel2D(0.5, 5), 0.5, mPlaceD)
-    local makeExtWallFence = junction.makeFn(models.mRoofFenceS, junction.fitModel2D(0.5, 5), 0.5, mPlaceD)
-    local makeWall = junction.makeFn(models.mSidePillar, junction.fitModel2D(0.5, 5), 0.5, mPlace)
-    local makeRoof = junction.makeFn(models.mRoof, junction.fitModel2D(5, 5), 5, mPlace)
-    local makeSideFence = junction.makeFn(models.mRoofFenceS, junction.fitModel2D(0.5, 5), 0.5, mPlace)
-    
-    
-    local walls = lowerGroup.walls
-    
-    local trackSets = pipe.new
-        * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
-            function(w1, w2) return pipe.new
-                * lowerGroup.tracks
-                * pipe.filter(function(t) return (t.xOffset < w2.xOffset and t.xOffset > w1.xOffset) or (t.xOffset < w1.xOffset and t.xOffset > w2.xOffset) end)
-                * pipe.map(function(t)
-                    return t:withLimits({
-                        sup = w2.sup,
-                        mid = t:rad(coor.xy(0, 0)),
-                        inf = w1.inf,
-                    }) end)
-            end)
-        * func.flatten
-    
-    
-    local upperFences = func.map(upperGroup.tracks, function(t)
-        local inner = t + (-2.5)
-        local outer = t + 2.5
-        local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
+            return fitModel(size)
+        end
+        local function mPlace(fitModel, arcL, arcR, rad1, rad2)
+            return mPlaceD(fitModel, arcL, arcR, rad1, rad2) * mDepth
+        end
+        
+        local makeExtWall = junction.makeFn(models.mSidePillar, fitModel2D(0.5, 5), 0.5, mPlaceD)
+        local makeExtWallFence = junction.makeFn(models.mRoofFenceS, fitModel2D(0.5, 5), 0.5, mPlaceD)
+        local makeWall = junction.makeFn(models.mSidePillar, fitModel2D(0.5, 5), 0.5, mPlace)
+        local makeRoof = junction.makeFn(models.mRoof, fitModel2D(5, 5), 5, mPlace)
+        local makeSideFence = junction.makeFn(models.mRoofFenceS, fitModel2D(0.5, 5), 0.5, mPlace)
+        
+        
+        local walls = lowerGroup.walls
+        
+        local trackSets = pipe.new
+            * func.map2(func.range(walls, 1, #walls - 1), func.range(walls, 2, #walls),
+                function(w1, w2) return pipe.new
+                    * lowerGroup.tracks
+                    * pipe.filter(function(t) return (t.xOffset < w2.xOffset and t.xOffset > w1.xOffset) or (t.xOffset < w1.xOffset and t.xOffset > w2.xOffset) end)
+                    * pipe.map(function(t)
+                        return t:withLimits({
+                            sup = w2.sup,
+                            mid = t:rad(coor.xy(0, 0)),
+                            inf = w1.inf,
+                        }) end)
+                end)
+            * func.flatten
+        
+        
+        local upperFences = func.map(upperGroup.tracks, function(t)
+            local inner = t + (-2.5)
+            local outer = t + 2.5
+            local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
+            return {
+                station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(false, true), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(true, false), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(false, true), inner, outer, t.sup, t.sup + diff)),
+                station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(true, false), inner, outer, t.sup, t.sup + diff))
+            }
+        end)
+        
+        local fences = func.map(trackSets, function(t)
+            local inner = t + (-3)
+            local outer = t + 3
+            local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
+            return {
+                station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(fitModel2D(6, 0.5)(true, true),   inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(fitModel2D(6, 0.5)(false, false), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(fitModel2D(6, 0.5)(true, true),   inner, outer, t.sup, t.sup + diff)),
+                station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(fitModel2D(6, 0.5)(false, false), inner, outer, t.sup, t.sup + diff)),
+            }
+        end)
+        
+        local sideFencesL = func.map(lowerGroup.walls, function(t)
+            return t:withLimits({
+                sup = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
+                mid = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
+                inf = t.inf,
+            })
+        end)
+        
+        local sideFencesR = func.map(lowerGroup.walls, function(t)
+            return t:withLimits({
+                inf = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
+                mid = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
+                sup = t.sup,
+            })
+        end)
+        
         return {
-            station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), inner, outer, t.inf, t.inf - diff)),
-            station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), inner, outer, t.inf, t.inf - diff)),
-            station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(false, true), inner, outer, t.sup, t.sup + diff)),
-            station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(junction.fitModel2D(5, 0.5)(true, false), inner, outer, t.sup, t.sup + diff))
-        }
-    end)
-    
-    local fences = func.map(trackSets, function(t)
-        local inner = t + (-3)
-        local outer = t + 3
-        local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
-        return {
-            station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(6, 0.5)(true, true),   inner, outer, t.inf, t.inf - diff)),
-            station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(6, 0.5)(false, false), inner, outer, t.inf, t.inf - diff)),
-            station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(junction.fitModel2D(6, 0.5)(true, true),   inner, outer, t.sup, t.sup + diff)),
-            station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(junction.fitModel2D(6, 0.5)(false, false), inner, outer, t.sup, t.sup + diff)),
-        }
-    end)
-    
-    local sideFencesL = func.map(lowerGroup.walls, function(t)
-        return t:withLimits({
-            sup = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
-            mid = t:rad(func.min(upperGroup.walls[1] - t, ptXSelector)),
-            inf = t.inf,
-        })
-    end)
-    
-    local sideFencesR = func.map(lowerGroup.walls, function(t)
-        return t:withLimits({
-            inf = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
-            mid = t:rad(func.min(upperGroup.walls[2] - t, ptXSelector)),
-            sup = t.sup,
-        })
-    end)
-    
-    return {
-        {
-            fixed = pipe.new
-            + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
-            + func.mapFlatten(fences, pipe.range(1, 2))
-            + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
-            + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
-            + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
-            + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[1] end)
+            {
+                fixed = pipe.new
+                + func.mapFlatten(walls, function(w) return makeWall(w)[1] end)
+                + func.mapFlatten(fences, pipe.range(1, 2))
+                + func.mapFlatten(trackSets, function(t) return makeRoof(t)[1] end)
+                + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[1] end)
+                + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[1] end)
+                + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[1] end)
+                ,
+                upper = pipe.new
+                + makeSideFence(upperGroup.walls[2])[1]
+                + makeWall(upperGroup.walls[2])[1]
+                + func.mapFlatten(upperFences, pipe.range(1, 2))
+                ,
+                lower = pipe.new
+                + makeExtWall(lowerGroup.extWalls[1])[1]
+                + makeExtWallFence(lowerGroup.extWalls[1])[1]
+            }
             ,
-            upper = pipe.new
-            + makeSideFence(upperGroup.walls[2])[1]
-            + makeWall(upperGroup.walls[2])[1]
-            + func.mapFlatten(upperFences, pipe.range(1, 2))
-            ,
-            lower = pipe.new
-            + makeExtWall(lowerGroup.extWalls[1])[1]
-            + makeExtWallFence(lowerGroup.extWalls[1])[1]
+            {
+                fixed = pipe.new
+                + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
+                + func.mapFlatten(fences, pipe.range(3, 4))
+                + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
+                + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
+                + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[2] end)
+                + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
+                ,
+                upper = pipe.new
+                + makeSideFence(upperGroup.walls[1])[2]
+                + makeWall(upperGroup.walls[1])[2]
+                + func.mapFlatten(upperFences, pipe.range(3, 4))
+                ,
+                lower = pipe.new
+                + makeExtWall(lowerGroup.extWalls[2])[2]
+                + makeExtWallFence(lowerGroup.extWalls[2])[2]
+            }
         }
-        ,
-        {
-            fixed = pipe.new
-            + func.mapFlatten(walls, function(w) return makeWall(w)[2] end)
-            + func.mapFlatten(fences, pipe.range(3, 4))
-            + func.mapFlatten(trackSets, function(t) return makeRoof(t)[2] end)
-            + func.mapFlatten(upperGroup.tracks, function(t) return makeRoof(t)[2] end)
-            + func.mapFlatten(sideFencesL, function(t) return makeSideFence(t)[2] end)
-            + func.mapFlatten(sideFencesR, function(t) return makeSideFence(t)[2] end)
-            ,
-            upper = pipe.new
-            + makeSideFence(upperGroup.walls[1])[2]
-            + makeWall(upperGroup.walls[1])[2]
-            + func.mapFlatten(upperFences, pipe.range(3, 4))
-            ,
-            lower = pipe.new
-            + makeExtWall(lowerGroup.extWalls[2])[2]
-            + makeExtWallFence(lowerGroup.extWalls[2])[2]
-        }
-    }
+    end
 end
 
 
-local slopeWalls = function(
-    info,
-    models,
-    tunnelHeight,
-    extA, mainA,
-    extB, mainB,
-    upperL, upperR
-    )
-    local function retriveRef(result, arc, ...)
-        return arc
-            and retriveRef(result / (result[#result] + abs(arc.inf - arc.sup) * arc.r), ...)
-            or result
-    end
-    
-    return pipe.new
-        / func.map2(info.A.upper.isTerra and extA or {}, mainA,
-            function(w, cw)
-                return {
-                    guidelines = func.filter({
-                        cw:withLimits({sup = cw.inf, inf = mainA[#mainA].inf}),
-                        w.guidelines[2],
-                        w.guidelines[1]
-                    }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
-                    lower = w.guidelines[2],
-                    another = w.guidelines[1],
-                    upper = upperL.guidelines[1],
-                    fz = upperL.fn.fz,
-                    from = "sup", to = "inf"
-                }
-            end)
-        / func.map2(info.B.upper.isTerra and extB or {}, mainB,
-            function(w, cw)
-                return {
-                    guidelines = func.filter({
-                        cw:withLimits({inf = cw.sup, sup = mainB[1].sup}),
-                        w.guidelines[1],
-                        w.guidelines[2]
-                    }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
-                    lower = w.guidelines[1],
-                    another = w.guidelines[2],
-                    upper = upperR.guidelines[1],
-                    fz = upperR.fn.fz,
-                    from = "inf", to = "sup"
-                }
-            end)
-        * pipe.map(function(ws) return {ws[1], ws[#ws]} end)
-        * pipe.flatten()
-        * pipe.mapFlatten(function(sw)
-            local arcs = pipe.new
-                * sw.guidelines
-                * pipe.map(function(g)
-                    local loc = detectSlopeIntersection(g, sw.upper, sw.fz, g[sw.from], g[sw.to] - g[sw.from])
-                    local floc = abs(loc - g[sw.from]) < abs(g[sw.from] - g[sw.to]) and loc or g[sw.to]
-                    return g:withLimits({
-                        [sw.from] = g[sw.from],
-                        [sw.to] = floc,
-                        mid = (g[sw.from] + floc) * 0.5
-                    })
-                end
-                )
-                * pipe.filter(function(ar) return abs(ar.inf - ar.sup) * ar.r > 0.01 end)
-            
-            return retriveRef(pipe.new * {0}, table.unpack(arcs))
-                * function(ls) return ls * pipe.map(pipe.mul(1 / ls[#ls])) end
-                * function(ls) return func.zip(ls * pipe.range(1, #ls - 1), ls * pipe.range(2, #ls), {"f", "t"}) end
-                * pipe.map2(arcs, function(r, ar) return func.with(ar, r) end)
-                * pipe.mapFlatten(function(arc)
-                    local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight)
+local slopeWalls = function(fitModel, fitModel2D)
+    return function(
+        info,
+        models,
+        tunnelHeight,
+        extA, mainA,
+        extB, mainB,
+        upperL, upperR
+        )
+
+        local function retriveRef(result, arc, ...)
+            return arc
+                and retriveRef(result / (result[#result] + abs(arc.inf - arc.sup) * arc.r), ...)
+                or result
+        end
+        
+        return pipe.new
+            / func.map2(info.A.upper.isTerra and extA or {}, mainA,
+                function(w, cw)
                     return {
-                        junction.makeFn(models.mSidePillar, junction.fitModel(0.5, 5), 0.5, mPlace)(arc),
-                        junction.makeFn(models.mRoofFenceS, junction.fitModel(0.5, 5), 0.5, mPlace)(arc)
+                        guidelines = func.filter({
+                            cw:withLimits({sup = cw.inf, inf = mainA[#mainA].inf}),
+                            w.guidelines[2],
+                            w.guidelines[1]
+                        }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
+                        lower = w.guidelines[2],
+                        another = w.guidelines[1],
+                        upper = upperL.guidelines[1],
+                        fz = upperL.fn.fz,
+                        from = "sup", to = "inf"
                     }
                 end)
-        end)
-        * pipe.flatten()
-        * pipe.flatten()
+            / func.map2(info.B.upper.isTerra and extB or {}, mainB,
+                function(w, cw)
+                    return {
+                        guidelines = func.filter({
+                            cw:withLimits({inf = cw.sup, sup = mainB[1].sup}),
+                            w.guidelines[1],
+                            w.guidelines[2]
+                        }, function(g) return abs(g.inf - g.sup) * g.r > 0.1 end),
+                        lower = w.guidelines[1],
+                        another = w.guidelines[2],
+                        upper = upperR.guidelines[1],
+                        fz = upperR.fn.fz,
+                        from = "inf", to = "sup"
+                    }
+                end)
+            * pipe.map(function(ws) return {ws[1], ws[#ws]} end)
+            * pipe.flatten()
+            * pipe.mapFlatten(function(sw)
+                local arcs = pipe.new
+                    * sw.guidelines
+                    * pipe.map(function(g)
+                        local loc = detectSlopeIntersection(g, sw.upper, sw.fz, g[sw.from], g[sw.to] - g[sw.from])
+                        local floc = abs(loc - g[sw.from]) < abs(g[sw.from] - g[sw.to]) and loc or g[sw.to]
+                        return g:withLimits({
+                            [sw.from] = g[sw.from],
+                            [sw.to] = floc,
+                            mid = (g[sw.from] + floc) * 0.5
+                        })
+                    end
+                    )
+                    * pipe.filter(function(ar) return abs(ar.inf - ar.sup) * ar.r > 0.01 end)
+                
+                return retriveRef(pipe.new * {0}, table.unpack(arcs))
+                    * function(ls) return ls * pipe.map(pipe.mul(1 / ls[#ls])) end
+                    * function(ls) return func.zip(ls * pipe.range(1, #ls - 1), ls * pipe.range(2, #ls), {"f", "t"}) end
+                    * pipe.map2(arcs, function(r, ar) return func.with(ar, r) end)
+                    * pipe.mapFlatten(function(arc)
+                        local mPlace = mPlaceSlopeWall(sw, arc, tunnelHeight)
+                        return {
+                            junction.makeFn(models.mSidePillar, fitModel(0.5, 5), 0.5, mPlace)(arc),
+                            junction.makeFn(models.mRoofFenceS, fitModel(0.5, 5), 0.5, mPlace)(arc)
+                        }
+                    end)
+            end)
+            * pipe.flatten()
+            * pipe.flatten()
+    end
 end
 
 local function params(paramFilter)
@@ -763,6 +768,10 @@ local updateFn = function(fParams, models)
             local buildBridge = upperTrackBuilder.bridge(models.bridgeType)
             local retriveR = function(param) return rList[param + 1] * 1000 end
             
+            local fitModel = junction.fitModel(params.isMir == 1)
+            local fitModel2D = junction.fitModel2D(params.isMir == 1)
+            local generateStructure = generateStructure(fitModel, fitModel2D)
+            local slopeWalls = slopeWalls(fitModel, fitModel2D)
             local info = {
                 A = {
                     lower = {

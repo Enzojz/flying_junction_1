@@ -898,8 +898,9 @@ local updateFn = function(fParams, models)
                 return {
                     edges = retriveX(jA.retriveTracks, preparedExt.tracks),
                     polys = retriveX(jA.retrivePolys(), preparedExt.tracks),
-                    polysNarrow = retriveX(jA.retrivePolys(false, 2), preparedExt.tracks),
-                    surface = retriveX(jA.retriveTrackSurfaces(fitModel, fitModel2D), preparedExt.tracks),
+                    polysNarrow = retriveX(jA.retrivePolys(0, 2.5), preparedExt.tracks),
+                    polysNarrow2 = retriveX(jA.retrivePolys(0, 2.75), preparedExt.tracks),
+                    surface = retriveX(jA.retriveTrackSurfaces(fitModel), preparedExt.tracks),
                     walls = retriveX(jA.retriveWalls(fitModel, fitModel2D), preparedExt.walls)
                 }, preparedExt
             end)()
@@ -970,6 +971,18 @@ local updateFn = function(fParams, models)
                     preparedExt.walls.upper.A[1],
                     preparedExt.walls.upper.B[#preparedExt.walls.upper.B]
             )
+            local function withIfNotBridge(level, part)
+                return function(c)
+                    return (info[part][level].used and not info[part][level].isBridge) and c or {}
+                end
+            end
+            
+            local function withIfSolid(level, part)
+                return function(c)
+                    return (info[part][level].used and not info[part][level].isTerra and not info[part][level].isBridge) and c or {}
+                end
+            end
+            
             local uPolys = function(part)
                 local i = info[part].upper
                 local polySet = ext.polys.upper[part]
@@ -987,7 +1000,7 @@ local updateFn = function(fParams, models)
             )
             end
             
-            local slopeWallArcs = pipe.new
+            local lowerExtraWallPolys = pipe.new
                 / func.map(preparedExt.walls.lower.A,
                     function(w)
                         return {
@@ -1014,27 +1027,63 @@ local updateFn = function(fParams, models)
                     })
                 end
                 ))
-                * pipe.map(function(ar) return junction.generatePolyArc(ar, "inf", "sup")(0, 1) end)
+                * pipe.map(function(ar) return junction.generatePolyArc(ar, "inf", "sup")(0, 0) end)
                 * function(ls) return {A = ls[1], B = ls[2]} end
             
+            
+            local lowerInnerSlotPolys = pipe.new
+                / func.map2(preparedExt.walls.lower.A, {preparedExt.tracks.lower.A[1], preparedExt.tracks.lower.A[#preparedExt.tracks.lower.A]},
+                    function(w, t)
+                        return {
+                            lower = w.guidelines[2]:withLimits({inf = w.guidelines[1]:extendLimits(4).inf}),
+                            upper = preparedExt.walls.upper.A[1].guidelines[1],
+                            track = t.guidelines[2],
+                            fz = preparedExt.walls.upper.A[1].fn.fz,
+                            from = "sup", to = "inf"
+                        }
+                    end)
+                / func.map2(preparedExt.walls.lower.B, {preparedExt.tracks.lower.B[1], preparedExt.tracks.lower.B[#preparedExt.tracks.lower.B]},
+                    function(w, t)
+                        return {
+                            lower = w.guidelines[1]:withLimits({sup = w.guidelines[2]:extendLimits(4).sup}),
+                            upper = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].guidelines[1],
+                            track = t.guidelines[1],
+                            fz = preparedExt.walls.upper.B[#preparedExt.walls.upper.B].fn.fz,
+                            from = "inf", to = "sup"
+                        }
+                    end)
+                * pipe.map(pipe.map(function(sw)
+                    local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
+                    local wall = sw.lower:withLimits({
+                        [sw.to] = loc,
+                        [sw.from] = sw[sw.from],
+                    })
+                    local track = sw.track:withLimits({
+                        [sw.to] = loc,
+                        [sw.from] = sw[sw.from],
+                    })
+                    return {wall, track}
+                end
+                ))
+                * pipe.map(pipe.map(function(ar) return junction.generatePolyArc(ar, "inf", "sup")(0, 0) end))
+                * function(ls) return {A = func.flatten(ls[1]), B = func.flatten(ls[2])} end
+            
             local upperPolys = {
-                A = junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 3.5),
-                B = junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 3.5)
+                A = junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 2.75),
+                B = junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 2.75)
             }
             
             local lowerPolys = {
-                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(4, 2.75),
-                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(4, 2.75)
+                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(0, 2.75),
+                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(0, 2.75)
             }
             
             local lPolys = function(part)
                 local i = info[part].lower
-                local polySet = ext.polysNarrow.lower[part]
+                local polySet = ext.polys.lower[part]
                 return (not i.used)
                     and {}
-                    or {
-                        equal = station.projectPolys(coor.I())(info[part].upper.isTerra and slopeWallArcs[part] or polySet.polys)
-                    }
+                    or {equal = station.projectPolys(coor.I())(info[part].upper.isTerra and info[part].lower.isTerra and lowerExtraWallPolys[part] or polySet.polys)}
             end
             
             local uXPolys = {
@@ -1049,18 +1098,22 @@ local updateFn = function(fParams, models)
                 greater = pipe.new + (info.A.upper.isTerra and {} or station.projectPolys(mDepth)(upperPolys.A))
                 + (info.B.upper.isTerra and {} or station.projectPolys(mDepth)(upperPolys.B))
             }
-            
-            local function withIfNotBridge(level, part)
-                return function(c)
-                    return (info[part][level].used and not info[part][level].isBridge) and c or {}
-                end
-            end
-            
-            local function withIfSolid(level, part)
-                return function(c)
-                    return (info[part][level].used and not info[part][level].isTerra and not info[part][level].isBridge) and c or {}
-                end
-            end
+
+            local lXSurface = (group.A.lower.tracks + group.B.lower.tracks)
+                * pipe.map(
+                    junction.makeFn(models.mRoof, fitModel(5, 5), 5,
+                        function(fitModel, arcL, arcR, rad1, rad2)
+                            local size = {
+                                lt = arcL:pt(rad1):withZ((heightFactor - 1) * tunnelHeight),
+                                lb = arcL:pt(rad2):withZ((heightFactor - 1) * tunnelHeight),
+                                rt = arcR:pt(rad1):withZ((heightFactor - 1) * tunnelHeight),
+                                rb = arcR:pt(rad2):withZ((heightFactor - 1) * tunnelHeight)
+                            }
+                            return fitModel(size)
+                        end)
+                )
+                * pipe.flatten()
+                * pipe.flatten()
             
             local result = {
                 edgeLists = edges,
@@ -1069,6 +1122,9 @@ local updateFn = function(fParams, models)
                 + structure.B.fixed
                 + withIfSolid("upper", "A")(ext.surface.upper.A)
                 + withIfSolid("upper", "B")(ext.surface.upper.B)
+                + (info.A.lower.used and ext.surface.lower.A or {})
+                + (info.B.lower.used and ext.surface.lower.B or {})
+                + lXSurface
                 + (heightFactor > 0
                 and pipe.new
                 + structure.A.upper
@@ -1093,8 +1149,14 @@ local updateFn = function(fParams, models)
                 + station.mergePoly(lPolys("A"), lPolys("B"))()
                 ,
                 groundFaces =
-                    (ext.polys.lower.A.polys + ext.polys.lower.B.polys + lowerPolys.A + lowerPolys.B)
-                    * pipe.map(function(p) return {face = func.map(p, coor.vec2Tuple), modes = {{type = "FILL", key = "hole"}}} end)
+                (
+                lowerPolys.A + lowerPolys.B
+                + (info.A.lower.isTerra and info.A.upper.isTerra and lowerInnerSlotPolys.A or {})
+                + (info.B.lower.isTerra and info.B.upper.isTerra and lowerInnerSlotPolys.B or {})
+                + (info.A.lower.isTerra and ext.polysNarrow.lower.A.polys or ext.polysNarrow2.lower.A.polys)
+                + (info.B.lower.isTerra and ext.polysNarrow.lower.B.polys or ext.polysNarrow2.lower.B.polys)
+                )
+                * pipe.map(function(p) return {face = func.map(p, coor.vec2Tuple), modes = {{type = "FILL", key = "hole"}}} end)
             }
             
             -- End of generation

@@ -245,7 +245,7 @@ local retrivePolys = function(extLon, extLat)
     end
 end
 
-local retriveTrackSurfaces = function(fitModel, fitModel2D)
+local retriveTrackSurfaces = function(fitModel)
     return function(tracks)
         return tracks
             * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, fitModel(5, 5), 5, tr.fn.mPlaceA)) end)
@@ -259,11 +259,11 @@ local retriveWalls = function(fitModel, fitModel2D)
     return function(walls)
         return walls
             * pipe.map(function(w) return
-                w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,   
-                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5, 
+                w.guidelines * pipe.map(junction.makeFn(w.config.models.mSidePillar,
+                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5,
                     w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
-                + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS, 
-                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5, 
+                + w.guidelines * pipe.map(junction.makeFn(w.config.models.mRoofFenceS,
+                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5,
                     w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
             end)
             * pipe.map(pipe.flatten())

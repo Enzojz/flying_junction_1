@@ -3,6 +3,7 @@ local line = require "flyingjunction/coorline"
 local func = require "flyingjunction/func"
 local arc = {}
 
+local math = math
 local sin = math.sin
 local cos = math.cos
 local acos = math.acos

@@ -8,12 +8,14 @@ local junction = require "junction"
 
 local wallHeight = 11
 
+local math = math
 local abs = math.abs
 local atan = math.atan
 local cos = math.cos
 local sin = math.sin
 local tan = math.tan
 local pi = math.pi
+local unpack = table.unpack
 
 local retriveGeometry = function(config, slope)
     local rad = config.radFactor * slope.length / config.r
@@ -41,7 +43,7 @@ local retriveGeometry = function(config, slope)
     
     local limits = pipe.new * {func.range(radList, 2, 4), func.range(radList, 4, 6)}
         * pipe.map(function(s) local rs = {}
-            rs.inf, rs.mid, rs.sup = table.unpack(s)
+            rs.inf, rs.mid, rs.sup = unpack(s)
             return rs
         end)
     
@@ -225,7 +227,7 @@ end
 
 local retrivePolys = function(extLon, extLat)
     extLon = extLon or 4
-    extLat = extLat or 3.5
+    extLat = extLat or 2.75
     
     return function(tracks)
         return tracks

@@ -2,6 +2,7 @@ local coor = require "flyingjunction/coor"
 local line = {}
 
 
+local math = math
 local sin = math.sin
 local cos = math.cos
 

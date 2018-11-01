@@ -1,3 +1,4 @@
+dump = require "inspect"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
 local arc = require "flyingjunction/coorarc"
@@ -5,8 +6,10 @@ local station = require "flyingjunction/stationlib"
 local pipe = require "flyingjunction/pipe"
 local junction = {}
 
+local math = math
 local pi = math.pi
 local abs = math.abs
+local unpack = table.unpack
 
 junction.trackList = {"standard.lua", "high_speed.lua"}
 junction.trackWidthList = {5, 5}
@@ -37,15 +40,15 @@ junction.trackType = pipe.exec * function()
     local typeLower = func.map(type, function(i) return func.with(i, {name = _("Lower Track Type")}) end)
     local typeUpper = func.map(type, function(i) return func.with(i, {key = "trackTypeUpper", name = _("Upper Track Type"), values = func.concat({_("Sync")}, i.values)}) end)
     local catenary = func.map(func.filter(list, function(i) return i.key == "catenary" end), function(i) return func.with(i, {values = {_("None"), _("Both"), _("Lower"), _("Upper")}}) end)
-
+    
     return pipe.new + type + typeUpper + catenary
 end
 
 junction.infi = 1e8
 
 local normalizeSize = function(mirrored, size)
-    return 
-        ((size.lt - size.lb):cross(size.rb - size.lb).z * (mirrored and -1 or 1) < 0)
+    return
+    ((size.lt - size.lb):cross(size.rb - size.lb).z * (mirrored and -1 or 1) < 0)
         and size
         or {
             lt = size.rt,
@@ -258,20 +261,20 @@ junction.makeFn = function(model, fitModel, w, mPlace, length)
     local fitBottomRight = fitModel(false, false)
     return function(obj)
         local coordsGen = arc.coords(obj, length)
-        local inner = obj + (- w * 0.5)
+        local inner = obj + (-w * 0.5)
         local outer = obj + (w * 0.5)
         local function makeModel(seq, scale)
-            return pipe.new * func.map(func.interlace(seq, {"i", "s"}), 
-            function(rad)
-                return {
-                    station.newModel(model .. "_tl.mdl",
-                    mPlace(fitTopLeft, inner, outer, rad.i, rad.s)
-                ),
-                    station.newModel(model .. "_br.mdl",
-                    mPlace(fitBottomRight, inner, outer, rad.i, rad.s)
-                )
-            }
-            end) * pipe.flatten()
+            return pipe.new * func.map(func.interlace(seq, {"i", "s"}),
+                function(rad)
+                    return {
+                        station.newModel(model .. "_tl.mdl",
+                            mPlace(fitTopLeft, inner, outer, rad.i, rad.s)
+                        ),
+                        station.newModel(model .. "_br.mdl",
+                            mPlace(fitBottomRight, inner, outer, rad.i, rad.s)
+                    )
+                    }
+                end) * pipe.flatten()
         end
         return {
             makeModel(coordsGen(junction.normalizeRad(obj.inf), junction.normalizeRad(obj.mid))),
@@ -280,32 +283,38 @@ junction.makeFn = function(model, fitModel, w, mPlace, length)
     end
 end
 
-local generatePolyArcEdge = function(group, from, to)
+local generatePolyArcEdge = function(group, from, to, s)
+    local s = s or 5
     return pipe.from(junction.normalizeRad(group[from]), junction.normalizeRad(group[to]))
-        * arc.coords(group, 5)
+        * arc.coords(group, s)
         * pipe.map(function(rad) return func.with(group:pt(rad), {z = 0, rad = rad}) end)
+end
+
+local generatePolyArcEdgeN = function(group, from, to, n)
+    local f, t = junction.normalizeRad(group[from]), junction.normalizeRad(group[to])
+    local length = abs(t - f) * group.r
+    local step = length / n
+    return generatePolyArcEdge(group, from, to, step)
 end
 
 junction.generatePolyArc = function(groups, from, to)
     local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.r < q.r end))
     return function(extLon, extLat)
             
-            local groupL, groupR = table.unpack(
+            local groupL, groupR = unpack(
                 pipe.new
                 / (groupO + extLat):extendLimits(extLon)
                 / (groupI + (-extLat)):extendLimits(extLon)
                 * pipe.sort(function(p, q) return p:pt(p.mid).x < q:pt(p.mid).x end)
             )
-            return generatePolyArcEdge(groupR, from, to)
-                * function(ls) return ls * pipe.range(1, #ls - 1)
-                    * pipe.map2(ls * pipe.range(2, #ls),
-                        function(f, t) return
-                            {
-                                f, t,
-                                func.with(groupL:pt(t.rad), {z = 0, rad = t.rad}),
-                                func.with(groupL:pt(f.rad), {z = 0, rad = f.rad}),
-                            }
-                        end)
+            local ptsR = generatePolyArcEdge(groupR, from, to)
+            local ptsL = generatePolyArcEdgeN(groupL, from, to, #ptsR - 1)
+            
+            return ptsR
+                * pipe.map2(ptsL, function(r, l) return {r = r, l = l} end)
+                * function(ls) return
+                    ls * pipe.range(1, #ls - 1)
+                    * pipe.map2(ls * pipe.range(2, #ls), function(f, t) return {f.r, t.r, t.l, f.l} end)
                 end
     end
 end

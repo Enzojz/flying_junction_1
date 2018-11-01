@@ -1,7 +1,7 @@
 local func = require "flyingjunction/func"
 local pipe = require "flyingjunction/pipe"
 local coor = require "flyingjunction/coor"
-
+local unpack = table.unpack
 local stationlib = {
     platformWidth = 5,
     trackWidth = 5,
@@ -114,7 +114,7 @@ stationlib.buildCoors = function(nSeg)
     
     local function build(trackGroups, ...)
         if (#trackGroups == 1) then
-            local group = table.unpack(trackGroups)
+            local group = unpack(trackGroups)
             return buildGroup(group, group.baseX, group.nbTracks, ...)
         else
             return build(func.range(trackGroups, 2, #trackGroups), build({trackGroups[1]}, ...))
@@ -137,9 +137,9 @@ end
 
 stationlib.makeTerminals = function(xuIndex)
     return func.mapFlatten(xuIndex, function(xu)
-        local terminals, xIndices = table.unpack(xu)
+        local terminals, xIndices = unpack(xu)
         return func.map(xIndices, function(x)
-            local side, track = table.unpack(x)
+            local side, track = unpack(x)
             return {
                 terminals = func.map(terminals, function(t) return {t, side} end),
                 vehicleNodeOverride = track * 4 - 2
@@ -207,7 +207,7 @@ stationlib.joinEdges = function(edges)
     local lst = function(l) return l[#l][2] end
     local rev = function(l) return pipe.new
         * func.map(l, function(e)
-            local f, t, vf, vt = table.unpack(e)
+            local f, t, vf, vt = unpack(e)
             return {t, f, -vt, -vf}
         end)
         * pipe.rev()
@@ -228,7 +228,7 @@ stationlib.joinEdges = function(edges)
         }
         return pipe.new
             * func.map(pattern, function(fns)
-                local pl, pr, fadj = table.unpack(fns)
+                local pl, pr, fadj = unpack(fns)
                 return (pl(l) - pr(r)):length2() < 0.01
                     and joinEdge(fadj())
                     or nil
@@ -249,7 +249,7 @@ stationlib.joinEdges = function(edges)
         return snd and fn(...) or result / fst
     end
     
-    return #edges > 1 and join(pipe.new, table.unpack(edges)) or edges
+    return #edges > 1 and join(pipe.new, unpack(edges)) or edges
 end
 
 stationlib.mergeEdges = function(edges)
@@ -270,9 +270,9 @@ stationlib.fusionEdges = function(edges)
             or result
     end
     return #edges > 0
-        and transpose(nil, table.unpack(edges))
+        and transpose(nil, unpack(edges))
         * pipe.map(stationlib.joinEdges)
-        * function(ls) return transpose(nil, table.unpack(ls)) end
+        * function(ls) return transpose(nil, unpack(ls)) end
         or {}
 end
 
@@ -377,7 +377,7 @@ function stationlib.mergePoly(...)
                     type = "LESS",
                     faces = p.less,
                     slopeLow = profile.less or 0.75,
-                    slopeHigh = profile.less or 0.75,
+                    slopeHigh = profile.less or 0.75
                 },
                 {
                     type = "GREATER",

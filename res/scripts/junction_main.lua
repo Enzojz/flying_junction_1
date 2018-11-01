@@ -8,10 +8,12 @@ local station = require "flyingjunction/stationlib"
 local junction = require "junction"
 local jA = require "junction_assoc"
 
+local math = math
 local abs = math.abs
 local floor = math.floor
 local ceil = math.ceil
 local pi = math.pi
+local unpack = table.unpack
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
 local rList = {junction.infi * 0.001, 5, 3.5, 2, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
@@ -342,7 +344,7 @@ local function generateStructure(fitModel, fitModel2D)
                 rt = arcR:pt(rad1):withZ(0),
                 rb = arcR:pt(rad2):withZ(0)
             }
-
+            
             return fitModel(size)
         end
         local function mPlace(fitModel, arcL, arcR, rad1, rad2)
@@ -378,10 +380,10 @@ local function generateStructure(fitModel, fitModel2D)
             local outer = t + 2.5
             local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
             return {
-                station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(false, true), inner, outer, t.inf, t.inf - diff)),
-                station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(true, false), inner, outer, t.inf, t.inf - diff)),
-                station.newModel(models.mSidePillar.."_tl.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(false, true), inner, outer, t.sup, t.sup + diff)),
-                station.newModel(models.mSidePillar.."_br.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(true, false), inner, outer, t.sup, t.sup + diff))
+                station.newModel(models.mSidePillar .. "_tl.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(false, true), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mSidePillar .. "_br.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(true, false), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mSidePillar .. "_tl.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(false, true), inner, outer, t.sup, t.sup + diff)),
+                station.newModel(models.mSidePillar .. "_br.mdl", coor.rotZ(pi * 0.5), mPlace(fitModel2D(5, 0.5)(true, false), inner, outer, t.sup, t.sup + diff))
             }
         end)
         
@@ -390,10 +392,10 @@ local function generateStructure(fitModel, fitModel2D)
             local outer = t + 3
             local diff = (t.inf > t.sup and 0.5 or -0.5) / t.r
             return {
-                station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(fitModel2D(6, 0.5)(true, true),   inner, outer, t.inf, t.inf - diff)),
-                station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(fitModel2D(6, 0.5)(false, false), inner, outer, t.inf, t.inf - diff)),
-                station.newModel(models.mRoofFenceF.."_tl.mdl", mPlace(fitModel2D(6, 0.5)(true, true),   inner, outer, t.sup, t.sup + diff)),
-                station.newModel(models.mRoofFenceF.."_br.mdl", mPlace(fitModel2D(6, 0.5)(false, false), inner, outer, t.sup, t.sup + diff)),
+                station.newModel(models.mRoofFenceF .. "_tl.mdl", mPlace(fitModel2D(6, 0.5)(true, true), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mRoofFenceF .. "_br.mdl", mPlace(fitModel2D(6, 0.5)(false, false), inner, outer, t.inf, t.inf - diff)),
+                station.newModel(models.mRoofFenceF .. "_tl.mdl", mPlace(fitModel2D(6, 0.5)(true, true), inner, outer, t.sup, t.sup + diff)),
+                station.newModel(models.mRoofFenceF .. "_br.mdl", mPlace(fitModel2D(6, 0.5)(false, false), inner, outer, t.sup, t.sup + diff)),
             }
         end)
         
@@ -465,7 +467,6 @@ local slopeWalls = function(fitModel, fitModel2D)
         extB, mainB,
         upperL, upperR
         )
-
         local function retriveRef(result, arc, ...)
             return arc
                 and retriveRef(result / (result[#result] + abs(arc.inf - arc.sup) * arc.r), ...)
@@ -520,7 +521,7 @@ local slopeWalls = function(fitModel, fitModel2D)
                     )
                     * pipe.filter(function(ar) return abs(ar.inf - ar.sup) * ar.r > 0.01 end)
                 
-                return retriveRef(pipe.new * {0}, table.unpack(arcs))
+                return retriveRef(pipe.new * {0}, unpack(arcs))
                     * function(ls) return ls * pipe.map(pipe.mul(1 / ls[#ls])) end
                     * function(ls) return func.zip(ls * pipe.range(1, #ls - 1), ls * pipe.range(2, #ls), {"f", "t"}) end
                     * pipe.map2(arcs, function(r, ar) return func.with(ar, r) end)
@@ -540,7 +541,7 @@ end
 local function params(paramFilter)
     local sp = "·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·:·\n"
     return (junction.trackType
-        + 
+        +
         {
             func.with(paramsutil.makeTrackCatenaryParam(),
                 {
@@ -781,7 +782,7 @@ local updateFn = function(fParams, models)
                         rad = 0,
                         used = func.contains({0, 1}, params.transitionA),
                         isBridge = false,
-                        isTerra = false,
+                        isTerra = heightFactor >= 1,
                         extR = (params.trSRadiusA == 0 and 1 or -1) * retriveR(params.trRadiusA)
                     },
                     upper = {
@@ -803,7 +804,7 @@ local updateFn = function(fParams, models)
                         rad = 0,
                         used = func.contains({0, 1}, params.transitionB),
                         isBridge = false,
-                        isTerra = false,
+                        isTerra = heightFactor >= 1,
                         extR = (params.trSRadiusB == 0 and 1 or -1) * retriveR(params.trRadiusB)
                     },
                     upper = {
@@ -897,6 +898,7 @@ local updateFn = function(fParams, models)
                 return {
                     edges = retriveX(jA.retriveTracks, preparedExt.tracks),
                     polys = retriveX(jA.retrivePolys(), preparedExt.tracks),
+                    polysNarrow = retriveX(jA.retrivePolys(false, 2), preparedExt.tracks),
                     surface = retriveX(jA.retriveTrackSurfaces(fitModel, fitModel2D), preparedExt.tracks),
                     walls = retriveX(jA.retriveWalls(fitModel, fitModel2D), preparedExt.walls)
                 }, preparedExt
@@ -905,16 +907,6 @@ local updateFn = function(fParams, models)
             local trackEdges = {
                 lower = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mDepth, mvec = coor.I()}),
                 upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mDepth, mvec = coor.I()})
-            }
-            
-            local upperPolys = {
-                A = junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 3.5),
-                B = junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 3.5)
-            }
-            
-            local lowerPolys = {
-                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(4, 3.5),
-                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(4, 3.5)
             }
             
             local function selectEdge(level)
@@ -978,7 +970,6 @@ local updateFn = function(fParams, models)
                     preparedExt.walls.upper.A[1],
                     preparedExt.walls.upper.B[#preparedExt.walls.upper.B]
             )
-            
             local uPolys = function(part)
                 local i = info[part].upper
                 local polySet = ext.polys.upper[part]
@@ -997,7 +988,7 @@ local updateFn = function(fParams, models)
             end
             
             local slopeWallArcs = pipe.new
-                / func.map(info.A.upper.isTerra and preparedExt.tracks.lower.A or {},
+                / func.map(preparedExt.walls.lower.A,
                     function(w)
                         return {
                             lower = w.guidelines[2]:withLimits({inf = w.guidelines[1]:extendLimits(4).inf}),
@@ -1006,7 +997,7 @@ local updateFn = function(fParams, models)
                             from = "sup", to = "inf"
                         }
                     end)
-                / func.map(info.B.upper.isTerra and preparedExt.tracks.lower.B or {},
+                / func.map(preparedExt.walls.lower.B,
                     function(w)
                         return {
                             lower = w.guidelines[1]:withLimits({sup = w.guidelines[2]:extendLimits(4).sup}),
@@ -1016,30 +1007,33 @@ local updateFn = function(fParams, models)
                         }
                     end)
                 * pipe.map(pipe.map(function(sw)
-                    local loc = func.min(
-                        func.map(
-                            {sw.lower + 2.5, sw.lower + (-2.5)},
-                            function(a) return detectSlopeIntersection(a, sw.upper, sw.fz, a[sw.from], a[sw.to] - a[sw.from]) end),
-                        function(l, r) return abs(l - sw.lower[sw.to]) < abs(r - sw.lower[sw.to]) end)
-                    
+                    local loc = detectSlopeIntersection(sw.lower, sw.upper, sw.fz, sw.lower[sw.from], sw.lower[sw.to] - sw.lower[sw.from])
                     return sw.lower:withLimits({
                         [sw.from] = loc,
                         [sw.to] = sw[sw.to],
                     })
                 end
                 ))
-                * pipe.map(pipe.map(function(ar) return junction.generatePolyArc({ar, ar}, "inf", "sup")(0, 2.5) end))
-                * function(ls) return {A = func.flatten(ls[1]), B = func.flatten(ls[2])} end
+                * pipe.map(function(ar) return junction.generatePolyArc(ar, "inf", "sup")(0, 1) end)
+                * function(ls) return {A = ls[1], B = ls[2]} end
+            
+            local upperPolys = {
+                A = junction.generatePolyArc(group.A.upper.tracks, "inf", "mid")(0, 3.5),
+                B = junction.generatePolyArc(group.B.upper.tracks, "mid", "sup")(0, 3.5)
+            }
+            
+            local lowerPolys = {
+                A = junction.generatePolyArc(group.A.lower.tracks, "inf", "mid")(4, 2.75),
+                B = junction.generatePolyArc(group.B.lower.tracks, "mid", "sup")(4, 2.75)
+            }
             
             local lPolys = function(part)
                 local i = info[part].lower
-                local polySet = ext.polys.lower[part]
+                local polySet = ext.polysNarrow.lower[part]
                 return (not i.used)
                     and {}
                     or {
-                        less = station.projectPolys(coor.I())(info[part].upper.isTerra and slopeWallArcs[part] or polySet.polys),
-                        slot = station.projectPolys(coor.I())(polySet.trackPolys),
-                        greater = station.projectPolys(coor.I())(polySet.trackPolys)
+                        equal = station.projectPolys(coor.I())(info[part].upper.isTerra and slopeWallArcs[part] or polySet.polys)
                     }
             end
             
@@ -1056,12 +1050,6 @@ local updateFn = function(fParams, models)
                 + (info.B.upper.isTerra and {} or station.projectPolys(mDepth)(upperPolys.B))
             }
             
-            local lXPolys = {
-                less = station.projectPolys(coor.I())(info.A.upper.isTerra and {} or lowerPolys.A, info.B.upper.isTerra and {} or lowerPolys.B),
-                slot = station.projectPolys(mDepth * coor.transZ(-0.2))(lowerPolys.A, lowerPolys.B),
-                greater = station.projectPolys(mDepth)(lowerPolys.A, lowerPolys.B)
-            }
-
             local function withIfNotBridge(level, part)
                 return function(c)
                     return (info[part][level].used and not info[part][level].isBridge) and c or {}
@@ -1073,7 +1061,7 @@ local updateFn = function(fParams, models)
                     return (info[part][level].used and not info[part][level].isTerra and not info[part][level].isBridge) and c or {}
                 end
             end
-
+            
             local result = {
                 edgeLists = edges,
                 models = pipe.new
@@ -1100,24 +1088,13 @@ local updateFn = function(fParams, models)
                 or {})
                 + slopeWallModels
                 ,
-                terrainAlignmentLists = station.mergePoly(uXPolys, uPolys("A"), uPolys("B"))() + station.mergePoly(lXPolys, lPolys("A"), lPolys("B"))()
+                terrainAlignmentLists =
+                station.mergePoly(uXPolys, uPolys("A"), uPolys("B"))()
+                + station.mergePoly(lPolys("A"), lPolys("B"))()
                 ,
-                groundFaces = (pipe.new
-                + upperPolys.A
-                + upperPolys.B
-                + lowerPolys.A
-                + lowerPolys.B
-                + ((info.A.lower.used and not info.A.lower.isBridge) and ext.polys.lower.A.polys or {})
-                + ((info.B.lower.used and not info.B.lower.isBridge) and ext.polys.lower.B.polys or {})
-                + ((info.A.upper.used and not info.A.upper.isBridge) and ext.polys.upper.A.polys or {})
-                + ((info.B.upper.used and not info.B.upper.isBridge) and ext.polys.upper.B.polys or {})
-                )
-                * pipe.mapFlatten(function(p)
-                    return {
-                        {face = func.map(p, coor.vec2Tuple), modes = {{type = "FILL", key = "building_paving_fill"}}},
-                        {face = func.map(p, coor.vec2Tuple), modes = {{type = "STROKE_OUTER", key = "building_paving"}}}
-                    }
-                end)
+                groundFaces =
+                    (ext.polys.lower.A.polys + ext.polys.lower.B.polys + lowerPolys.A + lowerPolys.B)
+                    * pipe.map(function(p) return {face = func.map(p, coor.vec2Tuple), modes = {{type = "FILL", key = "hole"}}} end)
             }
             
             -- End of generation

@@ -374,6 +374,12 @@ function stationlib.mergePoly(...)
             
             return pipe.new * {
                 {
+                    type = "EQUAL",
+                    faces = p.equal,
+                    slopeLow = profile.equal or 0.75,
+                    slopeHigh = profile.equal or 0.75,
+                },
+                {
                     type = "LESS",
                     faces = p.less,
                     slopeLow = profile.less or 0.75,
@@ -384,12 +390,6 @@ function stationlib.mergePoly(...)
                     faces = p.greater,
                     slopeLow = profile.greater or 0.75,
                     slopeHigh = profile.greater or 0.75,
-                },
-                {
-                    type = "EQUAL",
-                    faces = p.equal,
-                    slopeLow = profile.equal or 0.75,
-                    slopeHigh = profile.equal or 0.755,
                 },
                 {
                     type = "LESS",

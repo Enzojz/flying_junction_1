@@ -230,18 +230,30 @@ local retrivePolys = function(extLon, extLat)
     extLat = extLat or 2.75
     
     return function(tracks)
-        return tracks
-            * pipe.map(function(tr)
-                local flat = pipe.new
-                    + junction.generatePolyArc({tr.guidelines[1], tr.guidelines[1]}, "inf", "sup")(extLon, extLat)
-                    + junction.generatePolyArc({tr.guidelines[2], tr.guidelines[2]}, "inf", "sup")(extLon, extLat)
-                return {flat * pipe.map(pipe.map(function(c) return coor.transZ(tr.fn.fz(c.rad).y)(c) end)), flat}
-            end)
-            * function(ls) return
-                {
-                    trackPolys = ls * pipe.map(pipe.select(1)) * pipe.flatten(),
-                    polys = ls * pipe.map(pipe.select(2)) * pipe.flatten(),
-                } end
+        local arcL, arcR = tracks[1], tracks[#tracks]
+
+        local tr = {
+            junction.trackLevel(arcL.fn.fz, arcR.fn.fz),
+            junction.trackLeft(arcL.fn.fz),
+            junction.trackRight(arcR.fn.fz)
+        }
+        
+        local polys = pipe.new
+            / {
+                junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(1)), "inf", "sup")
+                (extLon, extLat, tr)
+            }
+            / {
+                junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(2)), "inf", "sup")
+                (extLon, extLat, tr)
+            }
+            
+        return {
+            polys = polys * pipe.map(pipe.select(1)) * pipe.flatten(),
+            trackPolys = polys * pipe.map(pipe.select(2)) * pipe.flatten(),
+            leftPolys = polys * pipe.map(pipe.select(3)) * pipe.flatten(),
+            rightPolys = polys * pipe.map(pipe.select(4)) * pipe.flatten()
+        }
     end
 end
 
@@ -268,6 +280,15 @@ local retriveWalls = function(fitModel, fitModel2D)
             end)
             * pipe.map(pipe.flatten())
             * pipe.map(pipe.flatten())
+            + walls * pipe.range(2, #walls - 1)
+            * pipe.map(function(w) return
+                w.guidelines * pipe.map(junction.makeFn("flyingjunction/paving_base",
+                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5,
+                    w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
+            end)
+            * pipe.map(pipe.flatten())
+            * pipe.map(pipe.flatten())
+
     end
 end
 

@@ -189,9 +189,9 @@ function arc.intersectionArc(arc1, arc2)
 end
 
 function arc.coords(a, baseLength)
-    return function(inf, sup)
+    return function(inf, sup, nSeg)
         local length = a.r * abs(sup - inf)
-        local nSeg = (function(x) return (x < 1 or (x % 1 > 0.5)) and ceil(x) or floor(x) end)(length / baseLength)
+        local nSeg = nSeg or (function(x) return (x < 1 or (x % 1 > 0.5)) and ceil(x) or floor(x) end)(length / baseLength)
         local scale = length / (nSeg * baseLength)
         local dRad = (sup - inf) / nSeg
         local seq = abs(scale) < 1e-5 and {} or func.seqMap({0, nSeg}, function(n) return inf + n * dRad end)

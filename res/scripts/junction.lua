@@ -58,6 +58,7 @@ local normalizeSize = function(mirrored, size)
         }
 end
 
+junction.normalizeSize = normalizeSize
 
 junction.fitModel2D = function(mirrored)
     return function(w, h)
@@ -287,7 +288,7 @@ local generatePolyArcEdge = function(group, from, to, s)
     local s = s or 5
     return pipe.from(junction.normalizeRad(group[from]), junction.normalizeRad(group[to]))
         * arc.coords(group, s)
-        * pipe.map(function(rad) return func.with(group:pt(rad), {z = 0, rad = rad}) end)
+        * pipe.map(function(rad) return func.with(group:pt(rad):withZ(0), {rad = rad}) end)
 end
 
 local generatePolyArcEdgeN = function(group, from, to, n)
@@ -297,25 +298,56 @@ local generatePolyArcEdgeN = function(group, from, to, n)
     return generatePolyArcEdge(group, from, to, step)
 end
 
+junction.trackLevel = function(fzL, fzR)
+    return function(pts) return 
+        {
+            l = pts.l:withZ(fzL(pts.l.rad).y),
+            r = pts.r:withZ(fzR(pts.r.rad).y)
+        }
+    end
+end
+
+junction.trackLeft = function(fz)
+    return function(pts) 
+        local vec = pts.l - pts.r
+        local z = fz(pts.l.rad).y
+        local w = (z < 0 and 0 or z / 0.75) + 1
+        return { l = pts.l + vec:normalized() * w, r = pts.l:withZ(z) }
+    end
+end
+
+junction.trackRight = function(fz)
+    return function(pts) 
+        local vec = pts.r - pts.l
+        local z = fz(pts.r.rad).y
+        local w = (z < 0 and 0 or z / 0.75) + 1
+        return { l = pts.r:withZ(z), r = pts.r  + vec:normalized() * w }
+    end
+end
+
+
 junction.generatePolyArc = function(groups, from, to)
     local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.r < q.r end))
-    return function(extLon, extLat)
-            
-            local groupL, groupR = unpack(
-                pipe.new
-                / (groupO + extLat):extendLimits(extLon)
-                / (groupI + (-extLat)):extendLimits(extLon)
-                * pipe.sort(function(p, q) return p:pt(p.mid).x < q:pt(p.mid).x end)
-            )
-            local ptsR = generatePolyArcEdge(groupR, from, to)
-            local ptsL = generatePolyArcEdgeN(groupL, from, to, #ptsR - 1)
-            
-            return ptsR
-                * pipe.map2(ptsL, function(r, l) return {r = r, l = l} end)
-                * function(ls) return
-                    ls * pipe.range(1, #ls - 1)
-                    * pipe.map2(ls * pipe.range(2, #ls), function(f, t) return {f.r, t.r, t.l, f.l} end)
-                end
+    return function(extLon, extLat, trans)
+        local trans = pipe.new / (function(...) return ... end) + (trans or {})
+        
+        local groupO, groupI = (groupO + extLat):extendLimits(extLon), (groupI + (-extLat)):extendLimits(extLon)
+        
+        local ptsO = generatePolyArcEdge(groupO, from, to)
+        local ptsI = generatePolyArcEdgeN(groupI, from, to, #ptsO - 1)
+        
+        local ptsL, ptsR, groupL, groupR = unpack(
+            ((ptsO[1] - ptsO[#ptsO]):cross(ptsI[#ptsI] - ptsO[#ptsO])).z > 0
+                and {ptsO, ptsI, groupO, groupI} or {ptsI, ptsO, groupI, groupO}
+        )
+        local pts = func.zip(ptsL, ptsR, {"l", "r"})
+        return unpack(
+            pipe.new
+            * trans
+            * pipe.map(function(t) return func.map(pts, t) end)
+            * pipe.map(pipe.interlace({"f", "t"}))
+            * pipe.map(pipe.map(function(p) return {p.f.r, p.t.r, p.t.l, p.f.l} end))
+    )
     end
 end
 

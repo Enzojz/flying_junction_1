@@ -186,13 +186,15 @@ end
 junction.buildCoors = function(numTracks, groupSize, config)
     config = config or {
         trackWidth = station.trackWidth,
-        wallWidth = 0.5
+        wallWidth = 0.5,
+        pavingWidth = 1,
     }
-    local function builder(xOffsets, uOffsets, baseX, nbTracks)
+    local function builder(xOffsets, uOffsets, vOffsets, baseX, nbTracks)
         local function caller(n)
             return builder(
                 xOffsets + func.seqMap({1, n}, function(n) return baseX - 0.5 * config.trackWidth + n * config.trackWidth end),
                 uOffsets + {baseX + n * config.trackWidth + 0.5 * config.wallWidth},
+                vOffsets + {baseX + 0.5 * config.wallWidth, baseX + n * config.trackWidth - 0.5 *  config.wallWidth},
                 baseX + n * config.trackWidth + config.wallWidth,
                 nbTracks - n)
         end
@@ -201,7 +203,8 @@ junction.buildCoors = function(numTracks, groupSize, config)
             return
                 {
                     tracks = xOffsets * pipe.map(offset),
-                    walls = uOffsets * pipe.map(offset)
+                    walls = uOffsets * pipe.map(offset),
+                    pavings = vOffsets * pipe.map(offset)
                 }
         elseif (nbTracks < groupSize) then
             return caller(nbTracks)
@@ -209,7 +212,7 @@ junction.buildCoors = function(numTracks, groupSize, config)
             return caller(groupSize)
         end
     end
-    return builder(pipe.new, pipe.new * {0.5 * config.wallWidth}, config.wallWidth, numTracks)
+    return builder(pipe.new, pipe.new * {0.5 * config.wallWidth}, pipe.new, config.wallWidth, numTracks)
 end
 
 junction.normalizeRad = function(rad)

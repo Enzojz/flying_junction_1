@@ -209,10 +209,12 @@ local function trackGroup(info, offsets)
         lower = {
             tracks = sort(junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r)),
             walls = sort(junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r)),
+            pavings = sort(junction.fArcs(offsets.lower.pavings, info.lower.rad, info.lower.r)),
         },
         upper = {
             tracks = sort(junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r)),
             walls = sort(junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r)),
+            pavings = sort(junction.fArcs(offsets.upper.pavings, info.upper.rad, info.upper.r)),
         }
     }
     
@@ -237,13 +239,7 @@ local function trackGroup(info, offsets)
     local result = {
         lower = pipe.new * {
             tracks = func.map(gRef.lower.tracks, function(l) return l:withLimits(limitRads.lower) end),
-            simpleWalls = func.map(gRef.lower.walls, function(l)
-                return l:withLimits(
-                    {
-                        inf = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.L, ptXSelector))),
-                        mid = junction.normalizeRad(l:rad(coor.xy(0, 0))),
-                        sup = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.R, ptXSelector))),
-                    }) end),
+            pavings = pipe.new * func.map(gRef.lower.pavings, function(l) return l:withLimits(limitRads.lower) end),
             walls = pipe.new
             * func.map(gRef.lower.walls, function(l)
                 return l:withLimits(
@@ -265,19 +261,13 @@ local function trackGroup(info, offsets)
                         pipe.with({mid = ls.walls[1].inf})),
                     ls.walls[#ls.walls]:withLimits(limitRads.lower *
                         pipe.with({mid = ls.walls[#ls.walls].sup})),
-                },
-                extSimpleWalls = {
-                    ls.simpleWalls[1]:withLimits(limitRads.lower *
-                        pipe.with({mid = ls.simpleWalls[1].inf})),
-                    ls.simpleWalls[#ls.simpleWalls]:withLimits(limitRads.lower *
-                        pipe.with({mid = ls.simpleWalls[#ls.simpleWalls].sup})),
                 }
             }
         )
         end,
         upper = {
             tracks = func.map(gRef.upper.tracks, function(l) return l:withLimits(limitRads.upper) end),
-            simpleWalls = func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end),
+            pavings = pipe.new * func.map(gRef.upper.pavings, function(l) return l:withLimits(limitRads.upper) end),
             walls = {
                 wallExt.upper.L:withLimits(limitRads.upper
                     * pipe.with({mid = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector)))})
@@ -310,6 +300,10 @@ local function trackGroup(info, offsets)
                 inf = inferExt(result.lower.tracks, function(g) return g.inf end, info.lower.extR, info.lower.rFactor),
                 sup = inferExt(result.lower.tracks, function(g) return g.sup end, info.lower.extR, info.lower.rFactor)
             },
+            pavings = {
+                inf = inferExt(result.lower.pavings, function(g) return g.inf end, info.lower.extR, info.lower.rFactor),
+                sup = inferExt(result.lower.pavings, function(g) return g.sup end, info.lower.extR, info.lower.rFactor)
+            },
             walls = {
                 inf = inferExt(result.lower.walls, function(_) return limitRads.lower.inf end, info.lower.extR, info.lower.rFactor)
                 * function(ls) return {ls[1], ls[#ls]} end
@@ -322,6 +316,10 @@ local function trackGroup(info, offsets)
             tracks = {
                 inf = inferExt(result.upper.tracks, function(g) return g.inf end, info.upper.extR, info.upper.rFactor),
                 sup = inferExt(result.upper.tracks, function(g) return g.sup end, info.upper.extR, info.upper.rFactor)
+            },
+            pavings = {
+                inf = inferExt(result.upper.pavings, function(g) return g.inf end, info.upper.extR, info.upper.rFactor),
+                sup = inferExt(result.upper.pavings, function(g) return g.sup end, info.upper.extR, info.upper.rFactor)
             },
             walls = {
                 inf = inferExt(result.upper.walls, function(g) return g.inf end, info.upper.extR, info.upper.rFactor),
@@ -578,13 +576,20 @@ end
 
 local lowerTerrainPolys = function(terrainIntersection)
     return terrainIntersection
+        * pipe.map2(
+            {
+                function(a) return a:extendLimits(5, 0) end,
+                function(a) return a:extendLimits(0, 5) end,
+            },
+            function(arcs, f) return func.map(arcs, function(arcs) return pipe.new * arcs * pipe.range(1, #arcs - 1) / f(arcs[#arcs]) end) end
+        )
         * pipe.map2({pipe.rev(), pipe.noop()}, function(part, op)
             local arcsL, arcsR = unpack(func.map(part, op))
             
             if (not arcsL or not arcsR) then return {} end
             
-            local arcsLo = func.map(arcsL, function(arc) return func.with(arc, {r = arc.r + (arc.radius > 0 and 0.75 or -0.75)}) end)
-            local arcsRo = func.map(arcsR, function(arc) return func.with(arc, {r = arc.r + (arc.radius < 0 and 0.75 or -0.75)}) end)
+            local arcsLo = func.map(arcsL, function(arc) return func.with(arc, {r = arc.r + (arc.radius > 0 and 0.5 or -0.5)}) end)
+            local arcsRo = func.map(arcsR, function(arc) return func.with(arc, {r = arc.r + (arc.radius < 0 and 0.5 or -0.5)}) end)
             local arcsLi = func.map(arcsL, function(arc) return func.with(arc, {r = arc.r + (arc.radius < 0 and 0.5 or -0.5)}) end)
             local arcsRi = func.map(arcsR, function(arc) return func.with(arc, {r = arc.r + (arc.radius > 0 and 0.5 or -0.5)}) end)
             
@@ -594,8 +599,7 @@ local lowerTerrainPolys = function(terrainIntersection)
             local mLength = max(lengthL, lengthR)
             
             local lcm = (#arcsL * #arcsR) / gcd(#arcsL, #arcsR)
-            local factor = lcm * ceil(mLength / lcm / 1)
-            local nSeg = factor * lcm
+            local nSeg = lcm * lcm * ceil(mLength / lcm)
             
             local coordsLo = coords(arcsLo, nSeg / #arcsL)
             local coordsRo = coords(arcsRo, nSeg / #arcsR)
@@ -649,8 +653,7 @@ local lowerSlotPolys = function(terrainIntersection)
             local mLength = max(lengthL, lengthR)
             
             local lcm = (#arcsLo * #arcsRo) / gcd(#arcsLo, #arcsRo)
-            local factor = lcm * ceil(mLength / lcm / 5)
-            local nSeg = factor * lcm
+            local nSeg = lcm * lcm * ceil(mLength / lcm / 5)
             
             local coordsLo = coords(arcsLo, nSeg / #arcsLo)
             local coordsRo = coords(arcsRo, nSeg / #arcsRo)
@@ -889,47 +892,47 @@ local function defaultParams(param, fParams)
 end
 
 local generateEdges = function(info, ext, trackEdges, buildLowerTracks, buildUpperTracks, buildBridge)
-        local function selectEdge(level)
-            return (pipe.new
-                + (
-                info.A[level].used
-                and {
-                    ext.edges[level].A.inf,
-                    ext.edges[level].A.main
-                }
-                or {trackEdges[level].inf}
-                )
-                + {trackEdges[level].main}
-                + (
-                info.B[level].used
-                and {
-                    ext.edges[level].B.main,
-                    ext.edges[level].B.sup
-                }
-                or {trackEdges[level].sup}
-                ))
-                * station.fusionEdges
-                ,
-                pipe.new
-                + (info.A[level].used and (info.A[level].isBridge and {true, true} or {false, false}) or {true})
-                + {false}
-                + (info.B[level].used and (info.B[level].isBridge and {true, true} or {false, false}) or {true})
-        end
-        
-        local lowerEdges, _ = selectEdge("lower")
-        local upperEdges, upperBridges = selectEdge("upper")
-        
-        local bridgeEdges = upperEdges
-            * pipe.zip(upperBridges, {"e", "b"})
-            * pipe.filter(function(e) return e.b end)
-            * pipe.map(pipe.select("e"))
-        
-        local solidEdges = upperEdges
-            * pipe.zip(upperBridges, {"e", "b"})
-            * pipe.filter(function(e) return not e.b end)
-            * pipe.map(pipe.select("e"))
-        
-        return {lowerEdges, solidEdges, bridgeEdges}
+    local function selectEdge(level)
+        return (pipe.new
+            + (
+            info.A[level].used
+            and {
+                ext.edges[level].A.inf,
+                ext.edges[level].A.main
+            }
+            or {trackEdges[level].inf}
+            )
+            + {trackEdges[level].main}
+            + (
+            info.B[level].used
+            and {
+                ext.edges[level].B.main,
+                ext.edges[level].B.sup
+            }
+            or {trackEdges[level].sup}
+            ))
+            * station.fusionEdges
+            ,
+            pipe.new
+            + (info.A[level].used and (info.A[level].isBridge and {true, true} or {false, false}) or {true})
+            + {false}
+            + (info.B[level].used and (info.B[level].isBridge and {true, true} or {false, false}) or {true})
+    end
+    
+    local lowerEdges, _ = selectEdge("lower")
+    local upperEdges, upperBridges = selectEdge("upper")
+    
+    local bridgeEdges = upperEdges
+        * pipe.zip(upperBridges, {"e", "b"})
+        * pipe.filter(function(e) return e.b end)
+        * pipe.map(pipe.select("e"))
+    
+    local solidEdges = upperEdges
+        * pipe.zip(upperBridges, {"e", "b"})
+        * pipe.filter(function(e) return not e.b end)
+        * pipe.map(pipe.select("e"))
+    
+    return {lowerEdges, solidEdges, bridgeEdges}
 end
 
 local updateFn = function(fParams, models)
@@ -1082,16 +1085,16 @@ local updateFn = function(fParams, models)
                 
                 local preparedExt = {
                     tracks = retriveExt(extProtos("tracks")),
-                    walls = retriveExt(extProtos("walls"))
+                    walls = retriveExt(extProtos("walls")),
+                    pavings = retriveExt(extProtos("pavings"))
                 }
                 
                 return {
                     edges = retriveX(jA.retriveTracks, preparedExt.tracks),
                     polys = retriveX(jA.retrivePolys(), preparedExt.tracks),
-                    polysWide = retriveX(jA.retrivePolys(false, 20), preparedExt.tracks),
                     polysNarrow = retriveX(jA.retrivePolys(0, 2.5), preparedExt.tracks),
                     polysNarrow2 = retriveX(jA.retrivePolys(0, 2.75), preparedExt.tracks),
-                    surface = retriveX(jA.retriveTrackSurfaces(fitModel), preparedExt.tracks),
+                    pavings = retriveX(jA.retriveTrackPavings(fitModel), preparedExt.pavings),
                     walls = retriveX(jA.retriveWalls(fitModel, fitModel2D), preparedExt.walls)
                 }, preparedExt
             end)()
@@ -1213,10 +1216,9 @@ local updateFn = function(fParams, models)
             }
             end
             
-            
-            local lXSurface = (group.A.lower.tracks + group.B.lower.tracks)
+            local lXPavings = (group.A.lower.pavings + group.B.lower.pavings)
                 * pipe.map(
-                    junction.makeFn(models.mRoof, fitModel(5, 5), 5,
+                    junction.makeFn("flying_junction/paving_base", fitModel(1, 5), 1,
                         function(fitModel, arcL, arcR, rad1, rad2)
                             local size = {
                                 lt = arcL:pt(rad1):withZ((heightFactor - 1) * tunnelHeight),
@@ -1235,11 +1237,11 @@ local updateFn = function(fParams, models)
                 models = pipe.new
                 + structure.A.fixed
                 + structure.B.fixed
-                + withIfSolid("upper", "A")(ext.surface.upper.A)
-                + withIfSolid("upper", "B")(ext.surface.upper.B)
-                + (info.A.lower.used and ext.surface.lower.A or {})
-                + (info.B.lower.used and ext.surface.lower.B or {})
-                + lXSurface
+                + withIfSolid("upper", "A")(ext.pavings.upper.A)
+                + withIfSolid("upper", "B")(ext.pavings.upper.B)
+                + (info.A.lower.used and ext.pavings.lower.A or {})
+                + (info.B.lower.used and ext.pavings.lower.B or {})
+                + lXPavings
                 + (heightFactor > 0
                 and pipe.new
                 + structure.A.upper

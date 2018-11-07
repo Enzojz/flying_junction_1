@@ -224,10 +224,9 @@ local retriveTracks = function(tracks)
         end
 end
 
-
 local retrivePolys = function(extLon, extLat)
-    extLon = extLon or 4
-    extLat = extLat or 2.75
+    extLon = extLon or 5
+    extLat = extLat or 3
     
     return function(tracks)
         local arcL, arcR = tracks[1], tracks[#tracks]
@@ -257,10 +256,10 @@ local retrivePolys = function(extLon, extLat)
     end
 end
 
-local retriveTrackSurfaces = function(fitModel)
-    return function(tracks)
-        return tracks
-            * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn(tr.config.models.mRoof, fitModel(5, 5), 5, tr.fn.mPlaceA)) end)
+local retriveTrackPavings = function(fitModel)
+    return function(pavings)
+        return pavings
+            * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn("flying_junction/paving_base", fitModel(1, 5), 1, tr.fn.mPlaceA)) end)
             * pipe.flatten()
             * pipe.flatten()
             * pipe.flatten()
@@ -280,24 +279,15 @@ local retriveWalls = function(fitModel, fitModel2D)
             end)
             * pipe.map(pipe.flatten())
             * pipe.map(pipe.flatten())
-            + walls * pipe.range(2, #walls - 1)
-            * pipe.map(function(w) return
-                w.guidelines * pipe.map(junction.makeFn("flyingjunction/paving_base",
-                    w.fn.isDesc(fitModel(0.5, 5), fitModel2D(0.5, 5)), 0.5,
-                    w.fn.isDesc(w.fn.mPlaceA, w.fn.mPlaceD)))
-            end)
-            * pipe.map(pipe.flatten())
-            * pipe.map(pipe.flatten())
-
     end
 end
 
 return {
     retriveFn = retriveFn,
     retriveTracks = retriveTracks,
-    retriveTrackSurfaces = retriveTrackSurfaces,
     retrivePolys = retrivePolys,
     retriveWalls = retriveWalls,
+    retriveTrackPavings = retriveTrackPavings,
     solveSlope = solveSlope,
     generateSlope = generateSlope
 }

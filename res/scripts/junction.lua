@@ -328,7 +328,6 @@ junction.trackRight = function(fz)
     end
 end
 
-
 junction.generatePolyArc = function(groups, from, to)
     local groupI, groupO = (function(ls) return ls[1], ls[#ls] end)(func.sort(groups, function(p, q) return p.r < q.r end))
     return function(extLon, extLat, trans)

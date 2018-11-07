@@ -239,6 +239,13 @@ local function trackGroup(info, offsets)
     local result = {
         lower = pipe.new * {
             tracks = func.map(gRef.lower.tracks, function(l) return l:withLimits(limitRads.lower) end),
+            simpleWalls = func.map(gRef.lower.walls, function(l)
+                return l:withLimits(
+                    {
+                        inf = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.L, ptXSelector))),
+                        mid = junction.normalizeRad(l:rad(coor.xy(0, 0))),
+                        sup = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.R, ptXSelector))),
+                    }) end),
             pavings = pipe.new * func.map(gRef.lower.pavings, function(l) return l:withLimits(limitRads.lower) end),
             walls = pipe.new
             * func.map(gRef.lower.walls, function(l)
@@ -261,6 +268,12 @@ local function trackGroup(info, offsets)
                         pipe.with({mid = ls.walls[1].inf})),
                     ls.walls[#ls.walls]:withLimits(limitRads.lower *
                         pipe.with({mid = ls.walls[#ls.walls].sup})),
+                },
+                extSimpleWalls = {
+                    ls.simpleWalls[1]:withLimits(limitRads.lower *
+                        pipe.with({mid = ls.simpleWalls[1].inf})),
+                    ls.simpleWalls[#ls.simpleWalls]:withLimits(limitRads.lower *
+                        pipe.with({mid = ls.simpleWalls[#ls.simpleWalls].sup})),
                 }
             }
         )
@@ -274,7 +287,8 @@ local function trackGroup(info, offsets)
                 ),
                 wallExt.upper.R:withLimits(limitRads.upper
                     * pipe.with({mid = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector)))})
-            )
+                ),
+                simpleWalls = func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end)
             },
         }
     }
@@ -1319,5 +1333,9 @@ return {
     retriveX = retriveX,
     retriveExt = retriveExt,
     trackGroup = trackGroup,
-    slopeWalls = slopeWalls
+    slopeWalls = slopeWalls,
+    findIntersection = findIntersection,
+    lowerTerrainPolys = lowerTerrainPolys,
+    lowerSlotPolys = lowerSlotPolys
+
 }

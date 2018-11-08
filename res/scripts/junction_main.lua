@@ -330,9 +330,9 @@ local function trackGroup(info, offsets)
                 ),
                 wallExt.upper.R:withLimits(limitRads.upper
                     * pipe.with({mid = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector)))})
-                ),
-                simpleWalls = func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end)
+                )
             },
+            simpleWalls = func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end)
         }
     }
     
@@ -400,7 +400,7 @@ local function generateStructure(fitModel, fitModel2D)
             rb = size.rb + vecB * 0.25
         }
     end
-
+    
     return function(lowerGroup, upperGroup, mDepth, models, fitModels)
         local function mPlaceD(fitModel, arcL, arcR, rad1, rad2)
             local size = {

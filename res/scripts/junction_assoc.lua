@@ -190,11 +190,11 @@ local retriveFn = function(config)
     }
 end
 
-local retriveTracks = function(tracks)
+local retriveTracks = function(tracks, ext)
     return tracks
         * pipe.map(function(tr) return
             tr.guidelines
-            * pipe.map(junction.generateArc)
+            * pipe.map(junction.generateArc(ext))
             * function(ar) return {ar[1][3], ar[1][1], ar[1][2], ar[2][1], ar[2][2], ar[2][4]} end
             * pipe.map2(tr.fn.zsList, function(ar, nz) return func.map2(ar, nz, coor.apply) end)
             * function(edge) return {

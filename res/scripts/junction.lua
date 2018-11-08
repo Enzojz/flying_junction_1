@@ -219,28 +219,31 @@ junction.normalizeRad = function(rad)
     return (rad < pi * -0.5) and junction.normalizeRad(rad + pi * 2) or rad
 end
 
-junction.generateArc = function(arc)
-    local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
-    
-    local extArc = arc:extendLimits(5)
-    
-    local sup = toXyz(arc:pt(arc.sup))
-    local inf = toXyz(arc:pt(arc.inf))
-    local mid = toXyz(arc:pt(arc.mid))
-    
-    local vecSup = arc:tangent(arc.sup)
-    local vecInf = arc:tangent(arc.inf)
-    local vecMid = arc:tangent(arc.mid)
-    
-    local supExt = toXyz(extArc:pt(extArc.sup))
-    local infExt = toXyz(extArc:pt(extArc.inf))
-    
-    return {
-        {inf, mid, vecInf, vecMid},
-        {mid, sup, vecMid, vecSup},
-        {infExt, inf, extArc:tangent(extArc.inf), vecInf},
-        {sup, supExt, vecSup, extArc:tangent(extArc.sup)},
-    }
+junction.generateArc = function(ext)
+    local ext = ext or 5
+    return function(arc)
+        local toXyz = function(pt) return coor.xyz(pt.x, pt.y, 0) end
+        
+        local extArc = arc:extendLimits(ext)
+        
+        local sup = toXyz(arc:pt(arc.sup))
+        local inf = toXyz(arc:pt(arc.inf))
+        local mid = toXyz(arc:pt(arc.mid))
+        
+        local vecSup = arc:tangent(arc.sup)
+        local vecInf = arc:tangent(arc.inf)
+        local vecMid = arc:tangent(arc.mid)
+        
+        local supExt = toXyz(extArc:pt(extArc.sup))
+        local infExt = toXyz(extArc:pt(extArc.inf))
+        
+        return {
+            {inf, mid, vecInf, vecMid},
+            {mid, sup, vecMid, vecSup},
+            {infExt, inf, extArc:tangent(extArc.inf), vecInf},
+            {sup, supExt, vecSup, extArc:tangent(extArc.sup)},
+        }
+    end
 end
 
 
@@ -300,6 +303,9 @@ local generatePolyArcEdgeN = function(group, from, to, n)
     local step = length / n
     return generatePolyArcEdge(group, from, to, step)
 end
+
+junction.generatePolyArcEdge = generatePolyArcEdge
+junction.generatePolyArcEdgeN = generatePolyArcEdgeN
 
 junction.trackLevel = function(fzL, fzR)
     return function(pts) return 

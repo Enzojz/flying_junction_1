@@ -1387,6 +1387,10 @@ local updateFn = function(fParams, models)
                 * pipe.map(function(p) return {face = (func.map(p, coor.vec2Tuple)), modes = {{type = "FILL", key = "hole"}}} end)
             }
             
+            if (#result.terrainAlignmentLists == 0) then
+                result.terrainAlignmentLists = {{type = "EQUAL", faces = {}}}
+            end
+            
             -- End of generation
             -- Slope, Height, Mirror treatment
             return pipe.new

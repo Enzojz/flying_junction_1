@@ -14,6 +14,10 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.17
+* Terrain alignment reimplemented to get rid to zig-zags
+* Added 90° options in crossing angle (It's actually 89.95°)
+* Improved coliision detection on modification
 1.16
 * Model errors when mirrored is set on are fixed
 1.15
@@ -78,6 +82,10 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.17
+* Réimplémentation de alignment terrain pour éffacer les zigzags
+* Ajoute d'option 90° pour l'angle de croisement (C'est actuellement 89.95°)
+* Détection de colission améliorée
 1.16
 * Correction des erreurs des maquettes lors l'infrastructure est en miroir 
 1.15
@@ -134,6 +142,10 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.17
+* 重写了地面重整的算法，消除了锯齿
+* 增加了90度交会角的选项
+* 改进了碰撞检测
 1.16
 * 修正了镜像下的模型错误
 1.15

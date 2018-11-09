@@ -11,6 +11,8 @@ function data()
         availability = {
             yearFrom = 1950
         },
+        skipCollision = true,
+        autoRemovable = false,
         order = 27223,
         params = jMain.params({"rLower", "rUpper", "sLower", "sUpper"}),
         

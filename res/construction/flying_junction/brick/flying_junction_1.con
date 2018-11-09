@@ -10,6 +10,8 @@ function data()
         availability = {
             yearFrom = 1870
         },
+        skipCollision = true,
+        autoRemovable = false,
         order = 27219,
         params = jMain.params({"curvedLevel", "trRadiusA", "trSRadiusA", "trRadiusB", "trSRadiusB"}),
         

@@ -16,7 +16,7 @@ local pi = math.pi
 local max = math.max
 local unpack = table.unpack
 
-local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80}
+local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80, 90}
 local rList = {junction.infi * 0.001, 5, 3.5, 2, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
 
 local trSlopeList = {15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100}
@@ -89,50 +89,6 @@ local generateTrackGroups = function(tracks1, tracks2, trans, ext)
             sup = ls * pipe.map(pipe.select("sup"))
         }
         end
-end
-
-local nSeg = function(length, base)
-    local nSeg = ceil((length - base * 0.5) / base)
-    return nSeg > 0 and nSeg or 1
-end
-
-local subDivide = function(size, w, h)
-    local vecT = size.rt - size.lt
-    local vecB = size.rb - size.lb
-    local vecL = size.lb - size.lt
-    local vecR = size.rb - size.rt
-    local nSegH = nSeg((vecT + vecB):length() * 0.5, w)
-    local nSegV = nSeg((vecL + vecR):length() * 0.5, h)
-    local segLengthT = vecT:length() / nSegH
-    local segLengthB = vecB:length() / nSegH
-    local vecTN = vecT:normalized()
-    local vecBN = vecB:normalized()
-    return pipe.new
-        * func.seq(1, nSegH)
-        * pipe.map(function(h)
-            local lt = size.lt + vecTN * (h - 1) * segLengthT
-            local rt = lt + vecTN * segLengthT
-            local lb = size.lb + vecBN * (h - 1) * segLengthB
-            local rb = lb + vecBN * segLengthB
-            local vecL = lb - lt
-            local vecR = rb - rt
-            local segLengthL = vecL:length() / nSegV
-            local segLengthR = vecR:length() / nSegV
-            local vecLN = vecL:normalized()
-            local vecRN = vecR:normalized()
-            return pipe.new
-                * func.seq(1, nSegV)
-                * pipe.map(function(v)
-                    return
-                        {
-                            lt = lt + vecLN * (v - 1) * segLengthL,
-                            lb = lt + vecLN * v * segLengthL,
-                            rt = rt + vecRN * (v - 1) * segLengthR,
-                            rb = rt + vecRN * v * segLengthR
-                        }
-                end)
-        end)
-        * pipe.flatten()
 end
 
 local minimalR = function(offsets, info)
@@ -252,12 +208,12 @@ local function trackGroup(info, offsets)
         lower = {
             tracks = sort(junction.fArcs(offsets.lower.tracks, info.lower.rad, info.lower.r)),
             walls = sort(junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r)),
-            pavings = sort(junction.fArcs(offsets.lower.pavings, info.lower.rad, info.lower.r)),
+            pavings = sort(junction.fArcs(offsets.lower.walls, info.lower.rad, info.lower.r)),
         },
         upper = {
             tracks = sort(junction.fArcs(offsets.upper.tracks, info.upper.rad, info.upper.r)),
             walls = sort(junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r)),
-            pavings = sort(junction.fArcs(offsets.upper.pavings, info.upper.rad, info.upper.r)),
+            pavings = sort(junction.fArcs(offsets.upper.walls, info.upper.rad, info.upper.r)),
         }
     }
     
@@ -289,7 +245,7 @@ local function trackGroup(info, offsets)
                         mid = junction.normalizeRad(l:rad(coor.xy(0, 0))),
                         sup = junction.normalizeRad(l:rad(func.min(l - wallExt.upper.R, ptXSelector))),
                     }) end),
-            pavings = pipe.new * func.map(gRef.lower.pavings, function(l) return l:withLimits(limitRads.lower) end),
+            pavings = pipe.new * func.map(gRef.lower.walls, function(l) return l:withLimits(limitRads.lower) end),
             walls = pipe.new
             * func.map(gRef.lower.walls, function(l)
                 return l:withLimits(
@@ -323,14 +279,14 @@ local function trackGroup(info, offsets)
         end,
         upper = {
             tracks = func.map(gRef.upper.tracks, function(l) return l:withLimits(limitRads.upper) end),
-            pavings = pipe.new * func.map(gRef.upper.pavings, function(l) return l:withLimits(limitRads.upper) end),
+            pavings = pipe.new * func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end),
             walls = {
                 wallExt.upper.L:withLimits(limitRads.upper
                     * pipe.with({mid = junction.normalizeRad(wallExt.upper.L:rad(func.min(wallExt.upper.L - wallExt.lower.L, ptXSelector)))})
                 ),
                 wallExt.upper.R:withLimits(limitRads.upper
                     * pipe.with({mid = junction.normalizeRad(wallExt.upper.R:rad(func.min(wallExt.upper.R - wallExt.lower.R, ptXSelector)))})
-                )
+            )
             },
             simpleWalls = func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end)
         }
@@ -421,7 +377,7 @@ local function generateStructure(fitModel, fitModel2D)
         local makeWall = junction.makeFn(models.mSidePillar, fitModel2D(0.5, 5), 0.5, mPlace)
         local makeRoof = junction.makeFn(models.mRoof, fitModel2D(5, 5), 5, mPlace)
         local makeSideFence = junction.makeFn(models.mRoofFenceS, fitModel2D(0.5, 5), 0.5, mPlace)
-               
+        
         local walls = lowerGroup.walls
         
         local upperFences = func.map(upperGroup.tracks, function(t)
@@ -452,14 +408,14 @@ local function generateStructure(fitModel, fitModel2D)
             }
             
             return {
-                subDivide(ext(sizeInf), 5, 0.5) * pipe.map(function(size)
+                junction.subDivide(ext(sizeInf), 5, 0.5, false, 1) * pipe.map(function(size)
                     return {
                         station.newModel(models.mRoofFenceS .. "_tl.mdl", coor.rotZ(0.5 * pi) * fitModel2D(5, 0.5)(false, true)(size) * mDepth),
                         station.newModel(models.mRoofFenceS .. "_br.mdl", coor.rotZ(0.5 * pi) * fitModel2D(5, 0.5)(true, false)(size) * mDepth)
                     }
                 end)
                 * pipe.flatten(),
-                subDivide(ext(sizeSup), 5, 0.5) * pipe.map(function(size)
+                junction.subDivide(ext(sizeSup), 5, 0.5, false, 1) * pipe.map(function(size)
                     return {
                         station.newModel(models.mRoofFenceS .. "_tl.mdl", coor.rotZ(0.5 * pi) * fitModel2D(5, 0.5)(false, true)(size) * mDepth),
                         station.newModel(models.mRoofFenceS .. "_br.mdl", coor.rotZ(0.5 * pi) * fitModel2D(5, 0.5)(true, false)(size) * mDepth)
@@ -468,7 +424,7 @@ local function generateStructure(fitModel, fitModel2D)
                 * pipe.flatten()
             }
         end)
-                
+        
         local roof = func.map(func.interlace(walls, {"l", "r"}), function(w)
             local arcL = w.l:withLimits(
                 {
@@ -504,7 +460,7 @@ local function generateStructure(fitModel, fitModel2D)
                             lb = c.l.s,
                             rb = c.r.s
                         })
-                        return subDivide(size, 5, 5) * pipe.map(function(size)
+                        return junction.subDivide(size, 5, 5, false, 1) * pipe.map(function(size)
                             return {
                                 station.newModel(models.mRoof .. "_tl.mdl", fitModel2D(5, 5)(true, true)(size) * mDepth * coor.transZ(0.05)),
                                 station.newModel(models.mRoof .. "_br.mdl", fitModel2D(5, 5)(false, false)(size) * mDepth * coor.transZ(0.05))
@@ -710,8 +666,8 @@ local lowerTerrainPolys = function(terrainIntersection, extLon)
             
             if (not arcsL or not arcsR) then return {} end
             
-            local arcsLo = func.map(arcsL, function(arc) return func.with(arc, {r = arc.r + (arc.radius > 0 and 0.5 or -0.5)}) end)
-            local arcsRo = func.map(arcsR, function(arc) return func.with(arc, {r = arc.r + (arc.radius < 0 and 0.5 or -0.5)}) end)
+            local arcsLo = func.map(arcsL, function(arc) return func.with(arc, {r = arc.r + (arc.radius > 0 and 1 or -1)}) end)
+            local arcsRo = func.map(arcsR, function(arc) return func.with(arc, {r = arc.r + (arc.radius < 0 and 1 or -1)}) end)
             local arcsLi = func.map(arcsL, function(arc) return func.with(arc, {r = arc.r + (arc.radius < 0 and 0.5 or -0.5)}) end)
             local arcsRi = func.map(arcsR, function(arc) return func.with(arc, {r = arc.r + (arc.radius > 0 and 0.5 or -0.5)}) end)
             
@@ -840,7 +796,7 @@ local function params(paramFilter)
             {
                 key = "xDegDec",
                 name = _("Crossing angles"),
-                values = {_("5"), _("10"), _("20"), _("30"), _("40"), _("50"), _("60"), _("70"), _("80"), },
+                values = {_("5"), _("10"), _("20"), _("30"), _("40"), _("50"), _("60"), _("70"), _("80"), ("90")},
                 defaultIndex = 2
             },
             {
@@ -1063,7 +1019,7 @@ local updateFn = function(fParams, models)
             defaultParams(params, fParams)
             
             local deg = listDegree[params.xDegDec + 1] + params.xDegUni
-            local rad = math.rad(deg)
+            local rad = math.rad(deg > 89 and 89.95 or deg)
             
             local trackTypeLower = junction.trackList[params.trackType + 1]
             local trackTypeUpper = params.trackTypeUpper == 0 and trackTypeLower or junction.trackList[params.trackTypeUpper]
@@ -1216,7 +1172,7 @@ local updateFn = function(fParams, models)
                     polys = retriveX(jA.retrivePolys(), preparedExt.tracks),
                     polysNarrow = retriveX(jA.retrivePolys(0, 2.5), preparedExt.tracks),
                     polysNarrow2 = retriveX(jA.retrivePolys(0, 2.75), preparedExt.tracks),
-                    pavings = retriveX(jA.retriveTrackPavings(fitModel), preparedExt.pavings),
+                    pavings = retriveX(jA.retriveTrackPavings(fitModel, models), preparedExt.pavings),
                     walls = retriveX(jA.retriveWalls(fitModel, fitModel2D), preparedExt.walls)
                 }, preparedExt
             end)()
@@ -1339,17 +1295,35 @@ local updateFn = function(fParams, models)
             end
             
             local lXPavings = (group.A.lower.pavings + group.B.lower.pavings)
+                * pipe.interlace({"l", "r"})
                 * pipe.map(
-                    junction.makeFn("flying_junction/paving_base", fitModel(1, 5), 1,
-                        function(fitModel, arcL, arcR, rad1, rad2)
-                            local size = {
-                                lt = arcL:pt(rad1):withZ((heightFactor - 1) * tunnelHeight),
-                                lb = arcL:pt(rad2):withZ((heightFactor - 1) * tunnelHeight),
-                                rt = arcR:pt(rad1):withZ((heightFactor - 1) * tunnelHeight),
-                                rb = arcR:pt(rad2):withZ((heightFactor - 1) * tunnelHeight)
-                            }
-                            return fitModel(size)
-                        end)
+                    function(p)
+                        local coordsL = junction.generatePolyArcEdge(p.l, "inf", "sup")
+                        local coordsR = junction.generatePolyArcEdgeN(p.r, "inf", "sup", #coordsL - 1)
+                        
+                        return func.map2(
+                            func.interlace(coordsL, {"i", "s"}),
+                            func.interlace(coordsR, {"i", "s"}),
+                            function(l, r)
+                                local size = {
+                                    lt = l.i:withZ((heightFactor - 1) * tunnelHeight),
+                                    rt = r.i:withZ((heightFactor - 1) * tunnelHeight),
+                                    lb = l.s:withZ((heightFactor - 1) * tunnelHeight),
+                                    rb = r.s:withZ((heightFactor - 1) * tunnelHeight)
+                                }
+                                
+                                return
+                                    junction.subDivide(size, 5, 5, false, 1)
+                                    * pipe.map(function(size)
+                                        return {
+                                            station.newModel(models.mRoof .. "_tl.mdl", fitModel(5, 5)(true, true)(size)),
+                                            station.newModel(models.mRoof .. "_br.mdl", fitModel(5, 5)(false, false)(size))
+                                        }
+                                    end)
+                                    * pipe.flatten()
+                            end
+                    )
+                    end
                 )
                 * pipe.flatten()
                 * pipe.flatten()
@@ -1445,5 +1419,4 @@ return {
     findIntersection = findIntersection,
     lowerTerrainPolys = lowerTerrainPolys,
     lowerSlotPolys = lowerSlotPolys
-
 }

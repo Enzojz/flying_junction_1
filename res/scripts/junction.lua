@@ -1,4 +1,3 @@
-dump = require "inspect"
 local func = require "flyingjunction/func"
 local coor = require "flyingjunction/coor"
 local arc = require "flyingjunction/coorarc"
@@ -9,6 +8,7 @@ local junction = {}
 local math = math
 local pi = math.pi
 local abs = math.abs
+local ceil = math.ceil
 local unpack = table.unpack
 
 junction.trackList = {"standard.lua", "high_speed.lua"}
@@ -187,14 +187,12 @@ junction.buildCoors = function(numTracks, groupSize, config)
     config = config or {
         trackWidth = station.trackWidth,
         wallWidth = 0.5,
-        pavingWidth = 1,
     }
-    local function builder(xOffsets, uOffsets, vOffsets, baseX, nbTracks)
+    local function builder(xOffsets, uOffsets, baseX, nbTracks)
         local function caller(n)
             return builder(
                 xOffsets + func.seqMap({1, n}, function(n) return baseX - 0.5 * config.trackWidth + n * config.trackWidth end),
                 uOffsets + {baseX + n * config.trackWidth + 0.5 * config.wallWidth},
-                vOffsets + {baseX + 0.5 * config.wallWidth, baseX + n * config.trackWidth - 0.5 *  config.wallWidth},
                 baseX + n * config.trackWidth + config.wallWidth,
                 nbTracks - n)
         end
@@ -204,7 +202,6 @@ junction.buildCoors = function(numTracks, groupSize, config)
                 {
                     tracks = xOffsets * pipe.map(offset),
                     walls = uOffsets * pipe.map(offset),
-                    pavings = vOffsets * pipe.map(offset)
                 }
         elseif (nbTracks < groupSize) then
             return caller(nbTracks)
@@ -212,7 +209,7 @@ junction.buildCoors = function(numTracks, groupSize, config)
             return caller(groupSize)
         end
     end
-    return builder(pipe.new, pipe.new * {0.5 * config.wallWidth}, pipe.new, config.wallWidth, numTracks)
+    return builder(pipe.new, pipe.new * {0.5 * config.wallWidth}, config.wallWidth, numTracks)
 end
 
 junction.normalizeRad = function(rad)
@@ -363,6 +360,51 @@ function junction.regularizeRad(rad)
     return rad > pi
         and junction.regularizeRad(rad - pi)
         or (rad < -pi and junction.regularizeRad(rad + pi) or rad)
+end
+
+
+local nSeg = function(length, base)
+    local nSeg = ceil((length - base * 0.5) / base)
+    return nSeg > 0 and nSeg or 1
+end
+
+junction.subDivide = function(size, w, h, nSegH, nSegV)
+    local vecT = size.rt - size.lt
+    local vecB = size.rb - size.lb
+    local vecL = size.lb - size.lt
+    local vecR = size.rb - size.rt
+    local nSegH = nSegH or nSeg((vecT + vecB):length() * 0.5, w)
+    local nSegV = nSegV or nSeg((vecL + vecR):length() * 0.5, h)
+    local segLengthT = vecT:length() / nSegH
+    local segLengthB = vecB:length() / nSegH
+    local vecTN = vecT:normalized()
+    local vecBN = vecB:normalized()
+    return pipe.new
+        * func.seq(1, nSegH)
+        * pipe.map(function(h)
+            local lt = size.lt + vecTN * (h - 1) * segLengthT
+            local rt = lt + vecTN * segLengthT
+            local lb = size.lb + vecBN * (h - 1) * segLengthB
+            local rb = lb + vecBN * segLengthB
+            local vecL = lb - lt
+            local vecR = rb - rt
+            local segLengthL = vecL:length() / nSegV
+            local segLengthR = vecR:length() / nSegV
+            local vecLN = vecL:normalized()
+            local vecRN = vecR:normalized()
+            return pipe.new
+                * func.seq(1, nSegV)
+                * pipe.map(function(v)
+                    return
+                        {
+                            lt = lt + vecLN * (v - 1) * segLengthL,
+                            lb = lt + vecLN * v * segLengthL,
+                            rt = rt + vecRN * (v - 1) * segLengthR,
+                            rb = rt + vecRN * v * segLengthR
+                        }
+                end)
+        end)
+        * pipe.flatten()
 end
 
 

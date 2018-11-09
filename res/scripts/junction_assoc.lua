@@ -230,7 +230,7 @@ local retrivePolys = function(extLon, extLat)
     
     return function(tracks)
         local arcL, arcR = tracks[1], tracks[#tracks]
-
+        
         local tr = {
             junction.trackLevel(arcL.fn.fz, arcR.fn.fz),
             junction.trackLeft(arcL.fn.fz),
@@ -246,7 +246,7 @@ local retrivePolys = function(extLon, extLat)
                 junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(2)), "inf", "sup")
                 (extLon, extLat, tr)
             }
-            
+        
         return {
             polys = polys * pipe.map(pipe.select(1)) * pipe.flatten(),
             trackPolys = polys * pipe.map(pipe.select(2)) * pipe.flatten(),
@@ -256,10 +256,42 @@ local retrivePolys = function(extLon, extLat)
     end
 end
 
-local retriveTrackPavings = function(fitModel)
+local retriveTrackPavings = function(fitModel, models)
     return function(pavings)
         return pavings
-            * pipe.map(function(tr) return tr.guidelines * pipe.map(junction.makeFn("flying_junction/paving_base", fitModel(1, 5), 1, tr.fn.mPlaceA)) end)
+            * pipe.interlace({"l", "r"})
+            * pipe.map(function(p)
+                return func.map2(
+                    p.l.guidelines,
+                    p.r.guidelines,
+                    function(arcL, arcR)
+                        local coordsL = junction.generatePolyArcEdge(arcL, "inf", "sup")
+                        local coordsR = junction.generatePolyArcEdgeN(arcR, "inf", "sup", #coordsL - 1)
+                        
+                        return func.map2(
+                            func.interlace(coordsL, {"i", "s"}),
+                            func.interlace(coordsR, {"i", "s"}),
+                            function(l, r)
+                                local size = {
+                                    lt = l.i:withZ(p.l.fn.fz(l.i.rad).y),
+                                    rt = r.i:withZ(p.r.fn.fz(r.i.rad).y),
+                                    lb = l.s:withZ(p.l.fn.fz(l.s.rad).y),
+                                    rb = r.s:withZ(p.r.fn.fz(r.s.rad).y)
+                                }
+                                
+                                return
+                                    junction.subDivide(size, 5, 5, false, 1)
+                                    * pipe.map(function(size)
+                                        return {
+                                            station.newModel(models.mRoof .. "_tl.mdl", fitModel(5, 5)(true, true)(size)),
+                                            station.newModel(models.mRoof .. "_br.mdl", fitModel(5, 5)(false, false)(size))
+                                        }
+                                    end)
+                                    * pipe.flatten()
+                            end
+                    )
+                    end)
+            end)
             * pipe.flatten()
             * pipe.flatten()
             * pipe.flatten()

@@ -770,11 +770,6 @@ local function params(paramFilter)
     return (junction.trackType
         +
         {
-            func.with(paramsutil.makeTrackCatenaryParam(),
-                {
-                    values = {_("None"), _("Both"), _("Lower"), _("Upper")},
-                    defaultIndex = 0
-                }),
             {
                 key = "nbLowerTracks",
                 name = _("Number of lower tracks"),

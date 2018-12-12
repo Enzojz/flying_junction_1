@@ -15,6 +15,7 @@ local ceil = math.ceil
 local pi = math.pi
 local max = math.max
 local unpack = table.unpack
+local _ = _ or function(s) return s end
 
 local listDegree = {5, 10, 20, 30, 40, 50, 60, 70, 80, 90}
 local rList = {junction.infi * 0.001, 5, 3.5, 2, 1, 4 / 5, 2 / 3, 3 / 5, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 20}
@@ -1384,7 +1385,9 @@ local updateFn = function(fParams, models)
                 + (not info.A.lower.used and {} or info.A.lower.isTerra and ext.polysNarrow.lower.A.polys or ext.polysNarrow2.lower.A.polys)
                 + (not info.B.lower.used and {} or info.B.lower.isTerra and ext.polysNarrow.lower.B.polys or ext.polysNarrow2.lower.B.polys)
                 )
-                * pipe.map(function(p) return {face = (func.map(p, coor.vec2Tuple)), modes = {{type = "FILL", key = "hole"}}} end)
+                * pipe.map(station.finalizePoly)
+                * pipe.filter(pipe.noop())
+                * pipe.map(function(p) return {face = p, modes = {{type = "FILL", key = "hole"}}} end)
             }
             
             if (#result.terrainAlignmentLists == 0) then

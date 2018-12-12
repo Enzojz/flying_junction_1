@@ -2,17 +2,18 @@ local jMain = require "junction_main"
 
 function data()
     return {
-        type = "RAIL_STATION",
+        type = "ASSET_DEFAULT",
         description = {
             name = _("Bifurcation Flying Junction in concrete"),
             description = _("A flying junction that used to bifurcate two lines, built in concrete")
         },
+        categories = { "junctions" },
         availability = {
             yearFrom = 1950
         },
         skipCollision = true,
         autoRemovable = false,
-        order = 27224,
+        order = 9900013,
         params = jMain.params({"curvedLevel", "trRadiusA", "trSRadiusA"}),
         
         updateFn = jMain.updateFn(function(params)

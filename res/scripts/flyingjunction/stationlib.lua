@@ -201,7 +201,7 @@ stationlib.prepareEdges = function(edges)
     return {
         edges = edges * pipe.mapFlatten(pipe.select("edge")) * pipe.map(pipe.map(coor.vec2Tuple)) * coor.make,
         snapNodes = snapNodes(edges),
-        freeNodes = func.seq(1, #func.mapFlatten(edges, pipe.select("edge")) * 2 - 1)
+        freeNodes = func.seq(0, #func.mapFlatten(edges, pipe.select("edge")) * 2 - 1)
     }
 end
 

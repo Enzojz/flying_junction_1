@@ -14,6 +14,9 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.18
+* All tracks are modifiable free edges after construction (with support from the Final Patch)
+* Change of menu entry from Rail Depot to Asset/junctions
 1.17
 * Terrain alignment reimplemented to get rid to zig-zags
 * Added 90° options in crossing angle (It's actually 89.95°)
@@ -82,6 +85,9 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.18
+* Tous les voies soitent modifiable après la construction (avec support de patche finale)
+* Changement d'entrée de construction du dêpot ferroviaire à asset/junctions
 1.17
 * Réimplémentation de alignment terrain pour éffacer les zigzags
 * Ajoute d'option 90° pour l'angle de croisement (C'est actuellement 89.95°)
@@ -142,6 +148,9 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.18
+* 所有的轨道在建设完成后都可以自由修改（需要Final Patch的支持）
+* 菜单入口移至 资产/junctions 下
 1.17
 * 重写了地面重整的算法，消除了锯齿
 * 增加了90度交会角的选项

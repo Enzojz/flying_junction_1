@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.19
+* Added option to switch off/on free tracks and streets
 1.18
 * All tracks are modifiable free edges after construction (with support from the Final Patch)
 * Change of menu entry from Rail Depot to Asset/junctions
@@ -85,6 +87,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.19
+* Ajoute d'option de préférence aux voies à la modification libre.
 1.18
 * Tous les voies soitent modifiable après la construction (avec support de patche finale)
 * Changement d'entrée de construction du dêpot ferroviaire à asset/junctions
@@ -148,6 +152,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.19
+* 增加了可以控制是否修改轨道的选项
 1.18
 * 所有的轨道在建设完成后都可以自由修改（需要Final Patch的支持）
 * 菜单入口移至 资产/junctions 下
@@ -234,6 +240,7 @@ function data()
             ["None"] = "Aucun",
             ["All"] = "Toutes",
             ["Common"] = "Commune",
+            ["Free tracks/streets"] = "Voie à la modification libre",
             ["Bifurcation Flying Junction in concrete"] = "Saut de mouton de bifurcation en concrete",
             ["Crossing Flying Junction in concrete"] = "Saut de mouton de croisement en concrete",
             ["Exchange Flying Junction in concrete"] = "Saut de mouton d'échange en concrete",
@@ -281,6 +288,7 @@ function data()
             ["All"] = "所有",
             ["Common"] = "共轴",
             ["Tunnel Height"] = "隧道净高",
+            ["Free tracks/streets"] = "可自由修改的轨道",
             
             ["Bifurcation Flying Junction in concrete"] = "水泥制联络疏解",
             ["Crossing Flying Junction in concrete"] = "水泥制交叉疏解",

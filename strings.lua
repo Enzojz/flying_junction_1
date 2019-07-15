@@ -241,6 +241,7 @@ function data()
             ["All"] = "Toutes",
             ["Common"] = "Commune",
             ["Free tracks/streets"] = "Voie à la modification libre",
+            ["Not build"] = "Ne pas construire",
             ["Bifurcation Flying Junction in concrete"] = "Saut de mouton de bifurcation en concrete",
             ["Crossing Flying Junction in concrete"] = "Saut de mouton de croisement en concrete",
             ["Exchange Flying Junction in concrete"] = "Saut de mouton d'échange en concrete",
@@ -289,6 +290,7 @@ function data()
             ["Common"] = "共轴",
             ["Tunnel Height"] = "隧道净高",
             ["Free tracks/streets"] = "可自由修改的轨道",
+            ["Not build"] = "不建造",
             
             ["Bifurcation Flying Junction in concrete"] = "水泥制联络疏解",
             ["Crossing Flying Junction in concrete"] = "水泥制交叉疏解",

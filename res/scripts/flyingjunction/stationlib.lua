@@ -197,12 +197,18 @@ local snapNodes = function(edges)
         * pipe.map(pipe.select("index"))
 end
 
-stationlib.prepareEdges = function(edges)
-    return {
-        edges = edges * pipe.mapFlatten(pipe.select("edge")) * pipe.map(pipe.map(coor.vec2Tuple)) * coor.make,
-        snapNodes = snapNodes(edges),
-        freeNodes = func.seq(0, #func.mapFlatten(edges, pipe.select("edge")) * 2 - 1)
-    }
+stationlib.prepareEdges = function(freeNodes)
+    return function(edges)
+        return (freeNodes == nil)
+            and {
+                edges = {},
+                snapNodes = {}
+            } or {
+                edges = edges * pipe.mapFlatten(pipe.select("edge")) * pipe.map(pipe.map(coor.vec2Tuple)) * coor.make,
+                snapNodes = snapNodes(edges),
+                freeNodes = freeNodes and func.seq(0, #func.mapFlatten(edges, pipe.select("edge")) * 2 - 1) or {}
+            }
+    end
 end
 
 stationlib.joinEdges = function(edges)
@@ -355,34 +361,34 @@ end
 
 stationlib.cleanPoly = function(poly)
     return pipe.new * poly
-    * function(p)
-        if (#p ~= 4) then 
-            return p
-        else
-            local line12 = line.byPtPt(p[1], p[2])
-            local line34 = line.byPtPt(p[3], p[4])
-            local x = line12 - line34
-            return
-                x
-                and (p[1] - x):dot(p[2] - x) < 0
-                and (p[3] - x):dot(p[4] - x) < 0
-                and {p[1], p[3], p[2], p[4]}
-                or p
+        * function(p)
+            if (#p ~= 4) then
+                return p
+            else
+                local line12 = line.byPtPt(p[1], p[2])
+                local line34 = line.byPtPt(p[3], p[4])
+                local x = line12 - line34
+                return
+                    x
+                    and (p[1] - x):dot(p[2] - x) < 0
+                    and (p[3] - x):dot(p[4] - x) < 0
+                    and {p[1], p[3], p[2], p[4]}
+                    or p
+            end
         end
-    end
-    * function(p) return #p == 4 and p * ((p[2] - p[1]):cross(p[3] - p[2]).z > 0 and pipe.noop() or pipe.rev()) or p end
-    * function(p) return #p == 4 and abs((p[1] - p[2]):cross(p[3] - p[2]).z) < 0.1 and {p[1], p[3], p[4]} or p end
-    * function(p) return #p == 4 and abs((p[2] - p[3]):cross(p[4] - p[3]).z) < 0.1 and {p[1], p[2], p[4]} or p end
-    * function(p) return #p == 4 and abs((p[3] - p[4]):cross(p[1] - p[4]).z) < 0.1 and {p[1], p[2], p[3]} or p end
-    * function(p) return #p == 4 and abs((p[4] - p[1]):cross(p[2] - p[1]).z) < 0.1 and {p[2], p[3], p[4]} or p end
-    * function(p) return #p == 4 and abs((p[1] - p[2]):cross(p[3] - p[2]).z) + abs((p[3] - p[4]):cross(p[1] - p[4]).z) < 0.1 and nil or p end
-    * function(p) return #p == 3 and abs((p[1] - p[2]):cross(p[3] - p[2]).z) < 0.1 and nil or p end
+        * function(p) return #p == 4 and p * ((p[2] - p[1]):cross(p[3] - p[2]).z > 0 and pipe.noop() or pipe.rev()) or p end
+        * function(p) return #p == 4 and abs((p[1] - p[2]):cross(p[3] - p[2]).z) < 0.1 and {p[1], p[3], p[4]} or p end
+        * function(p) return #p == 4 and abs((p[2] - p[3]):cross(p[4] - p[3]).z) < 0.1 and {p[1], p[2], p[4]} or p end
+        * function(p) return #p == 4 and abs((p[3] - p[4]):cross(p[1] - p[4]).z) < 0.1 and {p[1], p[2], p[3]} or p end
+        * function(p) return #p == 4 and abs((p[4] - p[1]):cross(p[2] - p[1]).z) < 0.1 and {p[2], p[3], p[4]} or p end
+        * function(p) return #p == 4 and abs((p[1] - p[2]):cross(p[3] - p[2]).z) + abs((p[3] - p[4]):cross(p[1] - p[4]).z) < 0.1 and nil or p end
+        * function(p) return #p == 3 and abs((p[1] - p[2]):cross(p[3] - p[2]).z) < 0.1 and nil or p end
 end
 
 stationlib.finalizePoly = function(poly)
     return pipe.new * poly
-    * stationlib.cleanPoly
-    * pipe.map(coor.vec2Tuple)
+        * stationlib.cleanPoly
+        * pipe.map(coor.vec2Tuple)
 end
 
 function stationlib.projectPolys(mDepth)
@@ -429,7 +435,7 @@ function stationlib.mergePoly(...)
                     type = "LESS",
                     faces = p.slot,
                     slopeLow = profile.slot or stationlib.infi,
-                    slopeHigh = profile.slot or  stationlib.infi,
+                    slopeHigh = profile.slot or stationlib.infi,
                 },
                 {
                     type = "GREATER",

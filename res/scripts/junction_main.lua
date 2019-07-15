@@ -953,7 +953,7 @@ local function params(paramFilter)
             {
                 key = "freeNodes",
                 name = _("Free tracks"),
-                values = {_("No"), _("Yes")},
+                values = {_("No"), _("Yes"), _("Not build")},
                 defaultIndex = 0
             }
         }
@@ -1198,7 +1198,7 @@ local updateFn = function(fParams, models)
                         upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mDepth, mvec = coor.I()})
                     }),
                 {buildLowerTracks, buildUpperTracks, buildBridge},
-                function(e, b) return e * pipe.map(station.mergeEdges) * station.prepareEdges * b end)
+                function(e, b) return e * pipe.map(station.mergeEdges) * (station.prepareEdges(({false, true, nil})[params.freeNodes + 1])) * b end)
             
             local structure = {
                 A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mDepth, models)[1],
@@ -1331,7 +1331,7 @@ local updateFn = function(fParams, models)
                 * pipe.flatten()
             
             local result = {
-                edgeLists = func.map(edges, function(e) return func.with(e, { freeNodes = (params.freeNodes == 1) and e.freeNodes or {} }) end),
+                edgeLists = edges,
                 models = pipe.new
                 + structure.A.fixed
                 + structure.B.fixed

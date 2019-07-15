@@ -1151,12 +1151,12 @@ local updateFn = function(fParams, models)
                         },
                         frac = {
                             lower = {
-                                A = heightFactor >= 1 and 1 or lengthPercentList[params.trLengthLowerA + 1],
-                                B = heightFactor >= 1 and 1 or lengthPercentList[params.trLengthLowerB + 1]
+                                A = lengthPercentList[params.trLengthLowerA + 1],
+                                B = lengthPercentList[params.trLengthLowerB + 1]
                             },
                             upper = {
-                                A = heightFactor == 0 and 1 or lengthPercentList[params.trLengthUpperA + 1],
-                                B = heightFactor == 0 and 1 or lengthPercentList[params.trLengthUpperB + 1]
+                                A = lengthPercentList[params.trLengthUpperA + 1],
+                                B = lengthPercentList[params.trLengthUpperB + 1]
                             }
                         }
                     }

@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.20
+* Correction of terra holes on some configurations
 1.19
 * Added option to switch off/on free tracks and streets
 1.18
@@ -87,6 +89,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.20
+* Correction des trous dans la terre sur certain configurations
 1.19
 * Ajoute d'option de préférence aux voies à la modification libre.
 1.18
@@ -152,6 +156,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.20
+* 修正了一些配置下的空洞
 1.19
 * 增加了可以控制是否修改轨道的选项
 1.18

@@ -1087,7 +1087,7 @@ local updateFn = function(fParams, models)
                         rad = rad,
                         used = func.contains({0, 2}, params.transitionB),
                         isBridge = params.typeSlopeB == 0 or not func.contains({0, 2}, params.transitionB),
-                        isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type ~= 2,
+                        isTerra = params.typeSlopeB == 1 and func.contains({0, 2}, params.transitionB) and params.type == 1,
                         extR = (params.trSRadiusB == 0 and 1 or -1) * retriveR(params.trRadiusB)
                     }
                 }

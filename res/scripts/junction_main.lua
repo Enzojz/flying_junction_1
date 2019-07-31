@@ -955,6 +955,12 @@ local function params(paramFilter)
                 name = _("Free tracks"),
                 values = {_("No"), _("Yes"), _("Not build")},
                 defaultIndex = 0
+            },
+            {
+                key = "terrainToWalltop",
+                name = _("Terrain aligned to the walltop"),
+                values = {_("No"), _("Yes")},
+                defaultIndex = 0
             }
         }
         )
@@ -1267,7 +1273,10 @@ local updateFn = function(fParams, models)
                     lowerPolys[part].polys,
                     ext.polys.lower[part].polys,
                 },
-                greater = {
+                greater = params.terrainToWalltop == 1 and {
+                    lowerPolys[part].polys,
+                    ext.polys.lower[part].polysNoExt
+                } or {
                     lowerPolys[part].trackPolys,
                     ext.polys.lower[part].trackPolys
                 }

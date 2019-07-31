@@ -4,7 +4,7 @@ function data()
         name = _("Brick Flying Junction"),
         
         yearFrom = 1840,
-        yearTo = 1841,
+        yearTo = 0,
         
         carriers = {"RAIL"},
         

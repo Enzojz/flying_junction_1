@@ -246,9 +246,28 @@ local retrivePolys = function(extLon, extLat)
                 junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(2)), "inf", "sup")
                 (extLon, extLat, tr)
             }
+            
+        local polysNoExt = pipe.new
+        / {
+            junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(1)), "inf", "mid")
+            (-2, extLat, tr)
+        }
+        / {
+            junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(1)), "mid", "sup")
+            (2, extLat, tr)
+        }
+        / {
+            junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(2)), "inf", "mid")
+            (2, extLat, tr)
+        }
+        / {
+            junction.generatePolyArc(tracks * pipe.map(pipe.select("guidelines")) * pipe.map(pipe.select(2)), "mid", "sup")
+            (-2, extLat, tr)
+        }
         
         return {
             polys = polys * pipe.map(pipe.select(1)) * pipe.flatten(),
+            polysNoExt = polysNoExt * pipe.map(pipe.select(1)) * pipe.flatten(),
             trackPolys = polys * pipe.map(pipe.select(2)) * pipe.flatten(),
             leftPolys = polys * pipe.map(pipe.select(3)) * pipe.flatten(),
             rightPolys = polys * pipe.map(pipe.select(4)) * pipe.flatten()

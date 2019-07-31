@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.21
+* Added option to align terrain to the top of the wall
 1.20
 * Correction of terra holes on some configurations
 1.19
@@ -156,6 +158,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.21
+* 增加了让地形对齐到墙顶的选项
 1.20
 * 修正了一些配置下的空洞
 1.19
@@ -297,6 +301,7 @@ function data()
             ["Tunnel Height"] = "隧道净高",
             ["Free tracks/streets"] = "可自由修改的轨道",
             ["Not build"] = "不建造",
+            ["Terrain aligned to the walltop"] = "对齐地形到墙顶",
             
             ["Bifurcation Flying Junction in concrete"] = "水泥制联络疏解",
             ["Crossing Flying Junction in concrete"] = "水泥制交叉疏解",

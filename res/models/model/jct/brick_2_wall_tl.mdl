@@ -1,0 +1,41 @@
+function data() return {
+  boundingInfo = {
+    bbMax = {
+      0.500000,
+      0.000000,
+      0.000000
+    },
+    bbMin = {
+      0.000000,
+      -5.000000,
+      -1.000000
+    }
+  },
+  collider = {
+    params = {  },
+    type = "MESH"
+  },
+  lods = {
+    {
+      node = {
+        children = {
+          {
+            materials = {
+              -- "jct/uv/brick_2.mtl",
+              "jct/uz/brick_2.mtl"
+            },
+            mesh = "jct/brick_2_wall_tl.msh",
+            transf = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
+          }
+        },
+        name = "RootNode",
+        transf = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
+      },
+      static = true,
+      visibleFrom = 0,
+      visibleTo = 2500
+    }
+  },
+  metadata = {  },
+  version = 1
+} end

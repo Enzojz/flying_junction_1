@@ -1,0 +1,40 @@
+function data() return {
+  boundingInfo = {
+    bbMax = {
+      0.000000,
+      5.000000,
+      0.000000
+    },
+    bbMin = {
+      -5.000000,
+      0.000000,
+      0.000000
+    }
+  },
+  collider = {
+    params = {  },
+    type = "MESH"
+  },
+  lods = {
+    {
+      node = {
+        children = {
+          {
+            materials = {
+              "jct/paving.mtl"
+            },
+            mesh = "jct/ceil_br.msh",
+            transf = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
+          }
+        },
+        name = "RootNode",
+        transf = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
+      },
+      static = true,
+      visibleFrom = 0,
+      visibleTo = 2500
+    }
+  },
+  metadata = {  },
+  version = 1
+} end

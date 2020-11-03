@@ -1,0 +1,707 @@
+local func = require "jct/func"
+local coor = require "jct/coor"
+local pipe = require "jct/pipe"
+local line = require "jct/coorline"
+local arc = require "jct/coorarc"
+local quat = require "jct/quaternion"
+local jct = require "jct"
+
+local infi = 1e8
+
+-- local dump = require "dump"
+
+local tunnelHeightList = {7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12}
+local rList = pipe.new
+    * func.seqMap({1, 100}, function(n)
+        local p = n * 0.01
+        return -(p * p * p * p * p) * 9900 - 100
+    end)
+    * function(rs) return rs + {infi} + rs * pipe.map(pipe.neg()) * pipe.rev() end
+
+local xDeg = pipe.new
+    * func.seqMap({5, 180}, function(d) return d * 0.5 end)
+    * function(rs) return rs * pipe.map(pipe.neg()) * pipe.rev() + rs end
+
+local fitModels = {
+    wall = jct.fitModel(0.5, 5, -1, true, true),
+    fence = jct.fitModel(0.5, 5, -1, true, true),
+    surface = jct.fitModel(5, 5, -1, true, true),
+    front = jct.fitModel(5, 0.5, -1, true, true)
+}
+
+
+local table = table
+local unpack = table.unpack
+local insert = table.insert
+local math = math
+local abs = math.abs
+local atan = math.atan
+local tan = math.tan
+local sin = math.sin
+local cos = math.cos
+local pi = math.pi
+
+local trackNumberList = {1, 2, 3, 4, 5, 6, 7, 8, 10}
+
+
+local function params()
+    return {
+        {
+            key = "xDeg",
+            name = _("MENU_X_DEG"),
+            values = func.map(xDeg, tostring),
+            uiType = "SLIDER",
+            defaultIndex = 270
+        },
+        {
+            key = "rUpper",
+            name = _("MENU_R_UPPER"),
+            values = func.map(rList, tostring),
+            uiType = "SLIDER",
+            defaultIndex = (#rList - 1) / 2
+        },
+        {
+            key = "rLower",
+            name = _("MENU_R_LOWER"),
+            values = func.map(rList, tostring),
+            uiType = "SLIDER",
+            defaultIndex = (#rList - 1) / 2
+        },
+        {
+            key = "tunnelHeight",
+            name = _("MENU_TUNNEL_HEIGHT"),
+            values = func.map(tunnelHeightList, tostring),
+            uiType = "SLIDER",
+            defaultIndex = 2
+        },
+        {
+            key = "wallType",
+            name = _("MENU_WALL_STYLE"),
+            values = {
+                "ui/jct/concrete.tga",
+                "ui/jct/brick.tga",
+                "ui/jct/brick_2.tga"
+            },
+            uiType = "ICON_BUTTON",
+            defaultIndex = 0
+        },
+    }
+
+end
+
+local function defaultParams(param)
+    local function limiter(d, u)
+        return function(v) return v and v < u and v or d end
+    end
+    
+    func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
+end
+
+
+local upgradeFn = function(params)
+    local modules = {}
+    return modules
+end
+
+local offsetGen = function(meta)
+    local function gen(result, base, fst, snd, ...)
+        if (fst and snd) then
+            local pos = snd.pos
+            local offset = base + (fst.width + snd.width) * 0.5
+            
+            return gen(result + {{pos, offset, snd.width, snd.realWidth or snd.width}}, offset, snd, ...)
+        else
+            return result
+        end
+    end
+    return gen(pipe.new * {}, 0, {width = 0}, unpack(meta))
+end
+
+local slopeGen = function(height, slope)
+    local flatProfile = function()
+        return {
+            {
+                pt = function(x) return coor.xy(x, slope.height) end,
+                slope = function(_) return 0 end,
+                pred = function(_) return true end,
+            },
+        }
+    end
+    local normalProfile = function()
+        local a = atan(slope)
+        local da = 0.5 * a
+        local xl = height * tan(da)
+        local length = 2 * xl + height / slope
+        
+        local arc1 = arc.byOR(coor.xy(0, 0), height)
+        local arc2 = arc.byOR(coor.xy(length, height), height)
+        local pTr1 = arc1:pt(pi * 0.5 + a)
+        local pTr2 = arc2:pt(-pi * 0.5 + a)
+        local lineSlope = line.byPtPt(pTr1, pTr2)
+        local intersection = function(ar, cond) return function(x) return cond(ar / line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)), function(p, q) return p.y < q.y end) end end
+        return {
+            {
+                pred = function(x) return x <= 0 end,
+                slope = function(_) return 0 end,
+                pt = function(x) return coor.xy(x, height) end
+            },
+            {
+                pred = function(x) return x > 0 and x < pTr1.x end,
+                slope = function(pt) return tan(arc1:rad(pt) - pi * 0.5) end,
+                pt = intersection(arc1, height > 0 and func.max or func.min)
+            },
+            {
+                pred = function(x) return x >= pTr1.x and x <= pTr2.x end,
+                slope = function(_) return -lineSlope.a / lineSlope.b end,
+                pt = function(x) return lineSlope - line.byVecPt(coor.xy(0, 1), coor.xy(x, 0)) end
+            },
+            {
+                pred = function(x) return x > pTr2.x and x < length end,
+                slope = function(pt) return tan(arc2:rad(pt) - pi * 0.5) end,
+                pt = intersection(arc2, height < 0 and func.max or func.min)
+            },
+            {
+                pred = function(x) return x >= length end,
+                slope = function(_) return 0 end,
+                pt = function(x) return coor.xy(x, 0) end
+            },
+        }
+    end
+    return height == 0 and flatProfile() or normalProfile()
+end
+
+local fzGen = function(initHeight, finalHeight)
+    return function(initRad, finalRad)
+        local ln = line.byPtPt(
+            coor.xy(initRad, initHeight),
+            coor.xy(finalRad, finalHeight)
+        )
+        return function(rad) return (ln - line.byVecPt(coor.xy(0, 1), coor.xy(rad, 0))).y end
+    end
+end
+
+local fsGen = function(slope)
+    return function(initRad, finalRad) return function(_) return slope end end
+end
+
+local configPos = function(level)
+    table.sort(level.allPos)
+    level.posMin = func.min(level.allPos)
+    level.posMax = func.max(level.allPos)
+    
+    local offsets = pipe.new
+        * func.seq(level.posMin > 50 and 49 or (level.posMin - 1), level.posMax + 1)
+        * pipe.map(function(pos)
+            return level.modules[pos] or {pos = pos, width = 5}
+        end)
+        * offsetGen
+    
+    local reOffset =
+        level.posMin > 50 and func.min(offsets, function(l, r) return l[2] < r[2] end)[2]
+        or (offsets * pipe.filter(function(o) return o[1] <= 50 end) * pipe.max(function(l, r) return l[2] < r[2] end))[2]
+    level.offsets = offsets * pipe.map(function(o) return {o[1], o[2] - reOffset, o[3], o[4]} end)
+    
+    level.coords = {}
+    level.arcs = {}
+    
+    for i, offset in ipairs(level.offsets) do
+        local pos, offset, _, realWidth = unpack(offset)
+        level.arcs[pos] = func.map(level.arcPackers, function(fn)
+            local arc, initRad, f = fn(offset)(realWidth)
+            return {arc = arc, initRad = initRad, fn = f}
+        end)
+        level.coords[pos] = {offset = offset}
+    end
+
+-- local allWalls = {}
+-- for pos, m in pairs(level.modules) do
+--     if (m.type == "jct_wall") then
+--         table.insert(allWalls, pos)
+--     end
+-- end
+-- if (level.modules[level.posMin].type ~= "jct_wall") then
+--     table.insert(allWalls, level.posMin)
+-- end
+-- if (level.modules[level.posMax].type ~= "jct_wall") then
+--     table.insert(allWalls, level.posMax)
+-- end
+-- table.sort(allWalls)
+-- for _, group in ipairs(pipe.interlace()(allWalls)) do
+--     local min, max = unpack(group)
+--     for i = min, max do
+--         if (level.modules[i].type ~= "jct_wall") then
+--             level.modules[i].grMin = min
+--             level.modules[i].grMax = max
+--         end
+--     end
+-- end
+end
+
+local configLevel = function(params)
+    local height = tunnelHeightList[params.tunnelHeight + 1] or 8
+    local xDeg = xDeg[params.xDeg + 1]
+    local xRad = xDeg / 180 * pi
+    
+    local r = {
+        lower = {
+            rList[params.rLower + 1],
+            rList[params.rLower + 1]
+        },
+        upper = {
+            rList[params.rUpper + 1],
+            rList[params.rUpper + 1]
+        }
+    }
+    
+    local lower = {
+        modules = {},
+        allPos = {}
+    }
+    
+    local upper = {
+        modules = {},
+        allPos = {}
+    }
+    
+    for slotId, m in pairs(params.modules) do
+        local info = jct.slotInfo(slotId)
+        local allPos = info.isUpper and upper.allPos or lower.allPos
+        local modules = info.isUpper and upper.modules or lower.modules
+        if not func.contains(allPos, info.pos.x) then
+            insert(allPos, info.pos.x)
+        end
+        modules[info.pos.x] = func.with(
+            m.metadata,
+            {
+                typeId = info.typeId,
+                pos = info.pos.x
+            }
+    )
+    end
+    
+    lower.fz = fzGen(0, 0)
+    upper.fz = fzGen(height, height)
+    
+    lower.fs = fsGen(0)
+    upper.fs = fsGen(0)
+    
+    lower.arcPackers = {
+        jct.arcPacker(r.lower[1], -xRad * 0.5, lower.fz, lower.fs),
+        jct.arcPacker(r.lower[2], -xRad * 0.5, lower.fz, lower.fs)
+    }
+    upper.arcPackers = {
+        jct.arcPacker(r.upper[1], xRad * 0.5, upper.fz, upper.fs),
+        jct.arcPacker(r.upper[2], xRad * 0.5, upper.fz, upper.fs)
+    }
+    configPos(lower)
+    configPos(upper)
+    
+    local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
+    
+    local ptX = {
+        func.min(lower.arcs[lower.posMin][1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
+        func.min(lower.arcs[lower.posMax][2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
+    }
+    
+    -- local ptXs = {
+    --     func.mapValues(lower.arcs, function(arcs) return func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector) end),
+    --     func.mapValues(lower.arcs, function(arcs) return func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector) end)
+    -- }
+    lower.arcs, upper.arcs =
+        func.mapValues(lower.arcs, function(arcs, pos)
+            if (lower.modules[pos] and not lower.modules[pos].isTrack) then
+                local ptX2 = pos == lower.posMin and {
+                    func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
+                    func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[2], ptXSelector)
+                } or pos == lower.posMax and {
+                    func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[1], ptXSelector),
+                    func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
+                } or nil
+                
+                local inner = pipe.mapn(arcs, ptX2 or ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                local outer = pipe.mapn(arcs, ptX, ptX2 or {})(function(arcs, ptX, ptX2) return arcs.fn(ptX, ptX2) end)
+                
+                return {outer[1], inner[1], inner[2], outer[2]}
+            else
+                -- if (lower.modules[pos]) then
+                --     local ptX = {
+                --         ptXs[1][lower.modules[pos].grMin],
+                --         ptXs[2][lower.modules[pos].grMax]
+                --     }
+                --     return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                -- else
+                return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+            -- end
+            end
+        end
+        ),
+        func.mapValues(upper.arcs, function(arcs, slotId)
+            if (upper.modules[slotId] and not upper.modules[slotId].isTrack) then
+                local ptX2 = slotId == upper.posMin and {
+                    func.min(lower.arcs[lower.posMin][1].arc[2] - arcs[1].arc[2], ptXSelector),
+                    func.min(lower.arcs[lower.posMax][2].arc[2] - arcs[2].arc[2], ptXSelector)
+                } or slotId == upper.posMax and {
+                    func.min(lower.arcs[lower.posMin][1].arc[1] - arcs[1].arc[1], ptXSelector),
+                    func.min(lower.arcs[lower.posMax][2].arc[1] - arcs[2].arc[1], ptXSelector)
+                } or {}
+                
+                local inner = pipe.mapn(arcs, ptX, ptX2)(function(arcs, ptX, ptX2) return arcs.fn(ptX, ptX2) end)
+                local outer = pipe.mapn(arcs, ptX, ptX2)(function(arcs, ptX, ptX2) return arcs.fn(ptX, ptX2) end)
+                
+                return {outer[1], inner[1], inner[2], outer[2]}
+            else
+                return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+            end
+        end)
+    
+    lower.coords = func.mapValues(lower.arcs, function(arcs, slotId)
+        return func.map(arcs, function(arc)
+            local biLatCoords, nSeg, segLength, biLatTangents = jct.biLatCoords(5, arc)
+            return {
+                biLatCoords = biLatCoords,
+                nSeg = nSeg,
+                segLength = segLength,
+                coords = jct.interlace(biLatCoords(0)),
+                tangents = jct.interlace(biLatTangents())
+            }
+        end)
+    end)
+    upper.coords = func.mapValues(upper.arcs, pipe.map(function(arc)
+        local biLatCoords, nSeg, segLength, biLatTangents = jct.biLatCoords(5, arc)
+        return {
+            biLatCoords = biLatCoords,
+            nSeg = nSeg,
+            segLength = segLength,
+            coords = jct.interlace(biLatCoords(0)),
+            tangents = jct.interlace(biLatTangents())
+        }
+    end
+    ))
+    return {
+        mirrored = xDeg < 0,
+        lower = func.with(lower, {
+            build = {
+                wall = jct.buildSurface(fitModels.wall, coor.transZ(1) * coor.scaleZ(height))(),
+                fence = jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5 + height))(),
+                surface = jct.buildSurface(fitModels.surface, coor.transZ(height))(),
+                ceil = jct.buildSurface(fitModels.surface, coor.transZ(height - 1))(),
+                front = jct.buildSurface(fitModels.front, coor.scaleZ(2.5) * coor.transZ(1.5 + height))(),
+            }
+        }),
+        upper = func.with(upper, {
+            build = {
+                wall = jct.buildSurface(fitModels.wall, coor.scaleZ(height))(),
+                fence = jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5))(),
+                surface = jct.buildSurface(fitModels.surface, coor.I())(),
+                front = jct.buildSurface(fitModels.front, coor.scaleZ(height))(),
+            }
+        }),
+        height = height
+    }
+end
+
+local function levelPos(modules, isUpper)
+    local allPos = pipe.new
+        * func.keys(modules)
+        * pipe.map(jct.slotInfo)
+        * pipe.filter(function(i) return i.isUpper == isUpper end)
+        * pipe.map(pipe.select("pos"))
+        * pipe.map(pipe.select("x"))
+        * pipe.sort()
+    return {min = allPos[1], max = allPos[#allPos]}
+end
+
+local preProcessFn = function(modules, change)
+    local info = jct.slotInfo(change.slotId)
+    if change.added then
+        if (info.pos.z == 1) then
+            modules[jct.slotId(info.pos:withZ(0), info.typeId)] = change.module
+            modules[change.slotId] = nil
+            return modules
+        else
+            modules[change.slotId] = change.module
+        end
+    else
+        -- if (info.isUpper) then
+        --     local pos = levelPos(modules, true)
+        -- else
+        --     local pos = levelPos(modules, false)
+        -- end
+    end
+    
+    local pos = {
+        lower = levelPos(modules, false),
+        upper = levelPos(modules, true)
+    }
+    
+    local rearrange = false
+    if change.added then
+        if (info.typeId > 5) then
+            rearrange = true
+            for _, k in ipairs(func.keys(modules)) do
+                local info = jct.slotInfo(k)
+                if (info.typeId == 7) then
+                    local isFirstWall = pos.upper.min == info.pos.x
+                    local isLastWall = pos.upper.max == info.pos.x
+                    if (not isLastWall and not isFirstWall) then
+                        modules[k] = nil
+                    end
+                end
+            end
+        end
+    else
+        modules[change.slotId] = nil
+        rearrange = info.typeId == 2 or info.typeId == 7 or info.typeId == 1 or info.typeId == 6
+    end
+    
+    if (rearrange) then
+        local arrange = function(isUpper, min, max)
+            local level = pipe.new
+                * func.keys(modules)
+                * pipe.map(jct.slotInfo)
+                * pipe.filter(function(i) return i.isUpper == isUpper end)
+                * pipe.fold({}, function(rs, info)
+                    if (not rs[info.pos.x]) then rs[info.pos.x] = {} end
+                    table.insert(rs[info.pos.x], info)
+                    return rs
+                end)
+            
+            local op = false
+            
+            local offset = 0
+            for pos = 50, min, -1 do
+                if not level[pos] then
+                    offset = offset - 1
+                    op = true
+                end
+                level[pos] = level[pos + offset]
+            end
+            local offset = 0
+            for pos = 50, max do
+                if not level[pos] then
+                    offset = offset + 1
+                    op = true
+                end
+                level[pos] = level[pos + offset]
+            end
+            
+            if (op) then
+                local projection = {}
+                for _, pos in ipairs(func.keys(level)) do
+                    for _, info in ipairs(level[pos]) do
+                        projection[jct.slotId(coor.xyz(pos, info.pos.y, 0), info.typeId)] = modules[info.slotId]
+                        modules[info.slotId] = nil
+                    end
+                end
+                modules = func.with(modules, projection)
+            end
+        end
+        
+        arrange(true, pos.upper.min, pos.upper.max)
+        arrange(false, pos.lower.min, pos.lower.max)
+    end
+    
+    return modules
+end
+
+local updateFn = function(params)
+    if #func.keys(params.modules) == 0 then
+        return {
+            edgeLists = {},
+            models = {{
+                id = "asset/icon/marker_exclamation.mdl",
+                transf = coor.I(),
+            }},
+            terrainAlignmentLists = {{type = "EQUAL", faces = {}}}
+        }
+    end
+    
+    defaultParams(params)
+    
+    
+    local result = {
+        edgeLists = {},
+        models = pipe.new * {},
+        terrainAlignmentLists = {{type = "EQUAL", faces = {}}},
+        groundFaces = {},
+        slots = {},
+        -- config = config,
+        dependentSlots = {},
+        colliders = {}
+    }
+    
+    result.config = configLevel(params)
+    
+    local addSlot = function(typeId, pos, coord, tangent, dep, z)
+        local spacing = (typeId == 2 or typeId == 7) and coor.xy(0.25, 2.5) or coor.xy(2.4, 2.5)
+        local type = jct.idTable[typeId]
+        local mRot = quat.byVec(coor.xyz(0, 1, 0), tangent):mRot()
+        local id = jct.slotId(coor.xyz(pos, 0, z or 0), typeId)
+        insert(result.slots, {
+            id = id,
+            transf = mRot * coor.trans(coord),
+            type = type,
+            shape = 2,
+            spacing = {spacing.x, spacing.x, spacing.y, spacing.y}
+        })
+        
+        if dep then
+            if not result.dependentSlots[dep] then result.dependentSlots[dep] = {} end
+            table.insert(result.dependentSlots[dep], id)
+        end
+        return id
+    end
+    
+    for pos, arcs in pairs(result.config.lower.arcs) do
+        local ar = arcs[1]()
+        local pt = arc.ptByPt(ar, coor.o)
+        local tangent = ar:tangent(ar:rad(coor.o))
+        local m = result.config.lower.modules[pos]
+        local hasWallMin = result.config.lower.modules[result.config.lower.posMin].typeId == 2
+        local hasWallMax = result.config.lower.modules[result.config.lower.posMax].typeId == 2
+        if (m) then
+            addSlot(m.typeId, pos, pt, tangent)
+            addSlot(m.typeId, pos, pt + coor.xyz(0, 0, 1), tangent, nil, 1)
+        else
+            addSlot(1, pos, pt, tangent)
+            if ((pos == result.config.lower.posMin - 1 and not hasWallMin) or (pos == result.config.lower.posMax + 1 and not hasWallMax)) then
+                addSlot(2, pos, pt, tangent)
+            end
+        end
+    end
+    
+    for pos, arcs in pairs(result.config.upper.arcs) do
+        local ar = arcs[1]()
+        local pt = arc.ptByPt(ar, coor.o) + coor.xyz(0, 0, result.config.height)
+        local tangent = ar:tangent(ar:rad(coor.o))
+        local m = result.config.upper.modules[pos]
+        local hasWallMin = result.config.upper.modules[result.config.upper.posMin].typeId == 7
+        local hasWallMax = result.config.upper.modules[result.config.upper.posMax].typeId == 7
+        if (m) then
+            addSlot(m.typeId, pos, pt, tangent)
+            addSlot(m.typeId, pos, pt + coor.xyz(0, 0, 1), tangent, nil, 1)
+        else
+            addSlot(6, pos, pt, tangent)
+            if ((pos == result.config.upper.posMin - 1 and not hasWallMin) or (pos == result.config.upper.posMax + 1 and not hasWallMax)) then
+                addSlot(7, pos, pt, tangent)
+            end
+        end
+    end
+    
+    result.terminateConstructionHook = function()
+        end
+    return result
+end
+
+local streetTypeList = {
+    "town_small_new",
+    "town_medium_new",
+    "town_large_new",
+    "town_small_old",
+    "town_medium_old",
+    "town_large_old",
+    "town_x_large_new",
+    "country_small_new",
+    "country_medium_new",
+    "country_large_new",
+    "country_x_large_new",
+    "country_small_old",
+    "country_medium_old",
+    "country_large_old"
+}
+
+function data()
+    local constructionTemplates =
+        {
+            {
+                constructionType = "RAIL_STATION",
+                type = "DYNAMIC",
+                availability = {
+                    yearFrom = 1863,
+                    yearTo = 0
+                },
+                description = {
+                    name = _("MENU_NAME"),
+                    description = _("MENU_DESC"),
+                    icon = "ui/jct/jct.tga"
+                },
+                data = {
+                    params = {
+                        {
+                            key = "trackNbLower",
+                            name = _("MENU_TRACK_NR_LOWER"),
+                            values = func.map(trackNumberList, tostring),
+                            uiType = "SLIDER",
+                            defaultIndex = 1
+                        },
+                        {
+                            key = "trackNbUpper",
+                            name = _("MENU_TRACK_NR_UPPER"),
+                            values = func.map(trackNumberList, tostring),
+                            uiType = "SLIDER",
+                            defaultIndex = 1
+                        },
+                        {
+                            key = "trackType",
+                            name = _("MENU_TRACK_TYPE"),
+                            uiType = "COMBOBOX",
+                            values = {_("Standard"), _("High-Speed")},
+                            defaultIndex = 0
+                        },
+                        {
+                            key = "catenary",
+                            name = _("MENU_TRACK_CAT"),
+                            uiType = "CHECKBOX",
+                            values = {"0", "1"},
+                            defaultIndex = 0
+                        }
+                    }
+                },
+            },
+            {
+                constructionType = "STREET_CONSTRUCTION",
+                type = "DYNAMIC",
+                availability = {
+                    yearFrom = 1850,
+                    yearTo = 0
+                },
+                description = {
+                    name = _("MENU_NAME"),
+                    description = _("MENU_DESC"),
+                    icon = "ui/jct/jct_street.tga"
+                },
+                data = {
+                    params = {
+                        {
+                            key = "streetType",
+                            name = _("MENU_STREET_TYPE"),
+                            values = {"MOCK"},
+                            uiType = "COMBOBOX",
+                            defaultIndex = 0
+                        }
+                    }
+                },
+            }
+        }
+    
+    return {
+        type = "RAIL_DEPOT",
+        description = {
+            name = _("FLYING_JUNCTION"),
+            description = ""
+        },
+        categories = { "track_construction" },
+        availability = {
+            yearFrom = 0,
+            yearTo = 0,
+        },
+        order = 100,
+        constructionTemplates = constructionTemplates,
+        createTemplateFn = function() return {} end,
+        params = params(),
+        upgradeFn = upgradeFn,
+        updateFn = updateFn,
+        preProcessFn = preProcessFn
+    }
+
+end

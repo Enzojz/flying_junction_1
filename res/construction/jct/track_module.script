@@ -1,0 +1,102 @@
+local func = require "jct/func"
+local coor = require "jct/coor"
+local pipe = require "jct/pipe"
+local general = require "jct/general"
+local jct = require "jct"
+
+-- local dump = require "dump"
+
+local wallTypes = {
+    "jct/concrete_fence",
+    "jct/brick_fence",
+    "jct/brick_2_fence"
+}
+
+function data()
+    return {
+        updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
+            local modelFence = wallTypes[params.wallType + 1]
+
+            local trackWidth = closureParams.trackWidth
+            local trackType = closureParams.trackType
+            local catenary = closureParams.catenary
+            local isRev = closureParams.isRev or false
+            local isStreet = closureParams.isStreet or false
+            
+            local withTag = general.withTag(tag)
+            local info = jct.slotInfo(slotId)
+            
+            local config = info.isUpper and result.config.upper or result.config.lower
+            local arcs = config.arcs[info.pos.x]
+            
+            local coords = config.coords[info.pos.x]
+            local isLeftWall = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_wall"
+            local isRightWall = config.modules[info.pos.x + 1] and config.modules[info.pos.x + 1].type == "jct_wall"
+            local e =
+                func.mapi(arcs, function(arc, index)
+                    local arc = arc(0)
+                    local isRev = isRev
+                    if (index == 2) then isRev = not isRev end
+                    local length = isRev and -arc:length() or arc:length()
+                    local pts = pipe.new
+                        * (isRev and {arc.sup, arc.inf} or {arc.inf, arc.sup})
+                        * pipe.map(function(pt) return { arc:pt(pt), arc:tangent(pt) * length } end)
+                    
+                    return pts * pipe.map(pipe.map(coor.vec2Tuple))
+                end)
+            
+            local edges = {
+                type = isStreet and "STREET" or "TRACK",
+                edgeType = info.isUpper and "BRIDGE" or nil,
+                edgeTypeName = info.isUpper and "jct_void.lua" or nil,
+                alignTerrain = not info.isUpper,
+                params = {
+                    type = trackType,
+                    catenary = catenary,
+                    tramTrackType = "NO"
+                },
+                edges = func.flatten(e),
+                snapNodes = isRev and {0, 3} or {1, 2},
+                freeNodes = {},
+                tag2nodes = {},
+                slot = slotId
+            }
+            table.insert(result.edgeLists, edges)
+
+            local leftExtend = isLeftWall and (info.pos.x - 1 == config.posMin and -0.25 or -0.5) or 0
+            local rightExtend = isRightWall and (info.pos.x + 1 == config.posMax and 0.25 or 0.5) or 0
+            
+            result.models = result.models
+                + pipe.new
+                * func.mapi(coords, function(coords, i)
+                    local biLatCoords = coords.biLatCoords
+                    local lc, rc = biLatCoords(-trackWidth * 0.5 + leftExtend, trackWidth * 0.5 + rightExtend)
+                    if result.config.mirrored then
+                        lc, rc = rc, lc
+                    end
+                    local llc, lrc = func.range(lc, #lc - 1, #lc), func.range(rc, #rc - 1, #rc)
+                    llc[1] = llc[2] + (llc[1] - llc[2]):normalized() * 0.5
+                    lrc[1] = lrc[2] + (lrc[1] - lrc[2]):normalized() * 0.5
+                    if i == 1 then
+                        lc = func.rev(lc)
+                        rc = func.rev(rc)
+                        llc = func.rev(llc)
+                        lrc = func.rev(lrc)
+                    end
+                    local base = {lc = jct.interlace(lc), rc = jct.interlace(rc)}
+                    return pipe.new
+                        / func.map2(base.lc, base.rc, function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end)
+                        / (info.isUpper and {config.build.front(nil, modelFence, {s = llc[1], i = llc[2]}, {s = lrc[1], i = lrc[2]}) * withTag} or {})
+                        / (info.isUpper and {} or {config.build.front(nil, modelFence, {s = llc[1], i = llc[2]}, {s = lrc[1], i = lrc[2]}) * withTag})
+                        / (info.isUpper and {} or func.map2(base.lc, base.rc, function(baseL, baseR) return config.build.ceil(nil, "jct/concrete_ceil", baseL, baseR) * withTag end))
+                        * pipe.flatten()
+                        * pipe.flatten()
+                end)
+                * pipe.flatten()
+        end,
+        
+        getModelsFn = function(params)
+            return {}
+        end
+    }
+end

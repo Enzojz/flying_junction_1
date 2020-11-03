@@ -1,0 +1,72 @@
+local func = require "jct/func"
+local coor = require "jct/coor"
+local pipe = require "jct/pipe"
+local general = require "jct/general"
+local jct = require "jct"
+
+local wallTypes = {
+    "concrete_wall",
+    "brick_wall",
+    "brick_2_wall"
+}
+
+function data()
+    return {        
+        updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
+            local wallType = closureParams.wallType or wallTypes[params.wallType + 1]
+            local wallWidth = closureParams.wallWidth or 0.5
+
+            local modelWall = ("jct/%s"):format(wallType)
+            local modelFence = ("jct/%s_fence"):format(wallType)
+            local withTag = general.withTag(tag)
+            local info = jct.slotInfo(slotId)
+            
+            local config = info.isUpper and result.config.upper or result.config.lower
+            local coords = config.coords[info.pos.x]
+            
+            if (info.isUpper and info.pos.x > config.posMin and info.pos.x < config.posMax) then
+                else
+                result.models = result.models
+                    + pipe.new
+                    * pipe.mapn(coords, {pipe.rev(), pipe.rev(), pipe.noop(), pipe.noop()})(function(coords, op)
+                        local biLatCoords = coords.biLatCoords
+                        local lc, rc = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5)
+                        if result.config.mirrored then
+                            lc, rc = rc, lc
+                        end
+                        lc, rc = op(lc), op(rc)
+                        local base = {lc = jct.interlace(lc), rc = jct.interlace(rc)}
+                        return func.map2(base.lc, base.rc, function(baseL, baseR)
+                            return config.build.wall(nil, modelWall, baseL, baseR) * withTag
+                        end)
+                    end)
+                    * pipe.flatten()
+                    * pipe.flatten()
+                
+                if (info.pos.x == config.posMin or info.pos.x == config.posMax) then
+                    result.models = result.models + pipe.new
+                        * pipe.mapn({coords[1], coords[4]}, {pipe.rev(), pipe.noop()})(function(coords, op)
+                            local biLatCoords = coords.biLatCoords
+                            local lc, rc = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5)
+                            if result.config.mirrored then
+                                lc, rc = rc, lc
+                            end
+                            lc, rc = op(lc), op(rc)
+                            local base = {lc = jct.interlace(lc), rc = jct.interlace(rc)}
+                            return func.map2(base.lc, base.rc, function(baseL, baseR)
+                                return config.build.fence(nil, modelFence, baseL, baseR) * withTag
+                            end)
+                        end)
+                        * pipe.flatten()
+                        * pipe.flatten()
+                end
+            end
+        
+        end,
+        
+        getModelsFn = function(params)
+            return {}
+        end
+    }
+
+end

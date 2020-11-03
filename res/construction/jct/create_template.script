@@ -1,0 +1,54 @@
+local coor = require "jct/coor"
+local jct = require "jct"
+
+local trackNumberList = {1, 2, 3, 4, 5, 6, 7, 8, 10}
+
+local trackId = {lower = 1, upper = 6}
+local wallId = {lower = 2, upper = 7}
+
+local createTemplateFn = function(params)
+    local fn = {
+        function()
+            local trackType = ("%s%s.module"):format(params.capturedParams.trackModuleList[params.trackType + 1], params.catenary == 1 and "_catenary" or "")
+            
+            local trackNb = {
+                lower = trackNumberList[params.trackNbLower + 1],
+                upper = trackNumberList[params.trackNbUpper + 1]
+            }
+            
+            local result = {}
+            for level, trackNb in pairs(trackNb) do
+                local minPos = 50 - (trackNb % 2 == 1 and (trackNb - 1) / 2 or trackNb / 2)
+                local maxPos = minPos + trackNb - 1
+                
+                for p = minPos, maxPos do
+                    result[jct.slotId(coor.xyz(p, 0, 0), trackId[level])] = trackType
+                end
+                
+                result[jct.slotId(coor.xyz(minPos - 1, 0, 0), wallId[level])] = "jct/jct_wall.module"
+                result[jct.slotId(coor.xyz(maxPos + 1, 0, 0), wallId[level])] = "jct/jct_wall.module"
+            end
+            return result
+        end,
+        function()
+            local streetType = ("%s%s.module"):format(params.capturedParams.streetModuleList[params.streetType + 1], "")
+            
+            local result = {}
+            result[jct.slotId(coor.xyz(50, 0, 0), trackId.lower)] = streetType
+            result[jct.slotId(coor.xyz(50, 0, 0), trackId.upper)] = streetType
+            
+            result[jct.slotId(coor.xyz(49, 0, 0), wallId.lower)] = "jct/jct_wall.module"
+            result[jct.slotId(coor.xyz(51, 0, 0), wallId.lower)] = "jct/jct_wall.module"
+            result[jct.slotId(coor.xyz(49, 0, 0), wallId.upper)] = "jct/jct_wall.module"
+            result[jct.slotId(coor.xyz(51, 0, 0), wallId.upper)] = "jct/jct_wall.module"
+            return result
+        end
+    }
+    return fn[params.templateIndex + 1]()
+end
+
+function data()
+    return {
+        fn = createTemplateFn
+    }
+end

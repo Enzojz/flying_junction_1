@@ -14,6 +14,8 @@ Implemented functions:
 * Independent catenary options
 
 Changelog:
+1.22
+* Seperation of options to free tracks on different levels
 1.21
 * Added option to align terrain to the top of the wall
 1.20
@@ -91,6 +93,8 @@ Caractéristiques:
 * Options de caténaire indépendantes
 
 Changelog:
+1.22
+* Séparation des options de modification à libre pour les deux niveaux
 1.20
 * Correction des trous dans la terre sur certain configurations
 1.19
@@ -158,6 +162,8 @@ local descCN = [[欧式疏解桥.
 * 不同层不同的接触网选项
 
 Changelog:
+1.22
+* 分离了上下层可自由修改的选项
 1.21
 * 增加了让地形对齐到墙顶的选项
 1.20
@@ -251,6 +257,8 @@ function data()
             ["All"] = "Toutes",
             ["Common"] = "Commune",
             ["Free tracks/streets"] = "Voie à la modification libre",
+            ["Upper level free tracks"] = "Voie haut à la modification libre",
+            ["Lower level free tracks"] = "Voie bas la modification libre",
             ["Not build"] = "Ne pas construire",
             ["Bifurcation Flying Junction in concrete"] = "Saut de mouton de bifurcation en concrete",
             ["Crossing Flying Junction in concrete"] = "Saut de mouton de croisement en concrete",
@@ -300,6 +308,8 @@ function data()
             ["Common"] = "共轴",
             ["Tunnel Height"] = "隧道净高",
             ["Free tracks/streets"] = "可自由修改的轨道",
+            ["Upper level free tracks"] = "上层可自由修改",
+            ["Lower level free tracks"] = "下层可自由修改",
             ["Not build"] = "不建造",
             ["Terrain aligned to the walltop"] = "对齐地形到墙顶",
             

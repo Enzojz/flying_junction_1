@@ -238,6 +238,7 @@ local function trackGroup(info, offsets)
     
     local result = {
         lower = pipe.new * {
+            width = (offsets.lower.walls[2] - offsets.lower.walls[1] - 0.5) / #offsets.upper.tracks,
             tracks = func.map(gRef.lower.tracks, function(l) return l:withLimits(limitRads.lower) end),
             simpleWalls = func.map(gRef.lower.walls, function(l)
                 return l:withLimits(
@@ -279,6 +280,7 @@ local function trackGroup(info, offsets)
         )
         end,
         upper = {
+            width = (offsets.upper.walls[2] - offsets.upper.walls[1] - 0.5) / #offsets.upper.tracks,
             tracks = func.map(gRef.upper.tracks, function(l) return l:withLimits(limitRads.upper) end),
             pavings = pipe.new * func.map(gRef.upper.walls, function(l) return l:withLimits(limitRads.upper) end),
             walls = {
@@ -951,14 +953,20 @@ local function params(paramFilter)
                 defaultIndex = 6
             },
             {
-                key = "freeNodes",
-                name = _("Free tracks"),
+                key = "freeNodesUpper",
+                name = sp .. "\n" .. _("Upper Level Free tracks"),
+                values = {_("No"), _("Yes"), _("Not build")},
+                defaultIndex = 0
+            },
+            {
+                key = "freeNodesLower",
+                name = _("Lower Level Free tracks"),
                 values = {_("No"), _("Yes"), _("Not build")},
                 defaultIndex = 0
             },
             {
                 key = "terrainToWalltop",
-                name = _("Terrain aligned to the walltop"),
+                name = sp .. "\n" .. _("Terrain aligned to the walltop"),
                 values = {_("No"), _("Yes")},
                 defaultIndex = 0
             }
@@ -1025,7 +1033,7 @@ local updateFn = function(fParams, models)
     return function(params)
             
             defaultParams(params, fParams)
-            
+
             local deg = listDegree[params.xDegDec + 1] + params.xDegUni
             local rad = math.rad(deg > 89 and 89.95 or deg)
             
@@ -1197,14 +1205,18 @@ local updateFn = function(fParams, models)
                 end
             end
             
-            local edges = func.map2(
+            local edges = pipe.mapn(
                 generateEdges(info, ext,
                     {
                         lower = generateTrackGroups(group.A.lower.tracks, group.B.lower.tracks, {mpt = mDepth, mvec = coor.I()}),
                         upper = generateTrackGroups(group.A.upper.tracks, group.B.upper.tracks, {mpt = mTunnelZ * mDepth, mvec = coor.I()})
                     }),
                 {buildLowerTracks, buildUpperTracks, buildBridge},
-                function(e, b) return e * pipe.map(station.mergeEdges) * (station.prepareEdges(({false, true, nil})[params.freeNodes + 1])) * b end)
+                {params.freeNodesLower, params.freeNodesUpper, params.freeNodesUpper}
+                )
+                (
+                    function(e, b, f) return e * pipe.map(station.mergeEdges) * (station.prepareEdges(({false, true, nil})[f + 1])) * b end
+                )
             
             local structure = {
                 A = generateStructure(group.A.lower, group.A.upper, mTunnelZ * mDepth, models)[1],
@@ -1373,20 +1385,20 @@ local updateFn = function(fParams, models)
                 station.mergePoly({less = station.projectPolys(coor.I())(
                     unpack(
                         pipe.new
-                        + (info.A.lower.used and lowerTerrain("A").less or {})
-                        + (info.B.lower.used and lowerTerrain("B").less or {})
-                        + (info.A.upper.used and upperTerrain("A").less or {})
-                        + (info.B.upper.used and upperTerrain("B").less or {})
+                        + (info.A.lower.used and (heightFactor < 1 or params.freeNodesLower < 2) and lowerTerrain("A").less or {})
+                        + (info.B.lower.used and (heightFactor < 1 or params.freeNodesLower < 2) and lowerTerrain("B").less or {})
+                        + (info.A.upper.used and (heightFactor > 0 or params.freeNodesUpper < 2) and upperTerrain("A").less or {})
+                        + (info.B.upper.used and (heightFactor > 0 or params.freeNodesUpper < 2) and upperTerrain("B").less or {})
                 )
                 )
                 })()
                 + station.mergePoly({greater = station.projectPolys(coor.I())(
                     unpack(
                         pipe.new
-                        + (info.A.lower.used and lowerTerrain("A").greater or {})
-                        + (info.B.lower.used and lowerTerrain("B").greater or {})
-                        + (info.A.upper.used and upperTerrain("A").greater or {})
-                        + (info.B.upper.used and upperTerrain("B").greater or {})
+                        + (info.A.lower.used and (heightFactor < 1 or params.freeNodesLower < 2) and lowerTerrain("A").greater or {})
+                        + (info.B.lower.used and (heightFactor < 1 or params.freeNodesLower < 2) and lowerTerrain("B").greater or {})
+                        + (info.A.upper.used and (heightFactor > 0 or params.freeNodesUpper < 2) and upperTerrain("A").greater or {})
+                        + (info.B.upper.used and (heightFactor > 0 or params.freeNodesUpper < 2) and upperTerrain("B").greater or {})
                 )
                 )
                 })()

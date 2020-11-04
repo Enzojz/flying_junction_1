@@ -43,7 +43,7 @@ function data()
                     * pipe.flatten()
                     * pipe.flatten()
                 
-                if (info.pos.x == config.posMin or info.pos.x == config.posMax) then
+                -- if (info.pos.x == config.posMin or info.pos.x == config.posMax) then
                     result.models = result.models + pipe.new
                         * pipe.mapn({coords[1], coords[4]}, {pipe.rev(), pipe.noop()})(function(coords, op)
                             local biLatCoords = coords.biLatCoords
@@ -59,7 +59,7 @@ function data()
                         end)
                         * pipe.flatten()
                         * pipe.flatten()
-                end
+                -- end
             end
         
         end,

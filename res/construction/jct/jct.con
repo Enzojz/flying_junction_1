@@ -8,8 +8,7 @@ local jct = require "jct"
 
 local infi = 1e8
 
--- local dump = require "dump"
-
+local dump = require "dump"
 local tunnelHeightList = {7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12}
 local rList = pipe.new
     * func.seqMap({1, 100}, function(n)
@@ -212,29 +211,37 @@ local configPos = function(level)
         end)
         level.coords[pos] = {offset = offset}
     end
-
--- local allWalls = {}
--- for pos, m in pairs(level.modules) do
---     if (m.type == "jct_wall") then
---         table.insert(allWalls, pos)
---     end
--- end
--- if (level.modules[level.posMin].type ~= "jct_wall") then
---     table.insert(allWalls, level.posMin)
--- end
--- if (level.modules[level.posMax].type ~= "jct_wall") then
---     table.insert(allWalls, level.posMax)
--- end
--- table.sort(allWalls)
--- for _, group in ipairs(pipe.interlace()(allWalls)) do
---     local min, max = unpack(group)
---     for i = min, max do
---         if (level.modules[i].type ~= "jct_wall") then
---             level.modules[i].grMin = min
---             level.modules[i].grMax = max
---         end
---     end
--- end
+    
+    local allWalls = {}
+    for pos, m in pairs(level.modules) do
+        if (m.type == "jct_wall") then
+            table.insert(allWalls, pos)
+        end
+    end
+    if (level.modules[level.posMin].type ~= "jct_wall") then
+        table.insert(allWalls, level.posMin)
+    end
+    if (level.modules[level.posMax].type ~= "jct_wall") then
+        table.insert(allWalls, level.posMax)
+    end
+    table.sort(allWalls)
+    for _, group in ipairs(pipe.interlace()(allWalls)) do
+        local min, max = unpack(group)
+        
+        if (level.modules[min].type == "jct_wall") then
+            level.modules[min].rightWall = max
+        end
+        if (level.modules[max].type == "jct_wall") then
+            level.modules[max].leftWall = min
+        end
+        
+        for i = min, max do
+            if (level.modules[i].type ~= "jct_wall") then
+                level.modules[i].grMin = min
+                level.modules[i].grMax = max
+            end
+        end
+    end
 end
 
 local configLevel = function(params)
@@ -303,35 +310,68 @@ local configLevel = function(params)
         func.min(lower.arcs[lower.posMax][2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
     }
     
-    -- local ptXs = {
-    --     func.mapValues(lower.arcs, function(arcs) return func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector) end),
-    --     func.mapValues(lower.arcs, function(arcs) return func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector) end)
-    -- }
+    local ptXs = {
+        func.mapValues(lower.arcs, function(arcs) return func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector) end),
+        func.mapValues(lower.arcs, function(arcs) return func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector) end)
+    }
     lower.arcs, upper.arcs =
         func.mapValues(lower.arcs, function(arcs, pos)
             if (lower.modules[pos] and not lower.modules[pos].isTrack) then
-                local ptX2 = pos == lower.posMin and {
-                    func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
-                    func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[2], ptXSelector)
-                } or pos == lower.posMax and {
-                    func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[1], ptXSelector),
-                    func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
-                } or nil
                 
-                local inner = pipe.mapn(arcs, ptX2 or ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
-                local outer = pipe.mapn(arcs, ptX, ptX2 or {})(function(arcs, ptX, ptX2) return arcs.fn(ptX, ptX2) end)
+                if pos == lower.posMin then
+                    local ptXO = {
+                        func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
+                        func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[2], ptXSelector)
+                    }
+                    local ptX2 = ptXs[2][lower.modules[pos].rightWall];
+                    return {
+                        arcs[1].fn(ptX[1], ptXO[1]),
+                        arcs[1].fn(ptXO[1]),
+                        arcs[2].fn(ptXO[2]),
+                        arcs[2].fn(ptX2, ptXO[2])
+                    }
                 
-                return {outer[1], inner[1], inner[2], outer[2]}
+                elseif pos == lower.posMax then
+                    local ptXO = {
+                        func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[1], ptXSelector),
+                        func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
+                    }
+                    local ptX2 = ptXs[1][lower.modules[pos].leftWall]
+                    
+                    return {
+                        arcs[1].fn(ptX2, ptXO[1]),
+                        arcs[1].fn(ptXO[1]),
+                        arcs[2].fn(ptXO[2]),
+                        arcs[2].fn(ptX[2], ptXO[2])
+                    }
+                else
+                    local ptXO = {
+                        func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
+                        func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
+                    }
+
+                    local ptX2 = {
+                        ptXs[1][lower.modules[pos].leftWall],
+                        ptXs[2][lower.modules[pos].rightWall]
+                    }
+                    
+                    return {
+                        arcs[1].fn(ptX2[1], ptXO[1]),
+                        arcs[1].fn(ptXO[1]),
+                        arcs[2].fn(ptXO[2]),
+                        arcs[2].fn(ptX2[2], ptXO[2])
+                    }
+                end
             else
-                -- if (lower.modules[pos]) then
-                --     local ptX = {
-                --         ptXs[1][lower.modules[pos].grMin],
-                --         ptXs[2][lower.modules[pos].grMax]
-                --     }
-                --     return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
-                -- else
-                return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
-            -- end
+                if (lower.modules[pos]) then
+                    local ptX = {
+                        ptXs[1][lower.modules[pos].grMin],
+                        ptXs[2][lower.modules[pos].grMax]
+                    }
+                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                else
+                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                end
             end
         end
         ),
@@ -427,7 +467,7 @@ local preProcessFn = function(modules, change)
         -- else
         --     local pos = levelPos(modules, false)
         -- end
-    end
+        end
     
     local pos = {
         lower = levelPos(modules, false),
@@ -593,23 +633,6 @@ local updateFn = function(params)
     return result
 end
 
-local streetTypeList = {
-    "town_small_new",
-    "town_medium_new",
-    "town_large_new",
-    "town_small_old",
-    "town_medium_old",
-    "town_large_old",
-    "town_x_large_new",
-    "country_small_new",
-    "country_medium_new",
-    "country_large_new",
-    "country_x_large_new",
-    "country_small_old",
-    "country_medium_old",
-    "country_large_old"
-}
-
 function data()
     local constructionTemplates =
         {
@@ -690,7 +713,7 @@ function data()
             name = _("FLYING_JUNCTION"),
             description = ""
         },
-        categories = { "track_construction" },
+        categories = {"track_construction"},
         availability = {
             yearFrom = 0,
             yearTo = 0,

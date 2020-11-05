@@ -394,29 +394,6 @@ local configLevel = function(params)
             end
         end)
     
-    lower.coords = func.mapValues(lower.arcs, function(arcs, slotId)
-        return func.map(arcs, function(arc)
-            local biLatCoords, nSeg, segLength, biLatTangents = jct.biLatCoords(5, arc)
-            return {
-                biLatCoords = biLatCoords,
-                nSeg = nSeg,
-                segLength = segLength,
-                coords = jct.interlace(biLatCoords(0)),
-                tangents = jct.interlace(biLatTangents())
-            }
-        end)
-    end)
-    upper.coords = func.mapValues(upper.arcs, pipe.map(function(arc)
-        local biLatCoords, nSeg, segLength, biLatTangents = jct.biLatCoords(5, arc)
-        return {
-            biLatCoords = biLatCoords,
-            nSeg = nSeg,
-            segLength = segLength,
-            coords = jct.interlace(biLatCoords(0)),
-            tangents = jct.interlace(biLatTangents())
-        }
-    end
-    ))
     return {
         mirrored = xDeg < 0,
         lower = func.with(lower, {

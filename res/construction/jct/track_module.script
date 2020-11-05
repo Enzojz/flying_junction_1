@@ -29,9 +29,6 @@ function data()
             local config = info.isUpper and result.config.upper or result.config.lower
             local arcs = config.arcs[info.pos.x]
             
-            local coords = config.coords[info.pos.x]
-            local isLeftWall = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_wall"
-            local isRightWall = config.modules[info.pos.x + 1] and config.modules[info.pos.x + 1].type == "jct_wall"
             local e =
                 func.mapi(arcs, function(arc, index)
                     local arc = arc(0)
@@ -63,13 +60,15 @@ function data()
             }
             table.insert(result.edgeLists, edges)
 
+            local isLeftWall = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_wall"
+            local isRightWall = config.modules[info.pos.x + 1] and config.modules[info.pos.x + 1].type == "jct_wall"
             local leftExtend = isLeftWall and (info.pos.x - 1 == config.posMin and -0.25 or -0.5) or 0
             local rightExtend = isRightWall and (info.pos.x + 1 == config.posMax and 0.25 or 0.5) or 0
             
             result.models = result.models
                 + pipe.new
-                * func.mapi(coords, function(coords, i)
-                    local biLatCoords = coords.biLatCoords
+                * func.map(config.arcs[info.pos.x], function(arc) return jct.biLatCoords(5, arc) end)
+                * pipe.mapi(function(biLatCoords, i)
                     local lc, rc = biLatCoords(-trackWidth * 0.5 + leftExtend, trackWidth * 0.5 + rightExtend)
                     if result.config.mirrored then
                         lc, rc = rc, lc

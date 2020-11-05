@@ -22,14 +22,14 @@ function data()
             local info = jct.slotInfo(slotId)
             
             local config = info.isUpper and result.config.upper or result.config.lower
-            local coords = config.coords[info.pos.x]
+            
+            local biLatCoords = func.map(config.arcs[info.pos.x], function(arc) return jct.biLatCoords(5, arc) end)
             
             if (info.isUpper and info.pos.x > config.posMin and info.pos.x < config.posMax) then
                 else
                 result.models = result.models
                     + pipe.new
-                    * pipe.mapn(coords, {pipe.rev(), pipe.rev(), pipe.noop(), pipe.noop()})(function(coords, op)
-                        local biLatCoords = coords.biLatCoords
+                    * pipe.mapn(biLatCoords, {pipe.rev(), pipe.rev(), pipe.noop(), pipe.noop()})(function(biLatCoords, op)
                         local lc, rc = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5)
                         if result.config.mirrored then
                             lc, rc = rc, lc
@@ -45,8 +45,7 @@ function data()
                 
                 -- if (info.pos.x == config.posMin or info.pos.x == config.posMax) then
                     result.models = result.models + pipe.new
-                        * pipe.mapn({coords[1], coords[4]}, {pipe.rev(), pipe.noop()})(function(coords, op)
-                            local biLatCoords = coords.biLatCoords
+                        * pipe.mapn({biLatCoords[1], biLatCoords[4]}, {pipe.rev(), pipe.noop()})(function(biLatCoords, op)
                             local lc, rc = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5)
                             if result.config.mirrored then
                                 lc, rc = rc, lc

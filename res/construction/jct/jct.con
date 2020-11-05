@@ -325,10 +325,10 @@ local configLevel = function(params)
                     }
                     local ptX2 = ptXs[2][lower.modules[pos].rightWall];
                     return {
-                        arcs[1].fn(ptX[1], ptXO[1]),
-                        arcs[1].fn(ptXO[1]),
-                        arcs[2].fn(ptXO[2]),
-                        arcs[2].fn(ptX2, ptXO[2])
+                        { arc = arcs[1].fn(ptX[1], ptXO[1]), isRev = true, hasFence = true },
+                        { arc = arcs[1].fn(ptXO[1]), isRev = true, hasFence = false },
+                        { arc = arcs[2].fn(ptXO[2]), isRev = false, hasFence = false },
+                        { arc = arcs[2].fn(ptX2, ptXO[2]), isRev = false, hasFence = true }
                     }
                 
                 elseif pos == lower.posMax then
@@ -339,10 +339,10 @@ local configLevel = function(params)
                     local ptX2 = ptXs[1][lower.modules[pos].leftWall]
                     
                     return {
-                        arcs[1].fn(ptX2, ptXO[1]),
-                        arcs[1].fn(ptXO[1]),
-                        arcs[2].fn(ptXO[2]),
-                        arcs[2].fn(ptX[2], ptXO[2])
+                        { arc = arcs[1].fn(ptX2, ptXO[1]), isRev = true, hasFence = true },
+                        { arc = arcs[1].fn(ptXO[1]), isRev = true, hasFence = false },
+                        { arc = arcs[2].fn(ptXO[2]), isRev = false, hasFence = false },
+                        { arc = arcs[2].fn(ptX[2], ptXO[2]), isRev = false, hasFence = true }
                     }
                 else
                     local ptXO = {
@@ -356,10 +356,10 @@ local configLevel = function(params)
                     }
                     
                     return {
-                        arcs[1].fn(ptX2[1], ptXO[1]),
-                        arcs[1].fn(ptXO[1]),
-                        arcs[2].fn(ptXO[2]),
-                        arcs[2].fn(ptX2[2], ptXO[2])
+                        { arc = arcs[1].fn(ptX2[1], ptXO[1]), isRev = true, hasFence = true },
+                        { arc = arcs[1].fn(ptXO[1]), isRev = true, hasFence = false },
+                        { arc = arcs[2].fn(ptXO[2]), isRev = false, hasFence = false },
+                        { arc = arcs[2].fn(ptX2[2], ptXO[2]), isRev = false, hasFence = true }
                     }
                 end
             else
@@ -368,9 +368,9 @@ local configLevel = function(params)
                         ptXs[1][lower.modules[pos].grMin],
                         ptXs[2][lower.modules[pos].grMax]
                     }
-                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return { arc = arcs.fn(ptX) } end)
                 else
-                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return { arc = arcs.fn(ptX) } end)
                 end
             end
         end
@@ -385,12 +385,12 @@ local configLevel = function(params)
                     func.min(lower.arcs[lower.posMax][2].arc[1] - arcs[2].arc[1], ptXSelector)
                 } or {}
                 
-                local inner = pipe.mapn(arcs, ptX, ptX2)(function(arcs, ptX, ptX2) return arcs.fn(ptX, ptX2) end)
-                local outer = pipe.mapn(arcs, ptX, ptX2)(function(arcs, ptX, ptX2) return arcs.fn(ptX, ptX2) end)
-                
-                return {outer[1], inner[1], inner[2], outer[2]}
+                return {
+                    { arc = arcs[1].fn(ptX[1], ptX2[1]), isRev = true, hasFence = true },
+                    { arc = arcs[2].fn(ptX[2], ptX2[2]), isRev = false, hasFence = true }
+                }
             else
-                return pipe.mapn(arcs, ptX)(function(arcs, ptX) return arcs.fn(ptX) end)
+                return pipe.mapn(arcs, ptX)(function(arcs, ptX) return { arc = arcs.fn(ptX) } end)
             end
         end)
     
@@ -570,7 +570,7 @@ local updateFn = function(params)
     end
     
     for pos, arcs in pairs(result.config.lower.arcs) do
-        local ar = arcs[1]()
+        local ar = arcs[1].arc()
         local pt = arc.ptByPt(ar, coor.o)
         local tangent = ar:tangent(ar:rad(coor.o))
         local m = result.config.lower.modules[pos]
@@ -588,7 +588,7 @@ local updateFn = function(params)
     end
     
     for pos, arcs in pairs(result.config.upper.arcs) do
-        local ar = arcs[1]()
+        local ar = arcs[1].arc()
         local pt = arc.ptByPt(ar, coor.o) + coor.xyz(0, 0, result.config.height)
         local tangent = ar:tangent(ar:rad(coor.o))
         local m = result.config.upper.modules[pos]

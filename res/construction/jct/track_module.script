@@ -31,7 +31,7 @@ function data()
             
             local e =
                 func.mapi(arcs, function(arc, index)
-                    local arc = arc(0)
+                    local arc = arc.arc(0)
                     local isRev = isRev
                     if (index == 2) then isRev = not isRev end
                     local length = isRev and -arc:length() or arc:length()
@@ -67,7 +67,7 @@ function data()
             
             result.models = result.models
                 + pipe.new
-                * func.map(config.arcs[info.pos.x], function(arc) return jct.biLatCoords(5, arc) end)
+                * func.map(config.arcs[info.pos.x], function(arc) return jct.biLatCoords(5, arc.arc) end)
                 * pipe.mapi(function(biLatCoords, i)
                     local lc, rc = biLatCoords(-trackWidth * 0.5 + leftExtend, trackWidth * 0.5 + rightExtend)
                     if result.config.mirrored then

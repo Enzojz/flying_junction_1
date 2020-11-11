@@ -313,14 +313,14 @@ local configLevel = function(params)
     lower.arcs = func.mapValues(lower.arcs, function(arcs)
         return {
             func.with(arcs[1], {fn = arcs[1].fn(ptXSup[1])}),
-            func.with(arcs[2], {fn = arcs[2].fn(ptXSup[2])})   
+            func.with(arcs[2], {fn = arcs[2].fn(ptXSup[2])})
         }
     end)
     
     upper.arcs = func.mapValues(upper.arcs, function(arcs)
         return {
             func.with(arcs[1], {fn = arcs[1].fn(ptXSup[1])}),
-            func.with(arcs[2], {fn = arcs[2].fn(ptXSup[2])})   
+            func.with(arcs[2], {fn = arcs[2].fn(ptXSup[2])})
         }
     end)
     
@@ -379,7 +379,7 @@ local configLevel = function(params)
                         {arc = arcs[1].fn(ptXGr[1], ptXUpper[1]), isRev = true, hasFence = true},
                         {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, hasFence = false},
                         {arc = arcs[1].fn(ptXUpper[2], ptXGr[2]), isRev = true, hasFence = true},
-
+                        
                         {arc = arcs[2].fn(ptXGr[2], ptXUpper[2]), isRev = false, hasFence = true},
                         {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, hasFence = false},
                         {arc = arcs[2].fn(ptXUpper[1], ptXGr[1]), isRev = false, hasFence = true}
@@ -392,11 +392,14 @@ local configLevel = function(params)
                         ptXGr[2][lower.modules[pos].grMax]
                     }
                     result = {
-                        {arc = arcs[1].fn(ptX[1], ptX[2])},
-                        {arc = arcs[2].fn(ptX[2], ptX[1])}
+                        {arc = arcs[1].fn(ptX[1], ptX[2]), isRev = true},
+                        {arc = arcs[2].fn(ptX[2], ptX[1]), isRev = false}
                     }
                 else
-                    result = pipe.mapn(arcs, ptXSup)(function(arcs, ptX) return {arc = arcs.fn(ptX)} end)
+                    result = {
+                        {arc = arcs[1].fn(ptXSup[1]), isRev = true},
+                        {arc = arcs[2].fn(ptXSup[2]), isRev = false}
+                    }
                 end
             end
             return func.filter(result, function(r) return r.arc end)
@@ -434,11 +437,14 @@ local configLevel = function(params)
                     }
                 end
             else
-                result = pipe.mapn(arcs, ptXSup)(function(arcs, ptX) return {arc = arcs.fn(ptX)} end)
+                result = {
+                    {arc = arcs[1].fn(ptXSup[1]), isRev = true},
+                    {arc = arcs[2].fn(ptXSup[2]), isRev = false}
+                }
             end
             return func.filter(result, function(r) return r.arc end)
         end)
-        
+    
     return {
         mirrored = xDeg < 0,
         lower = func.with(lower, {
@@ -500,14 +506,23 @@ local preProcessFn = function(modules, change)
     if change.added then
         if (info.typeId > 5) then
             rearrange = true
+            local oldModule = nil
             for _, k in ipairs(func.keys(modules)) do
                 local info = jct.slotInfo(k)
                 if (info.typeId == 7) then
                     local isFirstWall = pos.upper.min == info.pos.x
                     local isLastWall = pos.upper.max == info.pos.x
                     if (not isLastWall and not isFirstWall) then
+                        oldModule = modules[k]
                         modules[k] = nil
                     end
+                end
+            end
+            if (oldModule ~= nil) then
+                if (info.pos.x == pos.upper.max) then
+                    modules[jct.slotId(func.with(info.pos, {x = info.pos.x + 1}), 7)] = oldModule
+                elseif (info.pos.x == pos.upper.min) then
+                    modules[jct.slotId(func.with(info.pos, {x = info.pos.x - 1}), 7)] = oldModule
                 end
             end
         end

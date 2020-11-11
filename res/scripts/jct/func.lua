@@ -78,10 +78,6 @@ function func.map2(ls1, ls2, fun)
     return func.pi.map2(ls2, fun)(ls1)
 end
 
-function func.mapi(ls, fun)
-    return func.pi.mapi(fun)(ls)
-end
-
 function func.range(ls, from, to)
     return func.pi.range(from, to)(ls)
 end

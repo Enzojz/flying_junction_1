@@ -44,15 +44,6 @@ end
 function pipe.map(fun)
     return function(ls)
         local result = {}
-        for i = 1, #ls do result[i] = fun(ls[i]) end
-        return result
-    end
-end
-
-
-function pipe.mapi(fun)
-    return function(ls)
-        local result = {}
         for i = 1, #ls do result[i] = fun(ls[i], i) end
         return result
     end

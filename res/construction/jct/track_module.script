@@ -16,7 +16,7 @@ function data()
     return {
         updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
             local modelFence = wallTypes[params.wallType + 1]
-
+            
             local trackWidth = closureParams.trackWidth
             local trackType = closureParams.trackType
             local catenary = closureParams.catenary
@@ -30,21 +30,21 @@ function data()
             local arcs = config.arcs[info.pos.x]
             
             local e = pipe.new
-                * func.mapi(arcs, function(arc, index)
-                    local arc = arc.arc(0)
+                * func.map(arcs, function(arc)
                     local isRev = isRev
-                    if (index == 2) then isRev = not isRev end
+                    if arc.isRev then isRev = not isRev end
+                    local arc = arc.arc(0)
                     local length = isRev and -arc:length() or arc:length()
                     local pts = pipe.new
                         * {arc.inf, (arc.inf + arc.sup) * 0.5, (arc.inf + arc.sup) * 0.5, arc.sup}
                         * (isRev and pipe.rev() or pipe.noop())
-                        * pipe.map(function(pt) return { arc:pt(pt), arc:tangent(pt) * length * 0.5 } end)
+                        * pipe.map(function(pt) return {arc:pt(pt), arc:tangent(pt) * length * 0.5} end)
                     
                     return pts * pipe.map(pipe.map(coor.vec2Tuple))
                 end)
-                * (isRev and pipe.noop() or pipe.rev())
+                * (isRev and pipe.rev() or pipe.noop())
                 * pipe.flatten()
-
+            
             local edges = {
                 type = isStreet and "STREET" or "TRACK",
                 edgeType = info.isUpper and "BRIDGE" or nil,
@@ -63,39 +63,49 @@ function data()
             }
             
             table.insert(result.edgeLists, edges)
-
+            
             local isLeftWall = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_wall"
             local isRightWall = config.modules[info.pos.x + 1] and config.modules[info.pos.x + 1].type == "jct_wall"
             local leftExtend = isLeftWall and (info.pos.x - 1 == config.posMin and -0.25 or -0.5) or 0
             local rightExtend = isRightWall and (info.pos.x + 1 == config.posMax and 0.25 or 0.5) or 0
             
+            local biLatCoords = func.map(arcs, function(arc)
+                local biLatCoords = jct.biLatCoords(5, arc.arc)
+                local isRev = arc.isRev
+                local lc, rc = biLatCoords(-trackWidth * 0.5 + leftExtend, trackWidth * 0.5 + rightExtend)
+                if result.config.mirrored then
+                    lc, rc = rc, lc
+                end
+                local op = isRev and pipe.rev() or pipe.noop()
+                lc, rc = op(lc), op(rc)
+                return {lc = lc, rc = rc}
+            end)
+            
             result.models = result.models
-                + pipe.new
-                * func.map(config.arcs[info.pos.x], function(arc) return jct.biLatCoords(5, arc.arc) end)
-                * pipe.mapi(function(biLatCoords, i)
-                    local lc, rc = biLatCoords(-trackWidth * 0.5 + leftExtend, trackWidth * 0.5 + rightExtend)
-                    if result.config.mirrored then
-                        lc, rc = rc, lc
-                    end
-                    local llc, lrc = func.range(lc, #lc - 1, #lc), func.range(rc, #rc - 1, #rc)
-                    llc[1] = llc[2] + (llc[1] - llc[2]):normalized() * 0.5
-                    lrc[1] = lrc[2] + (lrc[1] - lrc[2]):normalized() * 0.5
-                    if i == 1 then
-                        lc = func.rev(lc)
-                        rc = func.rev(rc)
-                        llc = func.rev(llc)
-                        lrc = func.rev(lrc)
-                    end
-                    local base = {lc = jct.interlace(lc), rc = jct.interlace(rc)}
+                + (function()
+                    local lc = func.mapFlatten(biLatCoords, pipe.select("lc"))
+                    local rc = func.mapFlatten(biLatCoords, pipe.select("rc"))
+                    
+                    local front = {
+                        {
+                            {s = lc[1], i = (lc[2] - lc[1]):normalized() * 0.5 + lc[1]},
+                            {s = rc[1], i = (rc[2] - rc[1]):normalized() * 0.5 + rc[1]},
+                        },
+                        {
+                            {s = (lc[#lc - 1] - lc[#lc]):normalized() * 0.5 + lc[#lc], i = lc[#lc]},
+                            {s = (rc[#rc - 1] - rc[#rc]):normalized() * 0.5 + rc[#rc], i = rc[#rc]}
+                        }
+                    }
+                    
                     return pipe.new
-                        / func.map2(base.lc, base.rc, function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end)
-                        / (info.isUpper and {config.build.front(nil, modelFence, {s = llc[1], i = llc[2]}, {s = lrc[1], i = lrc[2]}) * withTag} or {})
-                        / (info.isUpper and {} or {config.build.front(nil, modelFence, {s = llc[1], i = llc[2]}, {s = lrc[1], i = lrc[2]}) * withTag})
-                        / (info.isUpper and {} or func.map2(base.lc, base.rc, function(baseL, baseR) return config.build.ceil(nil, "jct/concrete_ceil", baseL, baseR) * withTag end))
+                        / func.map2(
+                            jct.interlace(lc), jct.interlace(rc),
+                            function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end
+                        )
+                        / func.map(front, function(base) return config.build.front(nil, modelFence, table.unpack(base)) * withTag end)
                         * pipe.flatten()
                         * pipe.flatten()
-                end)
-                * pipe.flatten()
+                end)()
         end,
         
         getModelsFn = function(params)

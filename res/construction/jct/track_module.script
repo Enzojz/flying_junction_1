@@ -4,7 +4,7 @@ local pipe = require "jct/pipe"
 local general = require "jct/general"
 local jct = require "jct"
 
--- local dump = require "dump"
+local dump = require "dump"
 
 local wallTypes = {
     "jct/concrete_fence",
@@ -29,19 +29,22 @@ function data()
             local config = info.isUpper and result.config.upper or result.config.lower
             local arcs = config.arcs[info.pos.x]
             
-            local e =
-                func.mapi(arcs, function(arc, index)
+            local e = pipe.new
+                * func.mapi(arcs, function(arc, index)
                     local arc = arc.arc(0)
                     local isRev = isRev
                     if (index == 2) then isRev = not isRev end
                     local length = isRev and -arc:length() or arc:length()
                     local pts = pipe.new
-                        * (isRev and {arc.sup, arc.inf} or {arc.inf, arc.sup})
-                        * pipe.map(function(pt) return { arc:pt(pt), arc:tangent(pt) * length } end)
+                        * {arc.inf, (arc.inf + arc.sup) * 0.5, (arc.inf + arc.sup) * 0.5, arc.sup}
+                        * (isRev and pipe.rev() or pipe.noop())
+                        * pipe.map(function(pt) return { arc:pt(pt), arc:tangent(pt) * length * 0.5 } end)
                     
                     return pts * pipe.map(pipe.map(coor.vec2Tuple))
                 end)
-            
+                * (isRev and pipe.noop() or pipe.rev())
+                * pipe.flatten()
+
             local edges = {
                 type = isStreet and "STREET" or "TRACK",
                 edgeType = info.isUpper and "BRIDGE" or nil,
@@ -52,12 +55,13 @@ function data()
                     catenary = catenary,
                     tramTrackType = "NO"
                 },
-                edges = func.flatten(e),
-                snapNodes = isRev and {0, 3} or {1, 2},
+                edges = e,
+                snapNodes = {0, #e - 1},
                 freeNodes = {},
                 tag2nodes = {},
                 slot = slotId
             }
+            
             table.insert(result.edgeLists, edges)
 
             local isLeftWall = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_wall"

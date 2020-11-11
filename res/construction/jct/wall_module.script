@@ -4,6 +4,7 @@ local pipe = require "jct/pipe"
 local general = require "jct/general"
 local jct = require "jct"
 
+local dump = require "dump"
 local wallTypes = {
     "concrete_wall",
     "brick_wall",

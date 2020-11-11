@@ -305,95 +305,140 @@ local configLevel = function(params)
     
     local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
     
-    local ptX = {
+    local ptXSup = {
         func.min(lower.arcs[lower.posMin][1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
         func.min(lower.arcs[lower.posMax][2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
     }
     
-    local ptXs = {
+    lower.arcs = func.mapValues(lower.arcs, function(arcs)
+        return {
+            func.with(arcs[1], {fn = arcs[1].fn(ptXSup[1])}),
+            func.with(arcs[2], {fn = arcs[2].fn(ptXSup[2])})   
+        }
+    end)
+    
+    upper.arcs = func.mapValues(upper.arcs, function(arcs)
+        return {
+            func.with(arcs[1], {fn = arcs[1].fn(ptXSup[1])}),
+            func.with(arcs[2], {fn = arcs[2].fn(ptXSup[2])})   
+        }
+    end)
+    
+    local ptXGr = {
         func.mapValues(lower.arcs, function(arcs) return func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector) end),
         func.mapValues(lower.arcs, function(arcs) return func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector) end)
     }
     lower.arcs, upper.arcs =
         func.mapValues(lower.arcs, function(arcs, pos)
+            local result = {}
             if (lower.modules[pos] and not lower.modules[pos].isTrack) then
-                
                 if pos == lower.posMin then
-                    local ptXO = {
+                    local ptXUpper = {
                         func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
                         func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[2], ptXSelector)
                     }
-                    local ptX2 = ptXs[2][lower.modules[pos].rightWall];
-                    return {
-                        { arc = arcs[1].fn(ptX[1], ptXO[1]), isRev = true, hasFence = true },
-                        { arc = arcs[1].fn(ptXO[1]), isRev = true, hasFence = false },
-                        { arc = arcs[2].fn(ptXO[2]), isRev = false, hasFence = false },
-                        { arc = arcs[2].fn(ptX2, ptXO[2]), isRev = false, hasFence = true }
+                    local ptXGr = ptXGr[2][lower.modules[pos].rightWall];
+                    result = {
+                        {arc = arcs[1].fn(ptXSup[1], ptXUpper[1]), isRev = true, hasFence = true},
+                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, hasFence = false},
+                        {arc = arcs[1].fn(ptXUpper[2], ptXGr), isRev = true, hasFence = true},
+                        
+                        {arc = arcs[2].fn(ptXUpper[1], ptXSup[1]), isRev = false, hasFence = true},
+                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, hasFence = false},
+                        {arc = arcs[2].fn(ptXGr, ptXUpper[2]), isRev = false, hasFence = true},
                     }
                 
                 elseif pos == lower.posMax then
-                    local ptXO = {
+                    local ptXUpper = {
                         func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[1], ptXSelector),
                         func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
                     }
-                    local ptX2 = ptXs[1][lower.modules[pos].leftWall]
+                    local ptXGr = ptXGr[1][lower.modules[pos].leftWall]
                     
-                    return {
-                        { arc = arcs[1].fn(ptX2, ptXO[1]), isRev = true, hasFence = true },
-                        { arc = arcs[1].fn(ptXO[1]), isRev = true, hasFence = false },
-                        { arc = arcs[2].fn(ptXO[2]), isRev = false, hasFence = false },
-                        { arc = arcs[2].fn(ptX[2], ptXO[2]), isRev = false, hasFence = true }
+                    result = {
+                        {arc = arcs[1].fn(ptXGr, ptXUpper[1]), isRev = true, hasFence = true},
+                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, hasFence = false},
+                        {arc = arcs[1].fn(ptXUpper[2], ptXSup[2]), isRev = true, hasFence = true},
+                        
+                        {arc = arcs[2].fn(ptXUpper[1], ptXGr), isRev = false, hasFence = true},
+                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, hasFence = false},
+                        {arc = arcs[2].fn(ptXSup[2], ptXUpper[2]), isRev = false, hasFence = true}
                     }
                 else
-                    local ptXO = {
+                    local ptXUpper = {
                         func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
                         func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
                     }
-
-                    local ptX2 = {
-                        ptXs[1][lower.modules[pos].leftWall],
-                        ptXs[2][lower.modules[pos].rightWall]
+                    
+                    local ptXGr = {
+                        ptXGr[1][lower.modules[pos].leftWall],
+                        ptXGr[2][lower.modules[pos].rightWall]
                     }
                     
-                    return {
-                        { arc = arcs[1].fn(ptX2[1], ptXO[1]), isRev = true, hasFence = true },
-                        { arc = arcs[1].fn(ptXO[1]), isRev = true, hasFence = false },
-                        { arc = arcs[2].fn(ptXO[2]), isRev = false, hasFence = false },
-                        { arc = arcs[2].fn(ptX2[2], ptXO[2]), isRev = false, hasFence = true }
+                    result = {
+                        {arc = arcs[1].fn(ptXGr[1], ptXUpper[1]), isRev = true, hasFence = true},
+                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, hasFence = false},
+                        {arc = arcs[1].fn(ptXUpper[2], ptXGr[2]), isRev = true, hasFence = true},
+
+                        {arc = arcs[2].fn(ptXGr[2], ptXUpper[2]), isRev = false, hasFence = true},
+                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, hasFence = false},
+                        {arc = arcs[2].fn(ptXUpper[1], ptXGr[1]), isRev = false, hasFence = true}
                     }
                 end
             else
                 if (lower.modules[pos]) then
                     local ptX = {
-                        ptXs[1][lower.modules[pos].grMin],
-                        ptXs[2][lower.modules[pos].grMax]
+                        ptXGr[1][lower.modules[pos].grMin],
+                        ptXGr[2][lower.modules[pos].grMax]
                     }
-                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return { arc = arcs.fn(ptX) } end)
+                    result = {
+                        {arc = arcs[1].fn(ptX[1], ptX[2])},
+                        {arc = arcs[2].fn(ptX[2], ptX[1])}
+                    }
                 else
-                    return pipe.mapn(arcs, ptX)(function(arcs, ptX) return { arc = arcs.fn(ptX) } end)
+                    result = pipe.mapn(arcs, ptXSup)(function(arcs, ptX) return {arc = arcs.fn(ptX)} end)
                 end
             end
+            return func.filter(result, function(r) return r.arc end)
         end
         ),
         func.mapValues(upper.arcs, function(arcs, slotId)
+            local result = {}
             if (upper.modules[slotId] and not upper.modules[slotId].isTrack) then
-                local ptX2 = slotId == upper.posMin and {
-                    func.min(lower.arcs[lower.posMin][1].arc[2] - arcs[1].arc[2], ptXSelector),
-                    func.min(lower.arcs[lower.posMax][2].arc[2] - arcs[2].arc[2], ptXSelector)
-                } or slotId == upper.posMax and {
-                    func.min(lower.arcs[lower.posMin][1].arc[1] - arcs[1].arc[1], ptXSelector),
-                    func.min(lower.arcs[lower.posMax][2].arc[1] - arcs[2].arc[1], ptXSelector)
-                } or {}
-                
-                return {
-                    { arc = arcs[1].fn(ptX[1], ptX2[1]), isRev = true, hasFence = true },
-                    { arc = arcs[2].fn(ptX[2], ptX2[2]), isRev = false, hasFence = true }
-                }
+                if (slotId == upper.posMin) then
+                    local ptXLower = {
+                        func.min(lower.arcs[lower.posMin][1].arc[2] - arcs[1].arc[2], ptXSelector),
+                        func.min(lower.arcs[lower.posMax][2].arc[2] - arcs[2].arc[2], ptXSelector)
+                    }
+                    result = {
+                        {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, hasFence = true},
+                        {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, hasFence = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, hasFence = true},
+                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, hasFence = true}
+                    }
+                elseif (slotId == upper.posMax) then
+                    local ptXLower = {
+                        func.min(lower.arcs[lower.posMin][1].arc[1] - arcs[1].arc[1], ptXSelector),
+                        func.min(lower.arcs[lower.posMax][2].arc[1] - arcs[2].arc[1], ptXSelector)
+                    }
+                    result = {
+                        {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, hasFence = true},
+                        {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, hasFence = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, hasFence = true},
+                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, hasFence = true}
+                    }
+                else
+                    result = {
+                        {arc = arcs[1].fn(ptXSup[1]), isRev = true, hasFence = true},
+                        {arc = arcs[2].fn(ptXSup[2]), isRev = false, hasFence = true}
+                    }
+                end
             else
-                return pipe.mapn(arcs, ptX)(function(arcs, ptX) return { arc = arcs.fn(ptX) } end)
+                result = pipe.mapn(arcs, ptXSup)(function(arcs, ptX) return {arc = arcs.fn(ptX)} end)
             end
+            return func.filter(result, function(r) return r.arc end)
         end)
-    
+        
     return {
         mirrored = xDeg < 0,
         lower = func.with(lower, {

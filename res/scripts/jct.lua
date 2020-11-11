@@ -5,7 +5,6 @@ local general = require "jct/general"
 local pipe = require "jct/pipe"
 
 -- local dump = require "dump"
-
 local jct = {}
 
 local math = math
@@ -28,7 +27,7 @@ jct.idTable = {
     [6] = "jct_track",
     [7] = "jct_wall",
     [8] = "jct_freenode",
-    -- [9] = "jct_replace"
+-- [9] = "jct_replace"
 }
 
 jct.slotId = function(pos, typeId)
@@ -84,6 +83,10 @@ jct.arc2Edges = function(arc)
     }
 end
 
+local function checkRange(a, b, c, d)
+    return (a <= b and b <= c and c <= d) or (a >= b and b >= c and c >= d)
+end
+
 jct.arcPacker = function(radius, rotRad, fz, fs)
     local rotCos = cos(rotRad)
     local rotSin = sin(rotRad)
@@ -99,19 +102,38 @@ jct.arcPacker = function(radius, rotRad, fz, fs)
                 arc.byOR(o, abs(radius - dr * 0.5)):withLimits({inf = initRad})
             }
             return ar,
-                initRad, 
-                function(ptX, ptX2)
-                    local finalRad = ar[1]:rad(ptX)
-                    local initRad = ptX2 and ar[1]:rad(ptX2) or initRad
-                    return function(xDr)
-                        local dr = xDr or 0
-                        local ar = arc.byOR(o, abs(radius - dr))
-                        return ar:withLimits({
-                            inf = initRad,
-                            sup = finalRad,
-                            fs = fs(initRad, finalRad),
-                            fz = fz(initRad, finalRad)
-                        })
+                initRad,
+                function(ptX)
+                    local sup = ar[1]:rad(ptX)
+                    local inf = initRad
+                    local ar = func.map(ar, function(ar) return ar:withLimits({sup = sup}) end)
+                    return function(ptX, ptX2)
+                        local sup = sup
+                        local inf = inf
+                        local finalRad = ar[1]:rad(ptX)
+                        local initRad = ptX2 and ar[1]:rad(ptX2) or initRad
+                        
+                        if checkRange(inf, initRad, finalRad, sup) then
+                        elseif checkRange(inf, initRad, sup, finalRad) then
+                            finalRad = sup
+                        elseif checkRange(initRad, inf, finalRad, sup) then
+                            initRad = inf
+                        elseif checkRange(initRad, inf, sup, finalRad) then
+                            initRad = inf
+                            finalRad = sup
+                        else
+                            return nil
+                        end
+                        return function(xDr)
+                            local dr = xDr or 0
+                            local ar = arc.byOR(o, abs(radius - dr))
+                            return ar:withLimits({
+                                inf = initRad,
+                                sup = finalRad,
+                                fs = fs(initRad, finalRad),
+                                fz = fz(initRad, finalRad)
+                            })
+                        end
                     end
                 end
         end
@@ -127,7 +149,7 @@ jct.biLatCoords = function(length, arc)
     return function(...)
         return unpack(func.map({...}, function(o)
             local refArc = arc(o)
-            return 
+            return
                 func.map(listRad, function(rad) return refArc:pt(rad) end)
         end))
     end, nSeg, arcRef:length() / nSeg,
@@ -184,7 +206,7 @@ jct.fitModel2D = function(w, h, zOffset, fitTop, fitLeft)
     
     local fitTop = {fitTop, not fitTop}
     local fitLeft = {fitLeft, not fitLeft}
-
+    
     return function(size, mode)
         local mXI = mXI[mode and 1 or 2]
         local fitTop = fitTop[mode and 1 or 2]

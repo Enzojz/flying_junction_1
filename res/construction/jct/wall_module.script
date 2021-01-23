@@ -4,7 +4,7 @@ local pipe = require "jct/pipe"
 local general = require "jct/general"
 local jct = require "jct"
 
-local dump = require "dump"
+-- local dump = require "dump"
 local wallTypes = {
     "concrete_wall",
     "brick_wall",
@@ -24,27 +24,79 @@ function data()
             
             local config = info.isUpper and result.config.upper or result.config.lower
             
-            result.models = result.models
-                + pipe.new
-                * func.map(config.arcs[info.pos.x], function(arc)
-                    local biLatCoords = jct.biLatCoords(5, arc.arc)
-                    local isRev = arc.isRev
-                    local hasFence = arc.hasFence
-                    local lc, rc = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5)
-                    if result.config.mirrored then
-                        lc, rc = rc, lc
-                    end
-                    local op = isRev and pipe.rev() or pipe.noop()
-                    lc, rc = op(lc), op(rc)
-                    local base = {lc = jct.interlace(lc), rc = jct.interlace(rc)}
-                    return pipe.new
-                        + func.map2(base.lc, base.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
-                        + (hasFence
-                        and func.map2(base.lc, base.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end)
-                        or {})
-                end)
-                * pipe.flatten()
-                * pipe.flatten()
+            local coords = func.map(config.arcs[info.pos.x], function(arc)
+                local biLatCoords = jct.biLatCoords(5, arc.arc)
+                local isRev = arc.isRev
+                local lc, rc, lce, rce = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5, -wallWidth * 0.5 - 0.5, wallWidth * 0.5 + 0.5)
+                if result.config.mirrored then
+                    lc, rc = rc, lc
+                    lce, rce = rce, lce
+                end
+                local op = isRev and pipe.rev() or pipe.noop()
+                lc, rc = op(lc), op(rc)
+                lce, rce = op(lce), op(rce)
+                return {lc = jct.interlace(lc), rc = jct.interlace(rc), lce = jct.interlace(lce), rce = jct.interlace(rce)}
+            end)
+            
+            local isLeftTrack = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_track"
+            local isRighTrack = config.modules[info.pos.x + 1] and config.modules[info.pos.x + 1].type == "jct_track"
+
+            table.insert(result.colliders, {
+                type = "POINT_CLOUD",
+                params = {
+                    points = pipe.new * func.map(coords, function(coord)
+                        return func.map2(coord.lc, coord.rc, function(l, r) return l.i:avg(l.s):avg(r.i:avg(r.s)) end)
+                    end)
+                    * pipe.flatten()
+                    * pipe.map(coor.vec2Tuple)
+                }
+            
+            }
+            )
+            if (params.extType == 0) then
+                result.models = result.models
+                    + pipe.new
+                    * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+                        return arc.onlyFence and {} or pipe.new
+                            + func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
+                            + (arc.hasFence
+                            and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end)
+                            or {})
+                    end)
+                    * pipe.flatten()
+                    * pipe.flatten()
+                if wallType == "concrete_wall" and not info.isUpper then
+                    result.models = result.models
+                    + pipe.new
+                    * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+                        return arc.onlyFence and {} or pipe.new
+                            + ((isLeftTrack and (result.config.mirrored ~= arc.isRev) or not arc.hasFence) and func.map2(coord.lc, coord.lce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner", baseL, baseR) * withTag end) or {})
+                            + ((isRighTrack and (result.config.mirrored == arc.isRev) or not arc.hasFence) and func.map2(coord.rc, coord.rce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner", baseL, baseR) * withTag end) or {})
+                    end)
+                    * pipe.flatten()
+                    * pipe.flatten()
+                end
+            else
+                if info.isUpper then
+                    result.models = result.models
+                        + pipe.new
+                        * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+                            return pipe.new
+                                + (arc.onlyFence and {} or func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end))
+                                + (arc.onlyFence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
+                        end)
+                        * pipe.flatten()
+                        * pipe.flatten()
+                else
+                    result.models = result.models
+                        + pipe.new
+                        * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+                            return arc.hasFence and {} or func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
+                        end)
+                        * pipe.flatten()
+                        * pipe.flatten()
+                end
+            end
         end,
         
         getModelsFn = function(params)

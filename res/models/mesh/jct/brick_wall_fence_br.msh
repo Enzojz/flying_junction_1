@@ -1,26 +1,86 @@
 function data() return {
-  subMeshes = {
-    {
-      indices = {
-        normal   = { count = 12, offset = 720 },
-        position = { count = 12, offset = 720 },
-        tangent  = { count = 12, offset = 720 },
-        uv0      = { count = 12, offset = 720 }
+   subMeshes = {
+      {
+         indices = {
+            normal = {
+               count = 24,
+               offset = 832
+            },
+            position = {
+               count = 24,
+               offset = 808
+            },
+            tangent = {
+               count = 24,
+               offset = 856
+            },
+            uv0 = {
+               count = 24,
+               offset = 880
+            }
+         }
+      },
+      {
+         indices = {
+            normal = {
+               count = 24,
+               offset = 928
+            },
+            position = {
+               count = 24,
+               offset = 904
+            },
+            tangent = {
+               count = 24,
+               offset = 952
+            },
+            uv0 = {
+               count = 24,
+               offset = 976
+            }
+         }
+      },
+      {
+         indices = {
+            normal = {
+               count = 24,
+               offset = 1024
+            },
+            position = {
+               count = 24,
+               offset = 1000
+            },
+            tangent = {
+               count = 24,
+               offset = 1048
+            },
+            uv0 = {
+               count = 24,
+               offset = 1072
+            }
+         }
       }
-    },
-    {
-      indices = {
-        normal   = { count = 48, offset = 732 },
-        position = { count = 48, offset = 732 },
-        tangent  = { count = 48, offset = 732 },
-        uv0      = { count = 48, offset = 732 }
+   },
+   vertexAttr = {
+      normal = {
+         count = 216,
+         numComp = 3,
+         offset = 72
+      },
+      position = {
+         count = 72,
+         numComp = 3,
+         offset = 0
+      },
+      tangent = {
+         count = 288,
+         numComp = 4,
+         offset = 288
+      },
+      uv0 = {
+         count = 232,
+         numComp = 2,
+         offset = 576
       }
-    }
-  },
-  vertexAttr = {
-    normal   = { count = 180, numComp = 3, offset = 300 },
-    position = { count = 180, numComp = 3, offset = 0 },
-    tangent  = { count = 240, numComp = 4, offset = 480 },
-    uv0      = { count = 120, numComp = 2, offset = 180 }
-  }
+   }
 } end

@@ -9,7 +9,7 @@ local jct = require "jct"
 local infi = 1e8
 
 local dump = require "dump"
-local tunnelHeightList = {7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12}
+local tunnelHeightList = {6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12}
 local rList = pipe.new
     * func.seqMap({1, 100}, function(n)
         local p = n * 0.01
@@ -84,6 +84,12 @@ local function params()
             uiType = "ICON_BUTTON",
             defaultIndex = 0
         },
+        {
+            key = "extType",
+            name = _("EXT_TYPE"),
+            values = { _("ZIGZAG"), _("ALIGNED")},
+            defaultIndex = 0
+        },
     }
 
 end
@@ -96,9 +102,38 @@ local function defaultParams(param)
     func.forEach(params(), function(i)param[i.key] = limiter(i.defaultIndex or 0, #i.values)(param[i.key]) end)
 end
 
-
 local upgradeFn = function(params)
     local modules = {}
+    local slotId = params.slotId
+    if params.modules[slotId] and params.modules[slotId].metadata.isTrack then
+        if (params.catenaryToggle == 1) then
+            local full = params.modules[slotId].name:match("(.+).module")
+            local cat = full:match("(.+)_catenary")
+            if cat then
+                table.insert(modules, {slotId, string.format("%s.module", cat)})
+            else
+                table.insert(modules, {slotId, string.format("%s_catenary.module", full)})
+            end
+        elseif (params.trackTypeToggle == 1) then
+            local function SwapModule(from, to, ...)
+                if (from and to) then
+                    if params.modules[slotId].name == from then
+                        table.insert(modules, {slotId, to})
+                    elseif params.modules[slotId].name == to then
+                        table.insert(modules, {slotId, from})
+                    else
+                        SwapModule(...)
+                    end
+                end
+            end
+            SwapModule(
+                "jct/tracks/standard.module",
+                "jct/tracks/high_speed.module",
+                "jct/tracks/standard_catenary.module",
+                "jct/tracks/high_speed_catenary.module"
+        )
+        end
+    end
     return modules
 end
 
@@ -417,7 +452,9 @@ local configLevel = function(params)
                         {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, hasFence = true},
                         {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, hasFence = true},
                         {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, hasFence = true},
-                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, hasFence = true}
+                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, hasFence = true},
+                        {arc = arcs[1].fn(ptXSup[1], ptXSup[2]), isRev = true, onlyFence = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXSup[1]), isRev = false, onlyFence = true}
                     }
                 elseif (slotId == upper.posMax) then
                     local ptXLower = {
@@ -428,7 +465,9 @@ local configLevel = function(params)
                         {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, hasFence = true},
                         {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, hasFence = true},
                         {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, hasFence = true},
-                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, hasFence = true}
+                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, hasFence = true},
+                        {arc = arcs[1].fn(ptXSup[1], ptXSup[2]), isRev = true, onlyFence = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXSup[1]), isRev = false, onlyFence = true}
                     }
                 else
                     result = {
@@ -449,6 +488,7 @@ local configLevel = function(params)
         mirrored = xDeg < 0,
         lower = func.with(lower, {
             build = {
+                corner = jct.buildSurface(fitModels.wall, coor.transZ(height - 1))(),
                 wall = jct.buildSurface(fitModels.wall, coor.transZ(1) * coor.scaleZ(height))(),
                 fence = jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5 + height))(),
                 surface = jct.buildSurface(fitModels.surface, coor.transZ(height))(),
@@ -461,6 +501,7 @@ local configLevel = function(params)
                 wall = jct.buildSurface(fitModels.wall, coor.scaleZ(height))(),
                 fence = jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5))(),
                 surface = jct.buildSurface(fitModels.surface, coor.I())(),
+                ceil = jct.buildSurface(fitModels.surface, coor.I())(),
                 front = jct.buildSurface(fitModels.front, coor.scaleZ(height))(),
             }
         }),

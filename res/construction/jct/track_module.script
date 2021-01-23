@@ -4,18 +4,25 @@ local pipe = require "jct/pipe"
 local general = require "jct/general"
 local jct = require "jct"
 
-local dump = require "dump"
-
+-- local dump = require "dump"
 local wallTypes = {
     "jct/concrete_fence",
     "jct/brick_fence",
     "jct/brick_2_fence"
 }
 
+-- local dump = require "dump"
+local ceilTypes = {
+    "jct/concrete_ceil",
+    "jct/brick_ceil",
+    "jct/brick_ceil"
+}
+
 function data()
     return {
         updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
             local modelFence = wallTypes[params.wallType + 1]
+            local modelCeil = ceilTypes[params.wallType + 1]
             
             local trackWidth = closureParams.trackWidth
             local trackType = closureParams.trackType
@@ -58,7 +65,9 @@ function data()
                 edges = e,
                 snapNodes = {0, #e - 1},
                 freeNodes = {},
-                tag2nodes = {},
+                tag2nodes = {
+                    [tag] = func.seq(0, #e - 1)
+                },
                 slot = slotId
             }
             
@@ -81,31 +90,50 @@ function data()
                 return {lc = lc, rc = rc}
             end)
             
-            result.models = result.models
-                + (function()
-                    local lc = func.mapFlatten(biLatCoords, pipe.select("lc"))
-                    local rc = func.mapFlatten(biLatCoords, pipe.select("rc"))
-                    
-                    local front = {
-                        {
-                            {s = lc[1], i = (lc[2] - lc[1]):normalized() * 0.5 + lc[1]},
-                            {s = rc[1], i = (rc[2] - rc[1]):normalized() * 0.5 + rc[1]},
-                        },
-                        {
-                            {s = (lc[#lc - 1] - lc[#lc]):normalized() * 0.5 + lc[#lc], i = lc[#lc]},
-                            {s = (rc[#rc - 1] - rc[#rc]):normalized() * 0.5 + rc[#rc], i = rc[#rc]}
+            local lc = func.mapFlatten(biLatCoords, pipe.select("lc"))
+            local rc = func.mapFlatten(biLatCoords, pipe.select("rc"))
+            
+            table.insert(result.colliders, {
+                type = "POINT_CLOUD",
+                params = {
+                    points = pipe.new * func.map2(jct.interlace(lc), jct.interlace(rc), function(l, r) return l.i:avg(l.s):avg(r.i:avg(r.s)) end)
+                    * pipe.map(coor.vec2Tuple)
+                }
+            }
+            )
+
+            if (params.extType == 0 or info.isUpper) then
+                result.models = result.models
+                    + (function()
+                        local front = {
+                            {
+                                {s = lc[1], i = (lc[2] - lc[1]):normalized() * 0.5 + lc[1]},
+                                {s = rc[1], i = (rc[2] - rc[1]):normalized() * 0.5 + rc[1]},
+                            },
+                            {
+                                {s = (lc[#lc - 1] - lc[#lc]):normalized() * 0.5 + lc[#lc], i = lc[#lc]},
+                                {s = (rc[#rc - 1] - rc[#rc]):normalized() * 0.5 + rc[#rc], i = rc[#rc]}
+                            }
                         }
-                    }
-                    
-                    return pipe.new
-                        / func.map2(
-                            jct.interlace(lc), jct.interlace(rc),
-                            function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end
-                        )
-                        / func.map(front, function(base) return config.build.front(nil, modelFence, table.unpack(base)) * withTag end)
-                        * pipe.flatten()
-                        * pipe.flatten()
-                end)()
+                        
+                        return pipe.new
+                            / func.map2(
+                                jct.interlace(lc), jct.interlace(rc),
+                                function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end
+                            )
+                            / (info.isUpper and params.extType == 1 and func.map2(
+                                jct.interlace(lc), jct.interlace(rc),
+                                function(baseL, baseR) return config.build.ceil(nil, modelCeil, baseL, baseR) * withTag end
+                            ) or {})
+                            / (info.isUpper and {} or func.map2(
+                                jct.interlace(lc), jct.interlace(rc),
+                                function(baseL, baseR) return config.build.ceil(nil, modelCeil, baseL, baseR) * withTag end
+                            ))
+                            / func.map(front, function(base) return config.build.front(nil, modelFence, table.unpack(base)) * withTag end)
+                            * pipe.flatten()
+                            * pipe.flatten()
+                    end)()
+            end
         end,
         
         getModelsFn = function(params)

@@ -107,11 +107,19 @@ jct.arcPacker = function(radius, rotRad, fz, fs)
                     local sup = ar[1]:rad(ptX)
                     local inf = initRad
                     local ar = func.map(ar, function(ar) return ar:withLimits({sup = sup}) end)
-                    return function(ptX, ptX2)
+                    return function(ptX, ptX2, offsetX, offsetX2)
                         local sup = sup
                         local inf = inf
                         local finalRad = ar[1]:rad(ptX)
                         local initRad = ptX2 and ar[1]:rad(ptX2) or initRad
+                        
+                        if (offsetX) then
+                            finalRad = inf > sup and (finalRad - 2 * offsetX / (ar[1].r + ar[2].r)) or (finalRad + 2 * offsetX / (ar[1].r + ar[2].r))
+                        end
+
+                        if (offsetX2) then
+                            initRad = sup > inf and (initRad - 2 * offsetX2 / (ar[1].r + ar[2].r)) or (initRad + 2 * offsetX2 / (ar[1].r + ar[2].r))
+                        end
                         
                         if checkRange(inf, initRad, finalRad, sup) then
                         elseif checkRange(inf, initRad, sup, finalRad) then

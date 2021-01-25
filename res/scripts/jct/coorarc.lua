@@ -26,6 +26,7 @@ function arc.new(o, r, limits)
         rad = arc.radByPt,
         length = arc.length,
         pt = arc.ptByRad,
+        ptByPt = arc.ptByPt,
         limits = arc.limits,
         withLimits = arc.withLimits,
         extendLimitsRad = arc.extendLimitsRad,

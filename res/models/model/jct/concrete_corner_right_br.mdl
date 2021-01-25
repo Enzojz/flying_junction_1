@@ -1,7 +1,7 @@
 function data() return {
    boundingInfo = {
-      bbMax = { 0, 5.000149, -0.500000 },
-      bbMin = { -0.500000, 0.000149, -1 }
+      bbMax = { 0, 5.000149, 0 },
+      bbMin = { -0.500000, 0.000149, -0.500000 }
    },
    collider = {
       params = {
@@ -13,8 +13,8 @@ function data() return {
       {
          node = {
             materials = { "jct/nz/concrete.mtl", "jct/tv/concrete.mtl" },
-            mesh = "jct/concrete_corner_br.msh",
-            name = "concrete_corner_br",
+            mesh = "jct/concrete_corner_right_br.msh",
+            name = "concrete_corner_right_br",
             transf = {
                1.000000, 0.000000, 0.000000, 0.000000, 
                0.000000, 1.000000, 0.000000, 0.000000, 

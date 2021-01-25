@@ -57,11 +57,10 @@ function data()
                 result.models = result.models
                     + pipe.new
                     * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
-                        return arc.onlyFence and {} or pipe.new
-                            + func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
-                            + (arc.hasFence
-                            and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end)
-                            or {})
+                        return pipe.new
+                            + (arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end) or {})
+                            + (arc.wall and arc.fence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
+                            + (arc.paving and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end) or {})
                     end)
                     * pipe.flatten()
                     * pipe.flatten()
@@ -70,8 +69,8 @@ function data()
                     + pipe.new
                     * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
                         return arc.onlyFence and {} or pipe.new
-                            + ((isLeftTrack and (result.config.mirrored ~= arc.isRev) or not arc.hasFence) and func.map2(coord.lc, coord.lce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner", baseL, baseR) * withTag end) or {})
-                            + ((isRighTrack and (result.config.mirrored == arc.isRev) or not arc.hasFence) and func.map2(coord.rc, coord.rce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner", baseL, baseR) * withTag end) or {})
+                            + ((isRighTrack and ((result.config.mirrored ~= arc.isRev) or not (arc.fence and arc.wall))) and func.map2(coord.lce, coord.lc, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner_left", baseL, baseR) * withTag end) or {})
+                            + ((isLeftTrack and ((result.config.mirrored == arc.isRev) or not (arc.fence and arc.wall))) and func.map2(coord.rc, coord.rce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner_right", baseL, baseR) * withTag end) or {})
                     end)
                     * pipe.flatten()
                     * pipe.flatten()
@@ -82,8 +81,8 @@ function data()
                         + pipe.new
                         * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
                             return pipe.new
-                                + (arc.onlyFence and {} or func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end))
-                                + (arc.onlyFence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
+                                + (arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end) or {})
+                                + (arc.fence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
                         end)
                         * pipe.flatten()
                         * pipe.flatten()
@@ -91,7 +90,7 @@ function data()
                     result.models = result.models
                         + pipe.new
                         * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
-                            return arc.hasFence and {} or func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
+                            return ((arc.fence and arc.wall) or arc.paving) and {} or func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
                         end)
                         * pipe.flatten()
                         * pipe.flatten()

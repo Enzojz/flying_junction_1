@@ -21,10 +21,12 @@ function data()
             local modelFence = ("jct/%s_fence"):format(wallType)
             local withTag = general.withTag(tag)
             local info = jct.slotInfo(slotId)
+            local isZigZag = params.extType == 0
             
             local config = info.isUpper and result.config.upper or result.config.lower
             
-            local coords = func.map(config.arcs[info.pos.x], function(arc)
+            local arcs = func.filter(config.arcs[info.pos.x], pipe.select(isZigZag and "zigzag" or "aligned"))
+            local coords = func.map(arcs, function(arc)
                 local biLatCoords = jct.biLatCoords(5, arc.arc)
                 local isRev = arc.isRev
                 local lc, rc, lce, rce = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5, -wallWidth * 0.5 - 0.5, wallWidth * 0.5 + 0.5)
@@ -40,7 +42,7 @@ function data()
             
             local isLeftTrack = config.modules[info.pos.x - 1] and config.modules[info.pos.x - 1].type == "jct_track"
             local isRighTrack = config.modules[info.pos.x + 1] and config.modules[info.pos.x + 1].type == "jct_track"
-
+            
             table.insert(result.colliders, {
                 type = "POINT_CLOUD",
                 params = {
@@ -53,33 +55,30 @@ function data()
             
             }
             )
-            if (params.extType == 0) then
-                result.models = result.models
-                    + pipe.new
-                    * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+            if isZigZag then
+                result.models = result.models + pipe.new
+                    * func.map2(coords, arcs, function(coord, arc)
                         return pipe.new
                             + (arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end) or {})
-                            + (arc.wall and arc.fence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
+                            + (arc.fence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
                             + (arc.paving and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end) or {})
                     end)
                     * pipe.flatten()
                     * pipe.flatten()
                 if wallType == "concrete_wall" and not info.isUpper then
-                    result.models = result.models
-                    + pipe.new
-                    * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
-                        return arc.onlyFence and {} or pipe.new
-                            + ((isRighTrack and ((result.config.mirrored ~= arc.isRev) or not (arc.fence and arc.wall))) and func.map2(coord.lce, coord.lc, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner_left", baseL, baseR) * withTag end) or {})
-                            + ((isLeftTrack and ((result.config.mirrored == arc.isRev) or not (arc.fence and arc.wall))) and func.map2(coord.rc, coord.rce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner_right", baseL, baseR) * withTag end) or {})
-                    end)
-                    * pipe.flatten()
-                    * pipe.flatten()
+                    result.models = result.models + pipe.new
+                        * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+                            return arc.onlyFence and {} or pipe.new
+                                + (arc.cornerLeft and func.map2(coord.lce, coord.lc, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner_left", baseL, baseR) * withTag end) or {})
+                                + (arc.cornerRight and func.map2(coord.rc, coord.rce, function(baseL, baseR) return config.build.corner(nil, "jct/concrete_corner_right", baseL, baseR) * withTag end) or {})
+                        end)
+                        * pipe.flatten()
+                        * pipe.flatten()
                 end
             else
                 if info.isUpper then
-                    result.models = result.models
-                        + pipe.new
-                        * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
+                    result.models = result.models + pipe.new
+                        * func.map2(coords, arcs, function(coord, arc)
                             return pipe.new
                                 + (arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end) or {})
                                 + (arc.fence and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.fence(nil, modelFence, baseL, baseR) * withTag end) or {})
@@ -87,10 +86,9 @@ function data()
                         * pipe.flatten()
                         * pipe.flatten()
                 else
-                    result.models = result.models
-                        + pipe.new
-                        * func.map2(coords, config.arcs[info.pos.x], function(coord, arc)
-                            return ((arc.fence and arc.wall) or arc.paving) and {} or func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end)
+                    result.models = result.models + pipe.new
+                        * func.map2(coords, arcs, function(coord, arc)
+                            return arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return config.build.wall(nil, modelWall, baseL, baseR) * withTag end) or {}
                         end)
                         * pipe.flatten()
                         * pipe.flatten()

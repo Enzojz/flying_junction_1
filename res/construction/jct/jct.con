@@ -8,7 +8,6 @@ local jct = require "jct"
 
 local infi = 1e8
 
-local dump = require "luadump"
 local tunnelHeightList = {6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12}
 local rList = pipe.new
     * func.seqMap({1, 100}, function(n)
@@ -364,6 +363,7 @@ local configLevel = function(params)
         func.mapValues(lower.arcs, function(arcs) return func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector) end),
         func.mapValues(lower.arcs, function(arcs) return func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[1], ptXSelector) end)
     }
+    
     lower.arcs, upper.arcs =
         func.mapValues(lower.arcs, function(arcs, pos)
             local result = {}
@@ -373,21 +373,29 @@ local configLevel = function(params)
                         func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[2], ptXSelector),
                         func.min(arcs[2].arc[2] - upper.arcs[upper.posMin][2].arc[2], ptXSelector)
                     }
-                    local ptXGr = ptXGr[2][lower.modules[pos].rightWall];
+
+                    local ptXGr = {
+                        ptXGr[2][lower.modules[pos].rightWall],
+                        ptXGr[1][lower.modules[pos + 1].grMin],
+                        ptXGr[2][lower.modules[pos + 1].grMax]
+                    }
                     
                     if isZigZag then
                         ptXUpper[1] = arcs[1].arc[2]:ptByPt(ptXSup[1]) + (ptXUpper[1] - arcs[1].arc[2]:ptByPt(ptXSup[1])):normalized() * 0.5
                     end
                     result = {
-                        {arc = arcs[1].fn(ptXSup[1], ptXUpper[1]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, fence = false, wall = true},
-                        {arc = arcs[1].fn(ptXUpper[2], ptXGr), isRev = true, fence = true, wall = true},
+                        {arc = arcs[1].fn(ptXSup[1], ptXUpper[1]), isRev = true, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, fence = false, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[1].fn(ptXUpper[2], ptXGr[1]), isRev = true, fence = true, wall = true, zigzag = true},
                         
-                        {arc = arcs[2].fn(ptXUpper[1], ptXSup[1]), isRev = false, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, fence = false, wall = true},
-                        {arc = arcs[2].fn(ptXGr, ptXUpper[2]), isRev = false, fence = true, wall = true},
+                        {arc = arcs[2].fn(ptXUpper[1], ptXSup[1]), isRev = false, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, fence = false, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXGr[1], ptXUpper[2]), isRev = false, fence = true, wall = true, zigzag = true},
                         
-                        {arc = arcs[1].fn(ptXSup[1], func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[1], ptXSelector)), isRev = true, paving = true},
+                        {arc = arcs[1].fn(ptXSup[1], func.min(arcs[1].arc[2] - upper.arcs[upper.posMax][1].arc[1], ptXSelector)), isRev = true, paving = true, zigzag = true},
+
+                        {arc = arcs[1].fn(ptXGr[2], ptXGr[3]), isRev = true, cornerLeft = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXGr[3], ptXGr[2]), isRev = false, cornerLeft = true, zigzag = true},
                     }
                 
                 elseif pos == lower.posMax then
@@ -395,20 +403,27 @@ local configLevel = function(params)
                         func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[1], ptXSelector),
                         func.min(arcs[2].arc[1] - upper.arcs[upper.posMin][2].arc[1], ptXSelector)
                     }
-                    local ptXGr = ptXGr[1][lower.modules[pos].leftWall]
+                    local ptXGr = {
+                        ptXGr[1][lower.modules[pos].leftWall],
+                        ptXGr[1][lower.modules[pos - 1].grMin],
+                        ptXGr[2][lower.modules[pos - 1].grMax]
+                    }
                     if isZigZag then
                         ptXUpper[2] = arcs[2].arc[1]:ptByPt(ptXSup[2]) + (ptXUpper[2] - arcs[2].arc[1]:ptByPt(ptXSup[2])):normalized() * 0.5
                     end
                     result = {
-                        {arc = arcs[1].fn(ptXGr, ptXUpper[1]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, fence = false, wall = true},
-                        {arc = arcs[1].fn(ptXUpper[2], ptXSup[2]), isRev = true, fence = true, wall = true},
+                        {arc = arcs[1].fn(ptXGr[1], ptXUpper[1]), isRev = true, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2]), isRev = true, fence = false, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[1].fn(ptXUpper[2], ptXSup[2]), isRev = true, fence = true, wall = true, zigzag = true},
                         
-                        {arc = arcs[2].fn(ptXUpper[1], ptXGr), isRev = false, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, fence = false, wall = true},
-                        {arc = arcs[2].fn(ptXSup[2], ptXUpper[2]), isRev = false, fence = true, wall = true},
-
-                        {arc = arcs[2].fn(ptXSup[2], func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector)), isRev = false, paving = true}
+                        {arc = arcs[2].fn(ptXUpper[1], ptXGr[1]), isRev = false, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1]), isRev = false, fence = false, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXUpper[2]), isRev = false, fence = true, wall = true, zigzag = true},
+                        
+                        {arc = arcs[2].fn(ptXSup[2], func.min(arcs[1].arc[1] - upper.arcs[upper.posMax][1].arc[2], ptXSelector)), isRev = false, paving = true, zigzag = true},
+                        
+                        {arc = arcs[1].fn(ptXGr[2], ptXGr[3]), isRev = true, cornerRight = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXGr[3], ptXGr[2]), isRev = false, cornerRight = true, zigzag = true},
                     }
                 else
                     local ptXUpper = {
@@ -418,17 +433,28 @@ local configLevel = function(params)
                     
                     local ptXGr = {
                         ptXGr[1][lower.modules[pos].leftWall],
-                        ptXGr[2][lower.modules[pos].rightWall]
+                        ptXGr[2][lower.modules[pos].rightWall],
+                        ptXGr[1][lower.modules[pos + 1].grMin],
+                        ptXGr[2][lower.modules[pos + 1].grMax],
+                        ptXGr[1][lower.modules[pos - 1].grMin],
+                        ptXGr[2][lower.modules[pos - 1].grMax]
                     }
+
                     local step = isZigZag and 0.5 or 0
+
                     result = {
-                        {arc = arcs[1].fn(ptXGr[1], ptXUpper[1], nil, step), isRev = true, fence = true, wall = true},
-                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2], -step, -step), isRev = true, fence = false, wall = true},
-                        {arc = arcs[1].fn(ptXUpper[2], ptXGr[2], step), isRev = true, fence = true, wall = true},
+                        {arc = arcs[1].fn(ptXGr[1], ptXUpper[1], nil, step), isRev = true, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[1].fn(ptXUpper[1], ptXUpper[2], -step, -step), isRev = true, fence = false, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[1].fn(ptXUpper[2], ptXGr[2], step), isRev = true, fence = true, wall = true, zigzag = true},
                         
-                        {arc = arcs[2].fn(ptXGr[2], ptXUpper[2], nil, step), isRev = false, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1], -step, -step), isRev = false, fence = false, wall = true},
-                        {arc = arcs[2].fn(ptXUpper[1], ptXGr[1], step), isRev = false, fence = true, wall = true}
+                        {arc = arcs[2].fn(ptXGr[2], ptXUpper[2], nil, step), isRev = false, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXUpper[2], ptXUpper[1], -step, -step), isRev = false, fence = false, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXUpper[1], ptXGr[1], step), isRev = false, fence = true, wall = true, zigzag = true},
+                        
+                        {arc = arcs[1].fn(ptXGr[3], ptXGr[4]), isRev = true, cornerLeft = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXGr[4], ptXGr[3]), isRev = false, cornerLeft = true, zigzag = true},
+                        {arc = arcs[1].fn(ptXGr[5], ptXGr[6]), isRev = true, cornerRight = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXGr[6], ptXGr[5]), isRev = false, cornerRight = true, zigzag = true}
                     }
                 end
             else
@@ -439,7 +465,7 @@ local configLevel = function(params)
                     }
                     result = {
                         {arc = arcs[1].fn(ptX[1], ptX[2]), isRev = true},
-                        {arc = arcs[2].fn(ptX[2], ptX[1]), isRev = false}
+                        {arc = arcs[2].fn(ptX[2], ptX[1]), isRev = false},
                     }
                 else
                     result = {
@@ -463,15 +489,15 @@ local configLevel = function(params)
                         ptXLower[2] = arcs[2].arc[2]:ptByPt(ptXSup[2]) + (ptXLower[2] - arcs[2].arc[2]:ptByPt(ptXSup[2])):normalized() * 0.5
                     end
                     result = {
-                        {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, fence = true, wall = true},
+                        {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, fence = true, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, fence = true, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, fence = true, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, fence = true, wall = true, zigzag = true, aligned = true},
                         
-                        {arc = arcs[1].fn(ptXLower[1], ptXLower[2]), isRev = true, fence = true},
-                        {arc = arcs[2].fn(ptXLower[2], ptXLower[1]), isRev = false, fence = true},
+                        {arc = arcs[1].fn(ptXLower[1], ptXLower[2]), isRev = true, fence = true, aligned = true},
+                        {arc = arcs[2].fn(ptXLower[2], ptXLower[1]), isRev = false, fence = true, aligned = true},
                         
-                        {arc = arcs[2].fn(ptXLower[2], func.min(lower.arcs[lower.posMax][1].arc[1] - arcs[2].arc[2], ptXSelector)), isRev = false, paving = true}
+                        {arc = arcs[2].fn(ptXLower[2], func.min(lower.arcs[lower.posMax][1].arc[1] - arcs[2].arc[2], ptXSelector)), isRev = false, paving = true, zigzag = true}
                     }
                 elseif (slotId == upper.posMax) then
                     local ptXLower = {
@@ -482,21 +508,21 @@ local configLevel = function(params)
                         ptXLower[1] = arcs[1].arc[1]:ptByPt(ptXSup[1]) + (ptXLower[1] - arcs[1].arc[1]:ptByPt(ptXSup[1])):normalized() * 0.5
                     end
                     result = {
-                        {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, fence = true, wall = true},
+                        {arc = arcs[1].fn(ptXSup[1], ptXLower[1]), isRev = true, fence = true, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[1].fn(ptXLower[2], ptXSup[2]), isRev = true, fence = true, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXSup[2], ptXLower[2]), isRev = false, fence = true, wall = true, zigzag = true, aligned = true},
+                        {arc = arcs[2].fn(ptXLower[1], ptXSup[1]), isRev = false, fence = true, wall = true, zigzag = true, aligned = true},
                         
-                        {arc = arcs[1].fn(ptXLower[1], ptXLower[2]), isRev = true, fence = true},
-                        {arc = arcs[2].fn(ptXLower[2], ptXLower[1]), isRev = false, fence = true},
-
-                        {arc = arcs[1].fn(ptXSup[1], func.min(lower.arcs[lower.posMin][1].arc[2] - arcs[1].arc[1], ptXSelector)), isRev = true, paving = true},
+                        {arc = arcs[1].fn(ptXLower[1], ptXLower[2]), isRev = true, fence = true, aligned = true},
+                        {arc = arcs[2].fn(ptXLower[2], ptXLower[1]), isRev = false, fence = true, aligned = true},
                         
+                        {arc = arcs[1].fn(ptXSup[1], func.min(lower.arcs[lower.posMin][1].arc[2] - arcs[1].arc[1], ptXSelector)), isRev = true, paving = true, zigzag = true},
+                    
                     }
                 else
                     result = {
-                        {arc = arcs[1].fn(ptXSup[1]), isRev = true, fence = true, wall = true},
-                        {arc = arcs[2].fn(ptXSup[2]), isRev = false, fence = true, wall = true}
+                        {arc = arcs[1].fn(ptXSup[1]), isRev = true, fence = true, wall = true, zigzag = true},
+                        {arc = arcs[2].fn(ptXSup[2]), isRev = false, fence = true, wall = true, zigzag = true}
                     }
                 end
             else

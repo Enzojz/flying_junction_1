@@ -70,7 +70,7 @@ local function params()
             name = _("MENU_TUNNEL_HEIGHT"),
             values = func.map(tunnelHeightList, tostring),
             uiType = "SLIDER",
-            defaultIndex = 2
+            defaultIndex = 4
         },
         {
             key = "wallType",

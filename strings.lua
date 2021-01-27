@@ -51,7 +51,7 @@ function data()
             MENU_X_DEG = "Crossing angle (°)",
             MENU_R_UPPER = "Upper track radii (m)",
             MENU_R_LOWER = "Lower track radii (m)",
-            MENU_TUNNEL_HEIGHT = "Tunnel Height",
+            MENU_TUNNEL_HEIGHT = "Tunnel Height (m)",
             MENU_WALL_STYLE = "Retaining wall",
             MENU_WITH_CAT = "(with catenary)",
             TRACK_CAT = "Tracks (Elec.)",
@@ -62,7 +62,10 @@ function data()
             STREET = "Road",
             ONE_WAY = "Road - One way",
             ONE_WAY_REV = "Road - One way (Rev.)",
-            MENU_STREET_TYPE = "Road Type"
+            MENU_STREET_TYPE = "Road Type",
+            EXT_TYPE = "Edge Type",
+            ZIGZAG = "ZigZag",
+            ALIGNED = "Aligned"
         },
         zh = {
             MOD_NAME = "欧式疏解桥",
@@ -87,7 +90,10 @@ function data()
             STREET = "街道",
             ONE_WAY = "单行道",
             ONE_WAY_REV = "单行道 (反)",
-            MENU_STREET_TYPE = "道路类型"
+            MENU_STREET_TYPE = "道路类型",
+            EXT_TYPE = "边缘类型",
+            ZIGZAG = "齿状",
+            ALIGNED = "平直"
         },
         tw = {
             MOD_NAME = "歐式疏解橋",
@@ -112,7 +118,10 @@ function data()
             STREET = "街道",
             ONE_WAY = "單行道",
             ONE_WAY_REV = "單行道 (反)",
-            MENU_STREET_TYPE = "道路類型"
+            MENU_STREET_TYPE = "道路類型",
+            EXT_TYPE = "邊緣類型",
+            ZIGZAG = "齒狀",
+            ALIGNED = "平直"
         },
     }
 end

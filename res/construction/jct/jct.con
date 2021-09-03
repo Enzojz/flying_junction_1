@@ -765,7 +765,7 @@ function data()
     local constructionTemplates =
         {
             {
-                constructionType = "RAIL_STATION",
+                constructionType = "TRACK_CONSTRUCTION",
                 type = "DYNAMIC",
                 availability = {
                     yearFrom = 1863,
@@ -836,7 +836,7 @@ function data()
         }
     
     return {
-        type = "RAIL_DEPOT",
+        type = "TRACK_CONSTRUCTION",
         description = {
             name = _("FLYING_JUNCTION"),
             description = ""

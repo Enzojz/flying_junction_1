@@ -1,0 +1,157 @@
+local jct = require "jct2"
+local coor = require "jct/coor"
+
+local insert = table.insert
+local ma = math
+local pi = ma.pi
+local pow = math.pow
+local floor = math.floor
+
+
+local preProcessAdd = function(radiusFn)
+    return function(modules, change, classedModules, info)
+        if info.type == 80 and info.data == 1 then
+            modules[jct.base(info.id, 80)] = nil
+        elseif info.type == 80 and info.data == 0 then
+            modules[jct.base(info.id, 80)] = change.module
+        else
+            jct.gridization(modules, classedModules)
+            local id = info.id
+            local m = modules[classedModules[id].slotId]
+            
+            -- Clear previous radius
+            if classedModules[id].slot[54] then
+                modules[classedModules[id].slot[54]] = nil
+            end
+            
+            if classedModules[id].slot[55] then
+                modules[classedModules[id].slot[55]] = nil
+            end
+            
+            if classedModules[id].slot[56] then
+                modules[classedModules[id].slot[56]] = nil
+            end
+            if info.type == 80 and info.data == 2 then
+                -- Make straight
+                local addSlot = m.makeData(56, 0)
+                modules[addSlot] = {
+                    metadata = {isData = true},
+                    name = "station/rail/jct/data/radius.module",
+                    updateScript = {
+                        fileName = "",
+                        params = {}
+                    },
+                    variant = 0
+                }
+            elseif info.type >= 81 and info.type <= 82 then
+                -- 81 radius value
+                -- 82 directional
+                local radius = radiusFn(info.data, m, m.info.radius)
+                if radius > 999999 then radius = 999999 elseif radius < -999999 then radius = -999999 end
+                
+                local addSlot = m.makeData(54, radius > 0 and radius % 1000 or -(-radius % 1000))
+                modules[addSlot] = {
+                    metadata = {isData = true},
+                    name = "station/rail/jct/data/radius.module",
+                    updateScript = {
+                        fileName = "",
+                        params = {}
+                    },
+                    variant = 0
+                }
+                
+                local addSlot = m.makeData(55, radius > 0 and floor(radius / 1000) or -(floor(-radius / 1000)))
+                modules[addSlot] = {
+                    metadata = {isData = true},
+                    name = "station/rail/jct/data/radius.module",
+                    updateScript = {
+                        fileName = "",
+                        params = {}
+                    },
+                    variant = 0
+                }
+            end
+        end
+    end
+end
+
+local preProcessAddPrecise =
+    preProcessAdd(function(data, m, radius)
+        local delta = data > 0 and pow(10, data - 1) or -pow(10, -data - 1)
+        if m.info.radius == jct.infi or m.info.straight then
+            return delta
+        else
+            return radius + delta
+        end
+    end)
+
+local preProcessAddRough =
+    preProcessAdd(function(data, m)
+        local refArc = m.info.arcs.center
+        local i = data
+        local rad = (refArc.inf - refArc.sup) + i * pi / 180
+        return -floor(20 / rad)
+    end)
+
+local preProcessPostAdd = function(modules, change, slotId, classedModules, info)
+    if info.type < 50 or info.type > 82 then
+        modules[slotId] = nil
+    end
+end
+
+local slotSetup = function(params, result, slotId)
+    local info = params.modules[slotId].info
+    local id = info.id
+    local parent = params.classedModules[id].slotId
+    local m = params.modules[parent]
+    
+    insert(result.slots, {
+        id = slotId,
+        transf = m.info.transf,
+        type = "jct_radius_modifier",
+        spacing = {0, 0, 0, 0}
+    })
+
+end
+
+local classifyData = function(modules, classified, slotId)
+    local type, id, data = jct.classifyData(modules, classified, slotId)
+    local slotId = classified[id].slotId
+    modules[slotId].info.canModifyRadius = true
+end
+
+local addSlot = function(params, result)
+    local anyRadiusModifiable = false
+    for _, module in pairs(params.modules) do
+        anyRadiusModifiable = anyRadiusModifiable or module.info.canModifyRadius
+    end
+    
+    for id, info in pairs(params.classedModules) do
+        local module = params.modules[info.slotId]
+        if (module.metadata and (module.metadata.isTrack or module.metadata.isStreet)) then
+            local info = module.info
+            local makeData = module.makeData
+            
+            if not anyRadiusModifiable then
+                table.insert(result.slots, {
+                    id = makeData(80, 0),
+                    transf = info.transf,
+                    type = "jct_radius_modifier",
+                    spacing = {0, 0, 0, 0}
+                })
+            end
+        end
+    end
+end
+
+function data()
+    return {
+        classify = classifyData,
+        preProcessAddPrecise = preProcessAddPrecise,
+        preProcessAddRough = preProcessAddRough,
+        preProcessPostAdd = preProcessPostAdd,
+        slotSetup = slotSetup,
+        addSlot = addSlot
+    }
+
+end

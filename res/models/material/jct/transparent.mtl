@@ -1,0 +1,53 @@
+function data() return {
+   order = -1,
+   params = {
+      order = -1,
+      fade_out_range = {
+         fadeOutEndDist = 20000,
+         fadeOutStartDist = 10000
+      },
+      map_albedo_opacity = {
+         fileName = "models/jct/transparent.tga",
+         type = "TWOD",
+         wrapS = "REPEAT",
+         wrapT = "REPEAT"
+      },
+      map_metal_gloss_ao = {
+         fileName = "default_metal_gloss_ao.dds",
+         type = "TWOD",
+         wrapS = "REPEAT",
+         wrapT = "REPEAT"
+      },
+      map_normal = {
+         fileName = "default_normal_map.dds",
+         type = "TWOD",
+         wrapS = "REPEAT",
+         wrapT = "REPEAT"
+      },
+      map_op_1 = {
+			fileName = "unknown_texture.tga",
+          magFilter = "LINEAR",
+          minFilter = "LINEAR_MIPMAP_LINEAR"
+      },
+      operation_1 =
+      {
+			mode = "TEXCOORD",
+			op = "NO_OP",
+			opacity = 1,
+			scale = { 1, 1, },
+      },
+      normal_scale = {
+         normalScale = 1
+      },
+      polygon_offset = {
+         factor = -4,
+         units = -4,
+			forceDepthWrite = true,
+      },
+      two_sided = {
+         flipNormal = false,
+         twoSided = false
+      }
+   },
+   type = "PHYS_TRANSPARENT"
+} end

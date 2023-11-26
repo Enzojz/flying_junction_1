@@ -1,0 +1,179 @@
+local coor = require "jct/coor"
+local quat = require "jct/quaternion"
+local livetext = require "jct/livetext"
+local jct = require "jct2"
+
+local unpack = table.unpack
+local insert = table.insert
+local ma = math
+local pi = ma.pi
+
+---comment
+---@param result result
+---@param tag string
+---@param slotId number
+---@param params params
+local updateFn = function(result, transform, tag, slotId, addModelFn, params)
+    local id = params.modules[slotId].info.id
+    local m = params.modules[params.classedModules[id].slotId]
+    local info = m.info
+    local makeData = m.makeData
+    
+    insert(result.slots, {
+        id = makeData(83, -1),
+        transf = info.transf,
+        type = "jct_height_modifier",
+        spacing = {0, 0, 0, 0}
+    })
+    
+    local n = 12
+    local centerPts, vecs = jct.basePts(info.arcs.center, n)
+    local rightPts, rightVecs = jct.basePts(info.arcs.right, n)
+    local leftPts, leftVecs = jct.basePts(info.arcs.left, n)
+
+    local rotZ = quat.byVec(coor.xyz(0, 1, 0), vecs[7]):mRot()
+    local textR = ("H: %d mm"):format((m.metadata.isTrack and info.height or (info.height - params.refHeight)) * 1000)
+    
+    local addText = function(label, pos, fTrans, h)
+        local nameModelsF, width = livetext(h or 2)(label)
+        for _, m in ipairs(nameModelsF(function() return fTrans(width) * rotZ * coor.trans(pos) end)) do
+            insert(result.models, m)
+        end
+    end
+    
+    addText(textR, centerPts[7], function(w) return coor.trans(coor.xyz(-0.5 * w, 0, 0)) * coor.rotX90N end, 0.5)
+    
+    insert(result.slots, {
+        id = makeData(83, -2),
+        transf = coor.scale(coor.xyz(0.5, 0.5, 0.5)) * quat.byVec(coor.xyz(0, 1, 0), vecs[6]):mRot() * coor.trans(centerPts[3]),
+        type = "jct_height_modifier",
+        spacing = {0, 0, 0, 0}
+    })
+    
+    addText("⊘", centerPts[3], function(w) return coor.trans(coor.xyz(-w, 0, -0.35)) * coor.rotX90N end, 1)
+    
+
+    if info.octa[1] and params.modules[info.octa[1]] then
+        insert(result.slots, {
+            id = makeData(83, 1),
+            transf = coor.rotZ90P * coor.scale(coor.xyz(0.5, 0.5, 0.5)) * quat.byVec(coor.xyz(0, 1, 0), vecs[12]):mRot() * coor.trans(centerPts[12]),
+            type = "jct_height_modifier",
+            spacing = {0, 0, 0, 0},
+            shape = 1
+        })
+    end
+    
+    if info.octa[5] and params.modules[info.octa[5]] then
+        insert(result.slots, {
+            id = makeData(83, 5),
+            transf = coor.rotZ90N * coor.scale(coor.xyz(0.5, 0.5, 0.5)) * quat.byVec(coor.xyz(0, 1, 0), vecs[1]):mRot() * coor.trans(centerPts[1]),
+            type = "jct_height_modifier",
+            spacing = {0, 0, 0, 0},
+            shape = 1
+        })
+    end
+    
+    if info.octa[3] and params.modules[info.octa[3]] then
+        insert(result.slots, {
+            id = makeData(83, 3),
+            transf = coor.scale(coor.xyz(0.5, 0.5, 0.5)) * quat.byVec(coor.xyz(0, 1, 0), vecs[7]):mRot() * coor.trans(rightPts[7]),
+            type = "jct_height_modifier",
+            spacing = {0, 0, 0, 0},
+            shape = 1
+        })
+    end
+    
+    if info.octa[7] and params.modules[info.octa[7]] then
+        insert(result.slots, {
+            id = makeData(83, 7),
+            transf = coor.rotZ(pi) * coor.scale(coor.xyz(0.5, 0.5, 0.5)) * quat.byVec(coor.xyz(0, 1, 0), vecs[7]):mRot() * coor.trans(leftPts[7]),
+            type = "jct_height_modifier",
+            spacing = {0, 0, 0, 0},
+            shape = 1
+        })
+    end
+    
+    insert(result.slots, {
+        id = makeData(83, -3),
+        transf = coor.scale(coor.xyz(0.5, 0.5, 0.5)) * quat.byVec(coor.xyz(0, 1, 0), vecs[8]):mRot() * coor.trans(centerPts[11]),
+        type = "jct_height_modifier",
+        spacing = {0, 0, 0, 0}
+    })
+    
+    addText("⤨", centerPts[11], function(w) return coor.trans(coor.xyz(-w, 0, -0.35)) * coor.rotX90N end, 1)
+    addText("⤪", centerPts[11], function(w) return coor.trans(coor.xyz(-w, 0, -0.35)) * coor.rotX90N end, 1)
+    
+    
+    local rotLeft = quat.byVec(coor.xyz(0, 1, 0), vecs[9]):mRot()
+    local rotRight = quat.byVec(coor.xyz(0, 1, 0), vecs[5]):mRot()
+    for i = -10, 10, 1 do
+        if (i ~= 0) then
+            local dz = coor.xyz(0, 0, i * 0.1)
+            insert(result.slots, {
+                id = makeData(84, i),
+                transf = coor.scale(coor.xyz(0.05, 0.25, 1)) * coor.transY(i % 2 == 0 and 0.5 or -0.5) * coor.rotY90P * rotLeft * coor.trans(leftPts[9] + dz),
+                type = "jct_height_modifier",
+                shape = 0,
+                spacing = {0, 0, 0, 0}
+            })
+            
+            insert(result.slots, {
+                id = makeData(84, i),
+                transf = coor.scale(coor.xyz(0.05, 0.25, 1)) * coor.transY(i % 2 == 0 and 0.5 or -0.5) * coor.rotY90N * rotRight * coor.trans(rightPts[5] + dz),
+                type = "jct_height_modifier",
+                shape = 0,
+                spacing = {0, 0, 0, 0}
+            })
+            
+            if i % 2 == 1 then
+                addText((i > 0 and "+%.1fm" or "%.1fm"):format(i * 0.1), leftPts[9] + dz, function(w) return coor.trans(coor.xyz(0, 0, -0.075)) * coor.transX(1) * coor.rotZ90N end, 0.25)
+                addText((i > 0 and "+%.1fm" or "%.1fm"):format(i * 0.1), rightPts[5] + dz, function(w) return coor.trans(coor.xyz(-w, 0, -0.075)) * coor.transX(-1)  * coor.rotZ90P end, 0.25)
+            else
+                addText((i > 0 and "+%.1fm" or "%.1fm"):format(i * 0.1), leftPts[9] + dz, function(w) return coor.trans(coor.xyz(-w, 0, -0.075)) * coor.transX(-1)  * coor.rotZ90N end, 0.25)
+                addText((i > 0 and "+%.1fm" or "%.1fm"):format(i * 0.1), rightPts[5] + dz, function(w) return coor.trans(coor.xyz(0, 0, -0.075)) * coor.transX(1)  * coor.rotZ90P end, 0.25)
+            end
+        end
+    end
+end
+
+function data()
+    return {
+        availability = {
+            yearFrom = 0,
+            yearTo = 0,
+        },
+        visible = false,
+        buildMode = "SINGLE",
+        cost = {
+            price = 0,
+        },
+        description = {
+            name = _("MENU_HEIGHT_MODIFIER"),
+            description = _("MENU_HEIGHT_MODIFIER_DESC"),
+        },
+        category = {
+            categories = {"jct_cat_modifier"},
+        },
+        type = "jct_height_modifier",
+        order = {
+            value = 5,
+        },
+        metadata = {
+            typeName = "jct_height_modifier",
+            isData = true,
+            type = 83,
+            scriptName = "construction/jct2/modifier/height",
+            preProcessAdd = "preProcessAdd",
+            preProcessPostAdd = "preProcessPostAdd",
+            classify = "classify",
+            slotSetup = "slotSetup"
+        },
+        
+        updateFn = updateFn,
+        
+        getModelsFn = function(params)
+            return {}
+        end
+    }
+
+end

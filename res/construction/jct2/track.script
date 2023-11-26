@@ -1,0 +1,403 @@
+local func = require "jct/func"
+local coor = require "jct/coor"
+local pipe = require "jct/pipe"
+local jct = require "jct2"
+local quat = require "jct/quaternion"
+local livetext = require "jct/livetext"
+
+local jctg = require "jct_gridization"
+
+local insert = table.insert
+
+local preProcessAdd = function(modules, change, classedModules, info)
+    local maxId = func.max(func.keys(classedModules))
+    
+    if (info.data == -1) then
+        local id = info.id
+        local slotId = classedModules[id].slotId
+        modules[slotId].name = change.module.name
+    else
+        local grid = jct.octa(modules, classedModules)
+        
+        local refPos = modules[classedModules[info.id].slotId].info.pos
+        local pos = ({
+            [1] = coor.xyz(0, 1, 0),
+            [3] = coor.xyz(1, 0, 0),
+            [5] = coor.xyz(0, -1, 0),
+            [7] = coor.xyz(-1, 0, 0)
+        })[info.data] + refPos
+        
+        local x, y, z = pos.x, pos.y, pos.z
+        
+        local octa = {
+            [5] = grid[z][x] and grid[z][x][y - 1] or nil,
+            [1] = grid[z][x] and grid[z][x][y + 1] or nil,
+            [7] = grid[z][x - 1] and grid[z][x - 1][y] or nil,
+            [3] = grid[z][x + 1] and grid[z][x + 1][y] or nil,
+            [6] = grid[z][x - 1] and grid[z][x - 1][y - 1] or nil,
+            [4] = grid[z][x + 1] and grid[z][x + 1][y - 1] or nil,
+            [8] = grid[z][x - 1] and grid[z][x - 1][y + 1] or nil,
+            [2] = grid[z][x + 1] and grid[z][x + 1][y + 1] or nil,
+        }
+        
+        local function isTrack(pos)
+            return octa[pos] and (modules[octa[pos]].metadata.isTrack or modules[octa[pos]].metadata.isStreet or modules[octa[pos]].metadata.isPlaceholder)
+        end
+        
+        local function isPlatform(pos)
+            return octa[pos] and modules[octa[pos]].metadata.isPlatform
+        end
+        
+        local ref = {}
+        if isTrack(1) then
+            ref = {next = true}
+        elseif isTrack(5) then
+            ref = {prev = true}
+        elseif isTrack(3) then
+            ref = {right = true}
+        elseif isTrack(7) then
+            ref = {left = true}
+        elseif isPlatform(1) then
+            ref = {next = true}
+        elseif isPlatform(5) then
+            ref = {prev = true}
+        elseif isPlatform(3) then
+            ref = {right = true}
+        elseif isPlatform(7) then
+            ref = {left = true}
+        end
+        
+        local newInfo = {
+            id = maxId + 1,
+            type = change.module.metadata.typeId,
+            pos = pos,
+            length = 20,
+            width = change.module.metadata.width,
+            ref = ref,
+            extraHeight = (isTrack(5) and modules[octa[5]].info.extraHeight) or (isTrack(1) and modules[octa[1]].info.extraHeight) or nil
+        }
+        local slotId, dataIds = jct.slotIds(newInfo)
+        modules[slotId] = change.module
+        for m, slotIds in pairs(dataIds) do
+            for _, slotId in ipairs(slotIds) do
+                modules[slotId] = {
+                    metadata = {isData = true},
+                    name = string.format("station/rail/jct/data/%s.module", m),
+                    updateScript = {
+                        fileName = "",
+                        params = {}
+                    },
+                    variant = 0
+                }
+            
+            end
+        end
+    end
+end
+
+local preProcessRemove = function(modules, change, classedModules, info)
+    if info.id ~= 1 then
+        jct.octa(modules, classedModules)
+        local info = modules[change.slotId].info
+        local octaModules = {}
+        for i = 1, 8 do
+            octaModules[i] = info.octa[i] and modules[info.octa[i]] or false
+        end
+        if not (
+            octaModules[1] and octaModules[1].info.ref.prev
+            or octaModules[5] and octaModules[5].info.ref.next
+            or octaModules[3] and octaModules[3].info.ref.left
+            or octaModules[7] and octaModules[7].info.ref.right)
+        then
+            modules[change.slotId] = nil
+            for slotId, m in pairs(modules) do
+                local __, moduleId = jct.slotInfo(slotId)
+                if moduleId == info.id then
+                    modules[slotId] = nil
+                end
+            end
+        end
+    end
+end
+
+local slotSetup = function(params, result, slotId)
+    local module = params.modules[slotId]
+    local info = params.modules[slotId].info
+    local makeData = params.modules[slotId].makeData
+    
+    local arcs = info.arcs
+    
+    local pos = info.pos
+    local metadata = params.modules[slotId].metadata
+    local refArc = arcs.center
+    
+    insert(result.slots, {
+        id = slotId,
+        transf = module.info.transf,
+        type = module.metadata.typeName,
+        spacing = {0, 0, 0, 0}
+    })
+    
+    do
+        local octaModules = {}
+        for i = 1, 8 do
+            octaModules[i] = info.octa[i] and params.modules[info.octa[i]] or false
+        end
+        if info.id ~= 1 and not (
+            octaModules[1] and octaModules[1].info.ref.prev
+            or octaModules[5] and octaModules[5].info.ref.next
+            or octaModules[3] and octaModules[3].info.ref.left
+            or octaModules[7] and octaModules[7].info.ref.right)
+        then
+            insert(result.slots, {
+                id = makeData(1, -2),
+                transf = info.transf,
+                type = "jct_remove",
+                spacing = {0, 0, 0, 0}
+            })
+        end
+    end
+    
+    
+    insert(
+        result.slots,
+        {
+            id = makeData(1, -1),
+            transf = info.transf,
+            type = "jct_track",
+            spacing = {0, 0, 0, 0}
+        }
+    )
+    insert(
+        result.slots,
+        {
+            id = makeData(2, -1),
+            transf = info.transf,
+            type = "jct_street",
+            spacing = {0, 0, 0, 0}
+        }
+    )
+    if (info.id ~= 1) then -- id 1 must be a track
+        insert(
+            result.slots,
+            {
+                id = makeData(3, -1),
+                transf = info.transf,
+                type = "jct_wall",
+                spacing = {0, 0, 0, 0}
+            }
+        )
+        insert(
+            result.slots,
+            {
+                id = makeData(4, -1),
+                transf = info.transf,
+                type = "jct_placeholder",
+                spacing = {0, 0, 0, 0}
+            }
+    )
+    end
+    
+    jct.initSlotGrid(params, pos)
+    local newTopologySlots = jct.newTopologySlots(params, makeData, pos)
+    
+    if not (info.octa[3]) then
+        local transf = coor.transX(metadata.width) * info.transf
+        newTopologySlots(pos.x + 1, pos.y, transf, 3)
+    end
+    
+    if not (info.octa[7]) then
+        local transf = coor.transX(-metadata.width) * info.transf
+        newTopologySlots(pos.x - 1, pos.y, transf, 7)
+    end
+    
+    if not info.octa[1] then
+        local fwPt = refArc.sup + 0.5 * (refArc.sup - refArc.inf)
+        local transf = quat.byVec(coor.xyz(0, 1, 0), refArc:tangent(fwPt)):mRot() * coor.trans(refArc:pt(fwPt))
+        newTopologySlots(pos.x, pos.y + 1, transf, 1)
+    end
+    
+    if not info.octa[5] then
+        local bwPt = refArc.inf - 0.5 * (refArc.sup - refArc.inf)
+        local transf = quat.byVec(coor.xyz(0, -1, 0), refArc:tangent(bwPt)):mRot() * coor.trans(refArc:pt(bwPt))
+        newTopologySlots(pos.x, pos.y - 1, transf, 5)
+    end
+end
+
+local updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
+    local trackType = closureParams.trackType
+    
+    local info = params.modules[slotId].info
+    
+    local hasCenterNodeLeft, hasCenterNodeRight, hasInfNode, hasSupNode = false, false, false, false
+    
+    if info.trackGroup.left then
+        local trackGroup = params.trackGroup[info.trackGroup.left]
+        local n = #trackGroup
+        hasCenterNodeLeft = n % 2 == 1 and (n + 1) / 2 == info.trackGroup.leftPos
+        hasSupNode = n % 2 == 0 and (n / 2) == info.trackGroup.leftPos
+    end
+    
+    if info.trackGroup.right then
+        local trackGroup = params.trackGroup[info.trackGroup.right]
+        local n = #trackGroup
+        hasCenterNodeRight = n % 2 == 1 and (n + 1) / 2 == info.trackGroup.rightPos
+        hasInfNode = n % 2 == 0 and (n / 2) == info.trackGroup.rightPos - 1
+    end
+    
+    local rev = info.trackGroup.left and not info.trackGroup.right
+    
+    local function setPos()
+        if hasCenterNodeLeft or hasCenterNodeRight or hasInfNode or hasSupNode then
+            local pos = {{0, 0.05}, {0.05, 0.45}, {0.45, 0.5}, {1, 0.95}, {0.95, 0.55}, {0.55, 0.5}}
+            local leftNode, rightNode = nil, nil
+            if hasCenterNodeLeft then
+                leftNode = 10
+            elseif hasSupNode then
+                leftNode = 8
+            end
+            if hasCenterNodeRight then
+                rightNode = 3
+            elseif hasInfNode then
+                rightNode = 1
+            end
+            return pos, leftNode, rightNode, {0, 1, 2, 3, 4, 5, 11, 10, 9, 8, 7, 6}
+        elseif (info.octa[1] and params.modules[info.octa[1]].metadata.isTrack) or (info.octa[5] and params.modules[info.octa[5]].metadata.isTrack) then
+            if rev then
+                return {{1, 0}}, nil, nil, {1, 0}
+            else
+                return {{0, 1}}, nil, nil, {0, 1}
+            end
+        else
+            if rev then
+                return {{1, 0.5}, {0.5, 0}}, nil, nil, {3, 2, 1, 0}
+            else
+                return {{0, 0.5}, {0.5, 1}}, nil, nil, {0, 1, 2, 3}
+            end
+        end
+    end
+    
+    local pos, nodeLeft, nodeRight, seqNodes = setPos()
+    
+    if info.trackGroup.left or info.trackGroup.right then
+        local nodes = func.mapFlatten(result.edgeLists, function(e) return e.edges end)
+        if nodeLeft then
+            result.terminalGroups[info.trackGroup.left].vehicleNodeOverride = #nodes + nodeLeft
+        end
+        if nodeRight then
+            result.terminalGroups[info.trackGroup.right].vehicleNodeOverride = #nodes + nodeRight
+        end
+    end
+    
+    local e = pipe.new * pos
+        * pipe.map(function(idx)
+            local inf = info.arcs.center.inf * (1 - idx[1]) + info.arcs.center.sup * idx[1]
+            local sup = info.arcs.center.inf * (1 - idx[2]) + info.arcs.center.sup * idx[2]
+            local length = (idx[2] - idx[1]) * info.length
+            return {
+                {
+                    info.arcs.center:pt(inf),
+                    info.arcs.center:tangent(inf) * length
+                },
+                {
+                    info.arcs.center:pt(sup),
+                    info.arcs.center:tangent(sup) * length
+                }
+            }
+        end)
+    
+    
+    local edges = {
+        type = "TRACK",
+        alignTerrain = true,
+        params = {
+            type = trackType,
+            catenary = false,
+        },
+        edges = e * pipe.flatten() * pipe.map(pipe.map(coor.vec2Tuple)),
+        snapNodes = func.filter({(not info.octa[1]) and seqNodes[#seqNodes], (not info.octa[5]) and seqNodes[1]}, pipe.noop()),
+        freeNodes = {},
+        seqNodes = seqNodes,
+        tag2nodes = {
+            [tag] = seqNodes
+        },
+        slot = slotId
+    }
+    
+    insert(result.edgeLists, edges)
+    
+    params.edgeIndex[slotId] = #result.edgeLists
+    
+    if (info.octa[1] and params.modules[info.octa[1]].metadata.isTrack) then
+        insert(result.invokeLater, function()
+            local indexL = params.edgeIndex[slotId]
+            local indexR = params.edgeIndex[info.octa[1]]
+            local edgesL = result.edgeLists[indexL]
+            local edgesR = result.edgeLists[indexR]
+            local nodeL = edgesL.edges[edgesL.seqNodes[#edgesL.seqNodes] + 1]
+            local nodeR = edgesR.edges[edgesR.seqNodes[1] + 1]
+            local ptL = coor.tuple2Vec(nodeL[1])
+            local ptR = coor.tuple2Vec(nodeR[1])
+            local pt = ptL:avg(ptR):toTuple()
+            result.edgeLists[indexL].edges[edgesL.seqNodes[#edgesL.seqNodes] + 1][1] = pt
+            result.edgeLists[indexR].edges[edgesR.seqNodes[1] + 1][1] = pt
+        end)
+    end
+    
+    if params.debug == 1 then
+        local centerPts, centerVecs = jct.basePts(info.arcs.center, 4)
+        local text = tostring(info.id)
+        local pos = string.format("(%d, %d)", info.pos.x, info.pos.y)
+        
+        local addText = function(label, fAlign, h)
+            local nameModelsF, width = livetext(h or 2)(label)
+            for _, m in ipairs(nameModelsF(function() return coor.trans(fAlign(width)) * coor.rotX90N * info.transf end)) do
+                table.insert(result.models, m)
+            end
+        end
+        
+        addText(text, function(w) return coor.xyz(-0.5 * w, 0, 0) end)
+        addText(pos, function(w) return coor.xyz(-0.5 * w, 0, -2) end, 0.75)
+        
+        jct.marking(result, slotId, params)
+    end
+end
+
+local function gridization(x, y, z, data)
+    local slotId = data.grid[z][x][y]
+    
+    jctg.calculateRaidus(x, y, z, data)
+    jctg.genericArcs(x, y, z, data)
+    
+    coroutine.yield()
+    
+    local refArc = data.modules[slotId].info.arcs
+    
+    data.modules[slotId].info.transf =
+        quat.byVec(coor.xyz(0, 1, 0), refArc.center:tangent((refArc.center.inf + refArc.center.sup) * 0.5)):mRot() *
+        coor.trans(refArc.center:pt((refArc.center.inf + refArc.center.sup) * 0.5))
+end
+
+---@param modules table<slotid, module>
+---@param classified classified_modules
+---@param slotId slotid
+---@param params any
+local postClassify = function(modules, classified, slotId, params)
+    modules[slotId].info.height = ((params.refHeight or 0) - modules[slotId].metadata.height) + (modules[slotId].info.extraHeight or 0)
+end
+
+function data()
+    return {
+        preProcessAdd = preProcessAdd,
+        preProcessRemove = preProcessRemove,
+        slotSetup = slotSetup,
+        updateFn = updateFn,
+        preClassify = jct.preClassify,
+        postClassify = postClassify,
+        getModelsFn = function(params)
+            return {}
+        end,
+        gridization = gridization
+    }
+
+end

@@ -36,7 +36,7 @@ local preProcessAdd = function(radiusFn)
                 local addSlot = m.makeData(56, 0)
                 modules[addSlot] = {
                     metadata = {isData = true},
-                    name = "station/rail/jct/data/radius.module",
+                    name = "jct2/data/radius.module",
                     updateScript = {
                         fileName = "",
                         params = {}
@@ -52,7 +52,7 @@ local preProcessAdd = function(radiusFn)
                 local addSlot = m.makeData(54, radius > 0 and radius % 1000 or -(-radius % 1000))
                 modules[addSlot] = {
                     metadata = {isData = true},
-                    name = "station/rail/jct/data/radius.module",
+                    name = "jct2/data/radius.module",
                     updateScript = {
                         fileName = "",
                         params = {}
@@ -63,7 +63,7 @@ local preProcessAdd = function(radiusFn)
                 local addSlot = m.makeData(55, radius > 0 and floor(radius / 1000) or -(floor(-radius / 1000)))
                 modules[addSlot] = {
                     metadata = {isData = true},
-                    name = "station/rail/jct/data/radius.module",
+                    name = "jct2/data/radius.module",
                     updateScript = {
                         fileName = "",
                         params = {}

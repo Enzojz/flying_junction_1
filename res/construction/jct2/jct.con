@@ -356,8 +356,7 @@ local updateFn = function(params, closureParams)
     params.grid = jct.gridization(params.modules, params.classedModules)
     
     params.edgeIndex = {}
-    
-    jct.searchTerminalGroups(params, result)
+    params.slotGrid = {}
     
     -- slotSetup adds slots for modules itself
     for slotId, module in pairs(params.modules) do

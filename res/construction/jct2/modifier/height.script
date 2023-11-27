@@ -15,7 +15,7 @@ local setHeight = function(modules, classedModules, slotId, height)
         local addSlot = m.makeData(59, height)
         modules[addSlot] = {
             metadata = {isData = true},
-            name = "station/rail/jct/data/geometry.module",
+            name = "jct2/data/geometry.module",
             updateScript = {
                 fileName = "",
                 params = {}

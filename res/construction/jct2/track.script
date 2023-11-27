@@ -82,7 +82,7 @@ local preProcessAdd = function(modules, change, classedModules, info)
             for _, slotId in ipairs(slotIds) do
                 modules[slotId] = {
                     metadata = {isData = true},
-                    name = string.format("station/rail/jct/data/%s.module", m),
+                    name = string.format("jct2/data/%s.module", m),
                     updateScript = {
                         fileName = "",
                         params = {}
@@ -229,65 +229,11 @@ local updateFn = function(result, transform, tag, slotId, addModelFn, params, cl
     
     local info = params.modules[slotId].info
     
-    local hasCenterNodeLeft, hasCenterNodeRight, hasInfNode, hasSupNode = false, false, false, false
-    
-    if info.trackGroup.left then
-        local trackGroup = params.trackGroup[info.trackGroup.left]
-        local n = #trackGroup
-        hasCenterNodeLeft = n % 2 == 1 and (n + 1) / 2 == info.trackGroup.leftPos
-        hasSupNode = n % 2 == 0 and (n / 2) == info.trackGroup.leftPos
-    end
-    
-    if info.trackGroup.right then
-        local trackGroup = params.trackGroup[info.trackGroup.right]
-        local n = #trackGroup
-        hasCenterNodeRight = n % 2 == 1 and (n + 1) / 2 == info.trackGroup.rightPos
-        hasInfNode = n % 2 == 0 and (n / 2) == info.trackGroup.rightPos - 1
-    end
-    
-    local rev = info.trackGroup.left and not info.trackGroup.right
-    
     local function setPos()
-        if hasCenterNodeLeft or hasCenterNodeRight or hasInfNode or hasSupNode then
-            local pos = {{0, 0.05}, {0.05, 0.45}, {0.45, 0.5}, {1, 0.95}, {0.95, 0.55}, {0.55, 0.5}}
-            local leftNode, rightNode = nil, nil
-            if hasCenterNodeLeft then
-                leftNode = 10
-            elseif hasSupNode then
-                leftNode = 8
-            end
-            if hasCenterNodeRight then
-                rightNode = 3
-            elseif hasInfNode then
-                rightNode = 1
-            end
-            return pos, leftNode, rightNode, {0, 1, 2, 3, 4, 5, 11, 10, 9, 8, 7, 6}
-        elseif (info.octa[1] and params.modules[info.octa[1]].metadata.isTrack) or (info.octa[5] and params.modules[info.octa[5]].metadata.isTrack) then
-            if rev then
-                return {{1, 0}}, nil, nil, {1, 0}
-            else
-                return {{0, 1}}, nil, nil, {0, 1}
-            end
-        else
-            if rev then
-                return {{1, 0.5}, {0.5, 0}}, nil, nil, {3, 2, 1, 0}
-            else
-                return {{0, 0.5}, {0.5, 1}}, nil, nil, {0, 1, 2, 3}
-            end
-        end
+        return {{0, 0.5}, {0.5, 1}}, {0, 1, 2, 3}
     end
     
-    local pos, nodeLeft, nodeRight, seqNodes = setPos()
-    
-    if info.trackGroup.left or info.trackGroup.right then
-        local nodes = func.mapFlatten(result.edgeLists, function(e) return e.edges end)
-        if nodeLeft then
-            result.terminalGroups[info.trackGroup.left].vehicleNodeOverride = #nodes + nodeLeft
-        end
-        if nodeRight then
-            result.terminalGroups[info.trackGroup.right].vehicleNodeOverride = #nodes + nodeRight
-        end
-    end
+    local pos, seqNodes = setPos()
     
     local e = pipe.new * pos
         * pipe.map(function(idx)

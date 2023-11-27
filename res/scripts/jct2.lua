@@ -100,7 +100,17 @@ jct.slotIds = function(info)
             jct.mixData(jct.base(info.id, 59), math.floor((info.extraHeight or 0) * 10)),
             info.width and jct.mixData(jct.base(info.id, 58), info.width * 10) or false,
         -- info.gradient and jct.mixData(jct.base(info.id, 61), info.gradient * 1000) or false,
-        }, pipe.noop())
+        }, pipe.noop()),
+        ref = {
+            info.ref and
+            jct.mixData(jct.base(info.id, 60),
+                (info.ref.left and 1 or 0) +
+                (info.ref.right and 2 or 0) +
+                (info.ref.next and 4 or 0) +
+                (info.ref.prev and 8 or 0)
+            ) or
+            jct.base(info.id, 60)
+        }
     }
 end
 
@@ -140,7 +150,7 @@ end
 ---@param radius number
 ---@param isRev boolean
 ---@return fun(...: number): arc, arc ...
-jct.arcPacker = function(pt, vec, length, radius, isRev)
+jct.arcPacker = function(pt, vec, length, radius, isRev, fs, fz)
     local nVec = vec:withZ(0):normalized()
     local tVec = coor.xyz(-nVec.y, nVec.x, 0)
     local radius = isRev and -radius or radius
@@ -154,7 +164,9 @@ jct.arcPacker = function(pt, vec, length, radius, isRev)
     end
     ar = ar:withLimits({
         sup = sup,
-        inf = inf
+        inf = inf,
+        fs = fs(inf, sup),
+        fz = fz(inf, sup)
     })
     ---@param ... number
     ---@return arc, arc ...
@@ -164,6 +176,9 @@ jct.arcPacker = function(pt, vec, length, radius, isRev)
             return arc.byOR(o, abs(radius + dr), {
                 sup = sup,
                 inf = inf
+            }):withLimits({
+                fs = fs(inf, sup),
+                fz = fz(inf, sup)
             })
         end)
         return ar, unpack(result)

@@ -8,6 +8,7 @@ local unpack = table.unpack
 local insert = table.insert
 local remove = table.remove
 
+local dump = require "luadump"
 local jct = {}
 
 ---@param modules modules
@@ -243,11 +244,26 @@ jct.calculateRaidus = function(x, y, z, data)
     data.yState = yState
 end
 
+local fzGen = function(initHeight, finalHeight)
+    return function(initRad, finalRad)
+        local ln = line.byPtPt(
+            coor.xy(initRad, initHeight),
+            coor.xy(finalRad, finalHeight)
+        )
+        return function(rad) return (ln - line.byVecPt(coor.xy(0, 1), coor.xy(rad, 0))).y end
+    end
+end
+
+local fsGen = function(slope)
+    return function(initRad, finalRad) return function(_) return slope end end
+end
+
+
 jct.genericArcs = function(x, y, z, data)
     local slotId = data.grid[z][x][y]
     local ref = data.parentMap[slotId]
     local m = data.modules[slotId]
-    local packer = jct.arcPacker(data.yState.pos:withZ(m.info.height), data.yState.vec, m.info.length, m.info.radius, ref == m.info.octa[1])
+    local packer = jct.arcPacker(data.yState.pos:withZ(m.info.height), data.yState.vec, m.info.length, m.info.radius, ref == m.info.octa[1], fsGen(0), fzGen(0, 0))
     local ar, arL, arR = packer(-m.info.width * 0.5, m.info.width * 0.5)
     
     -- ALignement of starting point and ending point
@@ -305,6 +321,7 @@ jct.genericArcs = function(x, y, z, data)
         center = ar
     }
     
+    dump()(m.info.arcs)
     -- Generic ref pts
     m.info.pts = jct.refArc2Pts(m.info.arcs)
     m.info.limits = func.map(m.info.pts, function(ptvec) return line.byVecPt(ptvec[2] .. coor.rotZ(0.5 * pi), ptvec[1]) end)

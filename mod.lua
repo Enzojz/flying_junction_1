@@ -223,13 +223,13 @@ function data()
                 
                 mod.category.categories = {_("TRACK")}
                 
-                mod.updateScript.fileName = "construction/jct2`/track_module.updateFn"
+                mod.updateScript.fileName = "construction/jct2/track.updateFn"
                 mod.updateScript.params = {
                     trackType = trackName .. ".lua",
                     trackWidth = track.trackDistance
                 }
                 
-                mod.getModelsScript.fileName = "construction/jct2/track_module.getModelsFn"
+                mod.getModelsScript.fileName = "construction/jct2/track.getModelsFn"
                 mod.getModelsScript.params = {}
                 
                 api.res.moduleRep.add(mod.fileName, mod, true)

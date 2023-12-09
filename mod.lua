@@ -183,60 +183,59 @@ function data()
         },
         postRunFn = function(settings, params)
             oldPostRunFn()
-            
-            
-            local tracks = api.res.trackTypeRep.getAll()
-            local trackModuleList = {}
-            local trackIconList = {}
-            local trackNames = {}
-            for i, trackName in pairs(tracks) do
-                local track = api.res.trackTypeRep.get(api.res.trackTypeRep.find(trackName))
-                local trackName = trackName:match("(.+).lua")
-                local baseFileName = ("jct2/tracks/%s"):format(trackName)
-                local mod = api.type.ModuleDesc.new()
-                mod.fileName = ("%s.module"):format(baseFileName)
+                        
+            -- local tracks = api.res.trackTypeRep.getAll()
+            -- local trackModuleList = {}
+            -- local trackIconList = {}
+            -- local trackNames = {}
+            -- for i, trackName in pairs(tracks) do
+            --     local track = api.res.trackTypeRep.get(api.res.trackTypeRep.find(trackName))
+            --     local trackName = trackName:match("(.+).lua")
+            --     local baseFileName = ("jct2/tracks/%s"):format(trackName)
+            --     local mod = api.type.ModuleDesc.new()
+            --     mod.fileName = ("%s.module"):format(baseFileName)
                 
-                mod.availability.yearFrom = track.yearFrom
-                mod.availability.yearTo = track.yearTo
-                mod.cost.price = 0
+            --     mod.availability.yearFrom = track.yearFrom
+            --     mod.availability.yearTo = track.yearTo
+            --     mod.cost.price = 0
                 
-                mod.description.name = track.name
-                mod.description.description = track.desc
-                mod.description.icon = track.icon
+            --     mod.description.name = track.name
+            --     mod.description.description = track.desc
+            --     mod.description.icon = track.icon
                 
-                mod.type = "jct_track"
-                mod.order.value = i + 1
-                mod.metadata = {
-                    typeName = "jct_track",
-                    isTrack = true,
-                    width = track.trackDistance,
-                    height = track.railBase + track.railHeight,
-                    typeId = 1,
-                    scriptName = "construction/jct2/track",
-                    preProcessAdd = "preProcessAdd",
-                    preProcessRemove = "preProcessRemove",
-                    slotSetup = "slotSetup",
-                    preClassify = "preClassify",
-                    postClassify = "postClassify",
-                    gridization = "gridization"
-                }
+            --     mod.type = "jct_track"
+            --     mod.order.value = i + 1
+            --     mod.metadata = {
+            --         typeName = "jct_track",
+            --         isTrack = true,
+            --         width = track.trackDistance,
+            --         height = track.railBase + track.railHeight,
+            --         typeId = 1,
+            --         scriptName = "construction/jct2/track",
+            --         preProcessAdd = "preProcessAdd",
+            --         preProcessRemove = "preProcessRemove",
+            --         slotSetup = "slotSetup",
+            --         preClassify = "preClassify",
+            --         postClassify = "postClassify",
+            --         gridization = "gridization"
+            --     }
                 
-                mod.category.categories = {_("TRACK")}
+            --     mod.category.categories = {_("TRACK")}
                 
-                mod.updateScript.fileName = "construction/jct2/track.updateFn"
-                mod.updateScript.params = {
-                    trackType = trackName .. ".lua",
-                    trackWidth = track.trackDistance
-                }
+            --     mod.updateScript.fileName = "construction/jct2/track.updateFn"
+            --     mod.updateScript.params = {
+            --         trackType = trackName .. ".lua",
+            --         trackWidth = track.trackDistance
+            --     }
                 
-                mod.getModelsScript.fileName = "construction/jct2/track.getModelsFn"
-                mod.getModelsScript.params = {}
+            --     mod.getModelsScript.fileName = "construction/jct2/track.getModelsFn"
+            --     mod.getModelsScript.params = {}
                 
-                api.res.moduleRep.add(mod.fileName, mod, true)
-                table.insert(trackModuleList, baseFileName)
-                table.insert(trackIconList, track.icon)
-                table.insert(trackNames, track.name)
-            end
+            --     api.res.moduleRep.add(mod.fileName, mod, true)
+            --     table.insert(trackModuleList, baseFileName)
+            --     table.insert(trackIconList, track.icon)
+            --     table.insert(trackNames, track.name)
+            -- end
         end
     }
 end

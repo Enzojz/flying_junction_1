@@ -1,0 +1,190 @@
+local func = require "jct/func"
+local coor = require "jct/coor"
+local pipe = require "jct/pipe"
+local jct = require "jct2"
+local quat = require "jct/quaternion"
+local livetext = require "jct/livetext"
+
+local insert = table.insert
+
+local wallTypes = {
+    "jct/concrete_fence",
+    "jct/brick_fence",
+    "jct/brick_2_fence"
+}
+
+local ceilTypes = {
+    "jct/concrete_ceil",
+    "jct/brick_ceil",
+    "jct/brick_ceil"
+}
+
+local withTag = function(tag)
+    return pipe.map(function(m)
+        return func.with(m, {
+            tag = tag
+        })
+    end)
+end
+
+local dump = require "luadump"
+local updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
+    local modelFence = wallTypes[params.wallType + 1]
+    local modelCeil = ceilTypes[params.wallType + 1]
+
+    local info = params.modules[slotId].info
+
+    local arc = info.fnArc(0)
+    local length = arc:length()
+    dump(true)(arc)
+    
+    -- local trackWidth = closureParams.trackWidth
+    -- local trackType = closureParams.trackType
+    -- local catenary = false
+    -- local isRev = closureParams.isRev or false
+    -- local isStreet = closureParams.isStreet or false
+    
+    local trackWidth = 5
+    local trackType = "standard.lua"-- closureParams.trackType
+    -- local isRev = false
+
+    local withTag = withTag(tag)
+
+    local isUpper = info.pos.z > 0
+    
+    local e = pipe.new
+                * {arc.inf, (arc.inf + arc.sup) * 0.5, (arc.inf + arc.sup) * 0.5, arc.sup}
+                -- * (isRev and pipe.rev() or pipe.noop())
+                * pipe.map(function(pt) return {arc:pt(pt), arc:tangent(pt) * length * 0.5} end)
+                * pipe.map(pipe.map(coor.vec2Tuple))
+        -- * (isRev and pipe.rev() or pipe.noop())
+        -- * pipe.flatten()
+    dump()(e)
+    
+    local edges = {
+        type = "TRACK",
+        edgeType = isUpper and "BRIDGE" or nil,
+        edgeTypeName = isUpper and "jct_void.lua" or nil,
+        alignTerrain = not isUpper,
+        params = {
+            type = trackType,
+            catenary = false,
+            tramTrackType = "NO"
+        },
+        edges = e,
+        snapNodes = {0, #e - 1},
+        freeNodes = {},
+        tag2nodes = {
+            [tag] = func.seq(0, #e - 1)
+        },
+        slot = slotId
+    }
+    
+    table.insert(result.edgeLists, edges)
+    
+    -- local isLeftWall = info.octa[7] and params.modules[info.octa[7]].type == "jct_wall"
+    -- local isRightWall = info.octa[3] and params.modules[info.octa[3]].type == "jct_wall"
+    -- local leftExtend = 0 --isLeftWall and (info.pos.x - 1 == config.posMin and -0.25 or -0.5) or 0
+    -- local rightExtend = 0 --isRightWall and (info.pos.x + 1 == config.posMax and 0.25 or 0.5) or 0
+    
+    -- local biLatCoords = func.map(arcs, function(arc)
+    --     local biLatCoords = jct.biLatCoords(5, arc.arc)
+    --     local isRev = arc.isRev
+    --     local lc, rc = biLatCoords(-trackWidth * 0.5 + leftExtend, trackWidth * 0.5 + rightExtend)
+    --     if result.config.mirrored then
+    --         lc, rc = rc, lc
+    --     end
+    --     local op = isRev and pipe.rev() or pipe.noop()
+    --     lc, rc = op(lc), op(rc)
+    --     return {lc = lc, rc = rc}
+    -- end)
+    
+    -- local lc = func.mapFlatten(biLatCoords, pipe.select("lc"))
+    -- local rc = func.mapFlatten(biLatCoords, pipe.select("rc"))
+    
+    -- table.insert(result.colliders, {
+    --     type = "POINT_CLOUD",
+    --     params = {
+    --         points = pipe.new * func.map2(jct.interlace(lc), jct.interlace(rc), function(l, r) return l.i:avg(l.s):avg(r.i:avg(r.s)) end)
+    --         * pipe.map(coor.vec2Tuple)
+    --     }
+    -- }
+    -- )
+
+    -- if (params.extType == 0 or info.isUpper) then
+    --     result.models = result.models
+    --         + (function()
+    --             local front = {
+    --                 {
+    --                     {s = lc[1], i = (lc[2] - lc[1]):normalized() * 0.5 + lc[1]},
+    --                     {s = rc[1], i = (rc[2] - rc[1]):normalized() * 0.5 + rc[1]},
+    --                 },
+    --                 {
+    --                     {s = (lc[#lc - 1] - lc[#lc]):normalized() * 0.5 + lc[#lc], i = lc[#lc]},
+    --                     {s = (rc[#rc - 1] - rc[#rc]):normalized() * 0.5 + rc[#rc], i = rc[#rc]}
+    --                 }
+    --             }
+                
+    --             return pipe.new
+    --                 / func.map2(
+    --                     jct.interlace(lc), jct.interlace(rc),
+    --                     function(baseL, baseR) return config.build.surface(nil, "jct/surface", baseL, baseR) * withTag end
+    --                 )
+    --                 / (info.isUpper and params.extType == 1 and func.map2(
+    --                     jct.interlace(lc), jct.interlace(rc),
+    --                     function(baseL, baseR) return config.build.ceil(nil, modelCeil, baseL, baseR) * withTag end
+    --                 ) or {})
+    --                 / (info.isUpper and {} or func.map2(
+    --                     jct.interlace(lc), jct.interlace(rc),
+    --                     function(baseL, baseR) return config.build.ceil(nil, modelCeil, baseL, baseR) * withTag end
+    --                 ))
+    --                 / func.map(front, function(base) return config.build.front(nil, modelFence, table.unpack(base)) * withTag end)
+    --                 * pipe.flatten()
+    --                 * pipe.flatten()
+    --         end)()
+    -- end
+end
+
+function data()
+    return {
+        availability = {
+            yearFrom = 0,
+            yearTo = 0,
+        },
+        buildMode = "SINGLE",
+        cost = {
+            price = 0,
+        },
+        description = {
+            name = _("STANDARD"),
+            description = _("STANDARD"),
+        },
+        category = {
+            categories = {_("TRACK")},
+        },
+        type = "jct_track",
+        order = {
+            value = 5,
+        },
+        metadata = {
+            typeName = "jct_track",
+            isTrack = true,
+            width = 5,
+            height = 0.51,
+            typeId = 1,
+            scriptName = "construction/jct2/track",
+            preProcessAdd = "preProcessAdd",
+            preProcessRemove = "preProcessRemove",
+            slotSetup = "slotSetup",
+            preClassify = "preClassify",
+            postClassify = "postClassify",
+            gridization = "gridization"
+        },
+        
+        updateFn = updateFn,
+        getModelsFn = function(params)
+            return {}
+        end
+    }
+
+end

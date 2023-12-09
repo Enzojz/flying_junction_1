@@ -34,7 +34,8 @@ function arc.new(o, r, limits)
         extraRad = arc.extraRad,
         extra = arc.extra,
         tangent = arc.tangent,
-        rev = arc.rev
+        rev = arc.rev, 
+        xLine = arc.intersectionLine,
     }
     setmetatable(result, {
         __sub = arc.intersectionArc,
@@ -45,16 +46,36 @@ function arc.new(o, r, limits)
     return result
 end
 
+---@param dr number
+---@return fun(ar:arc) : arc
 function arc.dR(dr)
-    return function(ar) return ar + dr end
+    return
+        ---@param ar arc
+        ---@return arc 
+        function(ar) return ar + dr end
 end
 
+---@param o coor
+---@param r number
+---@param limits? limits
+---@return arc
 function arc.byOR(o, r, limits) return arc.new(o, r, limits) end
 
+---@param x number
+---@param y number
+---@param r number
+---@param limits limits
+---@return arc
 function arc.byXYR(x, y, r, limits) return arc.new(coor.xyz(x, y, 0), r, limits) end
 
+---@param ar arc
+---@param dr number
+---@param limits limits
+---@return arc
 function arc.byDR(ar, dr, limits) return arc.byOR(ar.o, dr + ar.r, limits) end
 
+---@param ar arc
+---@return arc
 function arc.rev(ar)
     return ar:withLimits({
         inf = ar.sup,
@@ -65,10 +86,17 @@ function arc.rev(ar)
     })
 end
 
+---@param a arc
+---@param limits limits
+---@return arc
 function arc.withLimits(a, limits)
     return func.with(a, limits)
 end
 
+---@param arc arc
+---@param dInf number
+---@param dSup? number
+---@return arc
 function arc.extendLimitsRad(arc, dInf, dSup)
     dSup = dSup or dInf
     return arc:withLimits({
@@ -77,15 +105,25 @@ function arc.extendLimitsRad(arc, dInf, dSup)
     })
 end
 
+---@param arc arc
+---@return number
 function arc.length(arc)
     return abs(arc.sup - arc.inf) * arc.r
 end
 
+---@param arc arc
+---@param dInf number
+---@param dSup? number
+---@return arc
 function arc.extendLimits(arc, dInf, dSup)
     dSup = dSup or dInf
     return arc:extendLimitsRad(dInf / arc.r, dSup / arc.r)
 end
 
+---@param arc arc
+---@param dInf number
+---@param dSup? number
+---@return limits
 function arc.extraRad(arc, dInf, dSup)
     dSup = dSup or dInf
     return {
@@ -100,11 +138,17 @@ function arc.extraRad(arc, dInf, dSup)
     }
 end
 
+---@param arc arc
+---@param dInf number
+---@param dSup? number
+---@return limits
 function arc.extra(arc, dInf, dSup)
     dSup = dSup or dInf
     return arc:extraRad(dInf / arc.r, dSup / arc.r)
 end
 
+---@param a arc
+---@return limits
 function arc.limits(a)
     return {
         inf = a.inf,
@@ -112,6 +156,9 @@ function arc.limits(a)
     }
 end
 
+---@param arc arc
+---@param rad number
+---@return coor3
 function arc.ptByRad(arc, rad)
     return
         coor.xyz(
@@ -121,6 +168,9 @@ function arc.ptByRad(arc, rad)
         ) + arc.o
 end
 
+---@param arc arc
+---@param pt coor
+---@return number
 function arc.radByPt(arc, pt)
     local veci = (arc:pt(arc.inf) - arc.o):withZ(0):normalized()
     local vec = (pt - arc.o):withZ(0):normalized()
@@ -131,16 +181,31 @@ function arc.radByPt(arc, pt)
     return arc.inf + r
 end
 
+---@param arc arc
+---@param pt coor
+---@return coor
 function arc.ptByPt(arc, pt)
     return (pt - arc.o):normalized() * arc.r + arc.o
 end
 
+---@param arc arc
+---@param rad number
+---@return coor3
 function arc.tangent(arc, rad)
     return (coor.xyz(0, (arc.sup < arc.inf) and -1 or 1, arc.fs(rad)) .. coor.rotZ(rad)):normalized()
 end
 
-
-function arc.intersectionLine(arc, line)
+---comment
+---@param arc arc
+---@param line line
+---@param betweenLimit? fun(x: number, y: number, z: number): coor3
+---@return coor3[]
+function arc.intersectionLine(arc, line, betweenLimit)
+    local xpt = betweenLimit and function(x, y, z)
+        local pt = coor.xyz(x, y, z)
+        local rad = arc:rad(pt)
+        if (rad >= arc.inf and rad <= arc.sup) or (rad >= arc.sup and rad <= arc.inf) then return arc:pt(rad) else return nil end
+    end or coor.xyz
     if (abs(line.a) > 1e-10) then
         
         -- a.x + b.y + c = 0
@@ -165,13 +230,13 @@ function arc.intersectionLine(arc, line)
         if (abs(delta) < 1e-10) then
             local y = -p / (2 * o)
             local x = -l - m * y
-            return {coor.xy(x, y)}
+            return {xpt(x, y, 0)}
         elseif (delta > 0) then
             local y0 = (-p + sqrt(delta)) / (2 * o)
             local y1 = (-p - sqrt(delta)) / (2 * o)
             local x0 = -l - m * y0
             local x1 = -l - m * y1
-            return {coor.xy(x0, y0), coor.xy(x1, y1)}
+            return {xpt(x0, y0, 0), xpt(x1, y1, 0)}
         else
             return {}
         end
@@ -181,19 +246,22 @@ function arc.intersectionLine(arc, line)
         local y = -line.c / line.b;
         local delta = arc.r * arc.r - (y - arc.o.y) * (y - arc.o.y);
         if (abs(delta) < 1e-10) then
-            return {coor.xy(arc.o.x, y)}
+            return {xpt(arc.o.x, y, 0)}
         elseif (delta > 0) then
             -- (x - a) = ± Sqrt(delta)
             -- x = ± Sqrt(delta) + a
             local x0 = sqrt(delta) + arc.o.x;
             local x1 = -sqrt(delta) + arc.o.x;
-            return {coor.xy(x0, y), coor.xy(x1, y)}
+            return {xpt(x0, y, 0), xpt(x1, y, 0)}
         else
             return {}
         end
     end
 end
 
+---@param arc1 arc
+---@param arc2 arc
+---@return line
 function arc.commonChord(arc1, arc2)
     return line.new(
         2 * arc2.o.x - 2 * arc1.o.x,
@@ -204,11 +272,16 @@ function arc.commonChord(arc1, arc2)
 )
 end
 
+---@param arc2 arc
+---@return coor3[]
+---@param arc1 arc
 function arc.intersectionArc(arc1, arc2)
     local chord = arc.commonChord(arc1, arc2)
     return arc.intersectionLine(arc1, chord)
 end
 
+---@param a arc
+---@param baseLength number
 function arc.coords(a, baseLength)
     return function(inf, sup)
         local length = a.r * abs(sup - inf)

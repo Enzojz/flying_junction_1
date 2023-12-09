@@ -8,8 +8,11 @@ local livetext = require "jct/livetext"
 local math = math
 local abs = math.abs
 local floor = math.floor
-local unpack = table.unpack
+local sin = math.sin
+local cos = math.cos
+local pi = math.pi
 
+local unpack = table.unpack
 local insert = table.insert
 
 jct.infi = 1e8
@@ -144,44 +147,67 @@ jct.slotInfo = function(slotId)
         return type, id, data
 end
 
----@param pt coor
----@param vec coor
----@param length number
----@param radius number
----@param isRev boolean
----@return fun(...: number): arc, arc ...
-jct.arcPacker = function(pt, vec, length, radius, isRev, fs, fz)
-    local nVec = vec:withZ(0):normalized()
-    local tVec = coor.xyz(-nVec.y, nVec.x, 0)
-    local radius = isRev and -radius or radius
-    local o = pt + tVec * radius
-    
-    local ar = arc.byOR(o, abs(radius))
-    local inf = ar:rad(pt)
-    local sup = inf + length / radius
-    if isRev then
-        inf, sup = sup, inf
-    end
-    ar = ar:withLimits({
-        sup = sup,
-        inf = inf,
-        fs = fs(inf, sup),
-        fz = fz(inf, sup)
-    })
-    ---@param ... number
-    ---@return arc, arc ...
-    return function(...)
-        local result = func.map({...}, function(dr)
-            local dr = isRev and -dr or dr
-            return arc.byOR(o, abs(radius + dr), {
-                sup = sup,
-                inf = inf
-            }):withLimits({
-                fs = fs(inf, sup),
-                fz = fz(inf, sup)
-            })
-        end)
-        return ar, unpack(result)
+local function checkRange(a, b, c, d)
+    return (a <= b and b <= c and c <= d) or (a >= b and b >= c and c >= d)
+end
+
+jct.arcPacker = function(radius, rotRad, fz, fs)
+    local rotCos = cos(rotRad)
+    local rotSin = sin(rotRad)
+    local vec = coor.xyz(rotCos, rotSin, 0)
+    local o = vec * radius
+    local initRad = (radius > 0 and pi or 0) + rotRad
+    return function(dR)
+        local radius = radius - dR
+        return function(xDr)
+            local dr = xDr or 0
+            local arInf = {
+                arc.byOR(o, abs(radius + dr * 0.5)):withLimits({inf = initRad}),
+                arc.byOR(o, abs(radius - dr * 0.5)):withLimits({inf = initRad})
+            }
+            return arInf,
+                initRad,
+                function(ptSup)
+                    return function(ptFinal, ptInit, offsetFinal, offsetInit)
+                        local inf = initRad
+                        local sup = arInf[1]:rad(ptSup)
+                        local ar = func.map(arInf, function(ar) return ar:withLimits({sup = sup}) end)
+                        local finalRad = ar[1]:rad(ptFinal)
+                        local initRad = ptInit and ar[1]:rad(ptInit) or initRad
+                        
+                        if (offsetFinal) then
+                            finalRad = inf > sup and (finalRad - 2 * offsetFinal / (ar[1].r + ar[2].r)) or (finalRad + 2 * offsetFinal / (ar[1].r + ar[2].r))
+                        end
+                        
+                        if (offsetInit) then
+                            initRad = sup > inf and (initRad - 2 * offsetInit / (ar[1].r + ar[2].r)) or (initRad + 2 * offsetInit / (ar[1].r + ar[2].r))
+                        end
+                        
+                        if checkRange(inf, initRad, finalRad, sup) then
+                        elseif checkRange(inf, initRad, sup, finalRad) then
+                            finalRad = sup
+                        elseif checkRange(initRad, inf, finalRad, sup) then
+                            initRad = inf
+                        elseif checkRange(initRad, inf, sup, finalRad) then
+                            initRad = inf
+                            finalRad = sup
+                        else
+                            return nil
+                        end
+                        
+                        return function(xDr)
+                            local dr = xDr or 0
+                            local ar = arc.byOR(o, abs(radius - dr))
+                            return ar:withLimits({
+                                inf = initRad,
+                                sup = finalRad,
+                                fs = fs(initRad, finalRad),
+                                fz = fz(initRad, finalRad)
+                            })
+                        end
+                    end
+                end
+        end
     end
 end
 
@@ -417,7 +443,6 @@ jct.preClassify = function(modules, classified, slotId)
         compList = {},
         pos = coor.xyz(0, 0, 0),
         width = modules[slotId].metadata.width or 5,
-        length = 20,
     }
     
     modules[slotId].makeData = function(type, data)
@@ -496,6 +521,20 @@ jct.initTerrainList = function(result, id)
             lessOpt = {},
             greaterOpt = {},
         }
+    end
+end
+
+jct.buildSurface = function(fitModel, tZ)
+    return function(fnSize)
+        local fnSize = fnSize or function(_, lc, rc) return jct.assembleSize(lc, rc) end
+        return function(i, s, ...)
+            local sizeS = fnSize(i, ...)
+            return s
+                and pipe.new
+                / general.newModel(s .. "_tl.mdl", tZ, fitModel(sizeS, true))
+                / general.newModel(s .. "_br.mdl", tZ, fitModel(sizeS, false))
+                or pipe.new * {}
+        end
     end
 end
 

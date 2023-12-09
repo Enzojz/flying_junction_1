@@ -1,327 +1,223 @@
 local func = require "jct/func"
 local coor = require "jct/coor"
 local pipe = require "jct/pipe"
+local arc = require "jct/coorarc"
+local line = require "jct/coorline"
 local jct = require "jct2"
 local quat = require "jct/quaternion"
 local livetext = require "jct/livetext"
-
-local jctg = require "jct_gridization"
+local dump = require "luadump"
 
 local insert = table.insert
 
 local preProcessAdd = function(modules, change, classedModules, info)
     local maxId = func.max(func.keys(classedModules))
-    
-    if (info.data == -1) then
-        local id = info.id
-        local slotId = classedModules[id].slotId
-        modules[slotId].name = change.module.name
-    else
-        local grid = jct.octa(modules, classedModules)
-        
-        local refPos = modules[classedModules[info.id].slotId].info.pos
-        local pos = ({
-            [1] = coor.xyz(0, 1, 0),
-            [3] = coor.xyz(1, 0, 0),
-            [5] = coor.xyz(0, -1, 0),
-            [7] = coor.xyz(-1, 0, 0)
-        })[info.data] + refPos
-        
-        local x, y, z = pos.x, pos.y, pos.z
-        
-        local octa = {
-            [5] = grid[z][x] and grid[z][x][y - 1] or nil,
-            [1] = grid[z][x] and grid[z][x][y + 1] or nil,
-            [7] = grid[z][x - 1] and grid[z][x - 1][y] or nil,
-            [3] = grid[z][x + 1] and grid[z][x + 1][y] or nil,
-            [6] = grid[z][x - 1] and grid[z][x - 1][y - 1] or nil,
-            [4] = grid[z][x + 1] and grid[z][x + 1][y - 1] or nil,
-            [8] = grid[z][x - 1] and grid[z][x - 1][y + 1] or nil,
-            [2] = grid[z][x + 1] and grid[z][x + 1][y + 1] or nil,
-        }
-        
-        local function isTrack(pos)
-            return octa[pos] and (modules[octa[pos]].metadata.isTrack or modules[octa[pos]].metadata.isStreet or modules[octa[pos]].metadata.isPlaceholder)
-        end
-        
-        local function isPlatform(pos)
-            return octa[pos] and modules[octa[pos]].metadata.isPlatform
-        end
-        
-        local ref = {}
-        if isTrack(1) then
-            ref = {next = true}
-        elseif isTrack(5) then
-            ref = {prev = true}
-        elseif isTrack(3) then
-            ref = {right = true}
-        elseif isTrack(7) then
-            ref = {left = true}
-        elseif isPlatform(1) then
-            ref = {next = true}
-        elseif isPlatform(5) then
-            ref = {prev = true}
-        elseif isPlatform(3) then
-            ref = {right = true}
-        elseif isPlatform(7) then
-            ref = {left = true}
-        end
-        
-        local newInfo = {
-            id = maxId + 1,
-            type = change.module.metadata.typeId,
-            pos = pos,
-            length = 20,
-            width = change.module.metadata.width,
-            ref = ref,
-            extraHeight = (isTrack(5) and modules[octa[5]].info.extraHeight) or (isTrack(1) and modules[octa[1]].info.extraHeight) or nil
-        }
-        local slotId, dataIds = jct.slotIds(newInfo)
-        modules[slotId] = change.module
-        for m, slotIds in pairs(dataIds) do
-            for _, slotId in ipairs(slotIds) do
-                modules[slotId] = {
-                    metadata = {isData = true},
-                    name = string.format("jct2/data/%s.module", m),
-                    updateScript = {
-                        fileName = "",
-                        params = {}
-                    },
-                    variant = 0
-                }
-            
-            end
-        end
-    end
+
+-- if (info.data == -1) then
+--     local id = info.id
+--     local slotId = classedModules[id].slotId
+--     modules[slotId].name = change.module.name
+-- else
+--     local grid = jct.octa(modules, classedModules)
+--     local refPos = modules[classedModules[info.id].slotId].info.pos
+--     local pos = ({
+--         [1] = coor.xyz(0, 1, 0),
+--         [3] = coor.xyz(1, 0, 0),
+--         [5] = coor.xyz(0, -1, 0),
+--         [7] = coor.xyz(-1, 0, 0)
+--     })[info.data] + refPos
+--     local x, y, z = pos.x, pos.y, pos.z
+--     local octa = {
+--         [5] = grid[z][x] and grid[z][x][y - 1] or nil,
+--         [1] = grid[z][x] and grid[z][x][y + 1] or nil,
+--         [7] = grid[z][x - 1] and grid[z][x - 1][y] or nil,
+--         [3] = grid[z][x + 1] and grid[z][x + 1][y] or nil,
+--         [6] = grid[z][x - 1] and grid[z][x - 1][y - 1] or nil,
+--         [4] = grid[z][x + 1] and grid[z][x + 1][y - 1] or nil,
+--         [8] = grid[z][x - 1] and grid[z][x - 1][y + 1] or nil,
+--         [2] = grid[z][x + 1] and grid[z][x + 1][y + 1] or nil,
+--     }
+--     local function isTrack(pos)
+--         return octa[pos] and (modules[octa[pos]].metadata.isTrack or modules[octa[pos]].metadata.isStreet or modules[octa[pos]].metadata.isPlaceholder)
+--     end
+--     local function isPlatform(pos)
+--         return octa[pos] and modules[octa[pos]].metadata.isPlatform
+--     end
+--     local ref = {}
+--     if isTrack(1) then
+--         ref = {next = true}
+--     elseif isTrack(5) then
+--         ref = {prev = true}
+--     elseif isTrack(3) then
+--         ref = {right = true}
+--     elseif isTrack(7) then
+--         ref = {left = true}
+--     elseif isPlatform(1) then
+--         ref = {next = true}
+--     elseif isPlatform(5) then
+--         ref = {prev = true}
+--     elseif isPlatform(3) then
+--         ref = {right = true}
+--     elseif isPlatform(7) then
+--         ref = {left = true}
+--     end
+--     local newInfo = {
+--         id = maxId + 1,
+--         type = change.module.metadata.typeId,
+--         pos = pos,
+--         length = 20,
+--         width = change.module.metadata.width,
+--         ref = ref,
+--         extraHeight = (isTrack(5) and modules[octa[5]].info.extraHeight) or (isTrack(1) and modules[octa[1]].info.extraHeight) or nil
+--     }
+--     local slotId, dataIds = jct.slotIds(newInfo)
+--     modules[slotId] = change.module
+--     for m, slotIds in pairs(dataIds) do
+--         for _, slotId in ipairs(slotIds) do
+--             modules[slotId] = {
+--                 metadata = {isData = true},
+--                 name = string.format("jct2/data/%s.module", m),
+--                 updateScript = {
+--                     fileName = "",
+--                     params = {}
+--                 },
+--                 variant = 0
+--             }
+--         end
+--     end
+-- end
 end
 
 local preProcessRemove = function(modules, change, classedModules, info)
-    if info.id ~= 1 then
-        jct.octa(modules, classedModules)
-        local info = modules[change.slotId].info
-        local octaModules = {}
-        for i = 1, 8 do
-            octaModules[i] = info.octa[i] and modules[info.octa[i]] or false
-        end
-        if not (
-            octaModules[1] and octaModules[1].info.ref.prev
-            or octaModules[5] and octaModules[5].info.ref.next
-            or octaModules[3] and octaModules[3].info.ref.left
-            or octaModules[7] and octaModules[7].info.ref.right)
-        then
-            modules[change.slotId] = nil
-            for slotId, m in pairs(modules) do
-                local __, moduleId = jct.slotInfo(slotId)
-                if moduleId == info.id then
-                    modules[slotId] = nil
-                end
-            end
-        end
+    -- if info.id ~= 1 then
+    --     jct.octa(modules, classedModules)
+    --     local info = modules[change.slotId].info
+    --     local octaModules = {}
+    --     for i = 1, 8 do
+    --         octaModules[i] = info.octa[i] and modules[info.octa[i]] or false
+    --     end
+    --     if not (
+    --         octaModules[1] and octaModules[1].info.ref.prev
+    --         or octaModules[5] and octaModules[5].info.ref.next
+    --         or octaModules[3] and octaModules[3].info.ref.left
+    --         or octaModules[7] and octaModules[7].info.ref.right)
+    --     then
+    --         modules[change.slotId] = nil
+    --         for slotId, m in pairs(modules) do
+    --             local __, moduleId = jct.slotInfo(slotId)
+    --             if moduleId == info.id then
+    --                 modules[slotId] = nil
+    --             end
+    --         end
+    --     end
+    -- end
     end
-end
 
 local slotSetup = function(params, result, slotId)
     local module = params.modules[slotId]
-    local info = params.modules[slotId].info
-    local makeData = params.modules[slotId].makeData
     
-    local arcs = info.arcs
-    
-    local pos = info.pos
-    local metadata = params.modules[slotId].metadata
-    local refArc = arcs.center
-    
-    insert(result.slots, {
+    table.insert(result.slots, {
         id = slotId,
-        transf = module.info.transf,
-        type = module.metadata.typeName,
+        transf = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+        type = "jct_track",
         spacing = {0, 0, 0, 0}
     })
-    
-    do
-        local octaModules = {}
-        for i = 1, 8 do
-            octaModules[i] = info.octa[i] and params.modules[info.octa[i]] or false
-        end
-        if info.id ~= 1 and not (
-            octaModules[1] and octaModules[1].info.ref.prev
-            or octaModules[5] and octaModules[5].info.ref.next
-            or octaModules[3] and octaModules[3].info.ref.left
-            or octaModules[7] and octaModules[7].info.ref.right)
-        then
-            insert(result.slots, {
-                id = makeData(1, -2),
-                transf = info.transf,
-                type = "jct_remove",
-                spacing = {0, 0, 0, 0}
-            })
-        end
-    end
-    
-    
-    insert(
-        result.slots,
-        {
-            id = makeData(1, -1),
-            transf = info.transf,
-            type = "jct_track",
-            spacing = {0, 0, 0, 0}
-        }
-    )
-    insert(
-        result.slots,
-        {
-            id = makeData(2, -1),
-            transf = info.transf,
-            type = "jct_street",
-            spacing = {0, 0, 0, 0}
-        }
-    )
-    if (info.id ~= 1) then -- id 1 must be a track
-        insert(
-            result.slots,
-            {
-                id = makeData(3, -1),
-                transf = info.transf,
-                type = "jct_wall",
-                spacing = {0, 0, 0, 0}
-            }
+
+end
+
+local fzGen = function(initHeight, finalHeight)
+    return function(initRad, finalRad)
+        local ln = line.byPtPt(
+            coor.xy(initRad, initHeight),
+            coor.xy(finalRad, finalHeight)
         )
-        insert(
-            result.slots,
-            {
-                id = makeData(4, -1),
-                transf = info.transf,
-                type = "jct_placeholder",
-                spacing = {0, 0, 0, 0}
-            }
-    )
-    end
-    
-    jct.initSlotGrid(params, pos)
-    local newTopologySlots = jct.newTopologySlots(params, makeData, pos)
-    
-    if not (info.octa[3]) then
-        local transf = coor.transX(metadata.width) * info.transf
-        newTopologySlots(pos.x + 1, pos.y, transf, 3)
-    end
-    
-    if not (info.octa[7]) then
-        local transf = coor.transX(-metadata.width) * info.transf
-        newTopologySlots(pos.x - 1, pos.y, transf, 7)
-    end
-    
-    if not info.octa[1] then
-        local fwPt = refArc.sup + 0.5 * (refArc.sup - refArc.inf)
-        local transf = quat.byVec(coor.xyz(0, 1, 0), refArc:tangent(fwPt)):mRot() * coor.trans(refArc:pt(fwPt))
-        newTopologySlots(pos.x, pos.y + 1, transf, 1)
-    end
-    
-    if not info.octa[5] then
-        local bwPt = refArc.inf - 0.5 * (refArc.sup - refArc.inf)
-        local transf = quat.byVec(coor.xyz(0, -1, 0), refArc:tangent(bwPt)):mRot() * coor.trans(refArc:pt(bwPt))
-        newTopologySlots(pos.x, pos.y - 1, transf, 5)
+        return function(rad) return (ln - line.byVecPt(coor.xy(0, 1), coor.xy(rad, 0))).y end
     end
 end
 
-local updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
-    local trackType = closureParams.trackType
+local fsGen = function(slope)
+    return function(initRad, finalRad) return function(_) return slope end end
+end
+
+local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
+
+local function gridization(pos, data)
+    local x, y, z = pos.x, pos.y, pos.z
+    local slotId = data.grid[z][y][x]
     
-    local info = params.modules[slotId].info
+    local m = data.modules[slotId]
+    local info = m.info
     
-    local function setPos()
-        return {{0, 0.5}, {0.5, 1}}, {0, 1, 2, 3}
-    end
-    
-    local pos, seqNodes = setPos()
-    
-    local e = pipe.new * pos
-        * pipe.map(function(idx)
-            local inf = info.arcs.center.inf * (1 - idx[1]) + info.arcs.center.sup * idx[1]
-            local sup = info.arcs.center.inf * (1 - idx[2]) + info.arcs.center.sup * idx[2]
-            local length = (idx[2] - idx[1]) * info.length
-            return {
-                {
-                    info.arcs.center:pt(inf),
-                    info.arcs.center:tangent(inf) * length
-                },
-                {
-                    info.arcs.center:pt(sup),
-                    info.arcs.center:tangent(sup) * length
-                }
-            }
-        end)
-    
-    
-    local edges = {
-        type = "TRACK",
-        alignTerrain = true,
-        params = {
-            type = trackType,
-            catenary = false,
-        },
-        edges = e * pipe.flatten() * pipe.map(pipe.map(coor.vec2Tuple)),
-        snapNodes = func.filter({(not info.octa[1]) and seqNodes[#seqNodes], (not info.octa[5]) and seqNodes[1]}, pipe.noop()),
-        freeNodes = {},
-        seqNodes = seqNodes,
-        tag2nodes = {
-            [tag] = seqNodes
-        },
-        slot = slotId
-    }
-    
-    insert(result.edgeLists, edges)
-    
-    params.edgeIndex[slotId] = #result.edgeLists
-    
-    if (info.octa[1] and params.modules[info.octa[1]].metadata.isTrack) then
-        insert(result.invokeLater, function()
-            local indexL = params.edgeIndex[slotId]
-            local indexR = params.edgeIndex[info.octa[1]]
-            local edgesL = result.edgeLists[indexL]
-            local edgesR = result.edgeLists[indexR]
-            local nodeL = edgesL.edges[edgesL.seqNodes[#edgesL.seqNodes] + 1]
-            local nodeR = edgesR.edges[edgesR.seqNodes[1] + 1]
-            local ptL = coor.tuple2Vec(nodeL[1])
-            local ptR = coor.tuple2Vec(nodeR[1])
-            local pt = ptL:avg(ptR):toTuple()
-            result.edgeLists[indexL].edges[edgesL.seqNodes[#edgesL.seqNodes] + 1][1] = pt
-            result.edgeLists[indexR].edges[edgesR.seqNodes[1] + 1][1] = pt
-        end)
-    end
-    
-    if params.debug == 1 then
-        local centerPts, centerVecs = jct.basePts(info.arcs.center, 4)
-        local text = tostring(info.id)
-        local pos = string.format("(%d, %d)", info.pos.x, info.pos.y)
-        
-        local addText = function(label, fAlign, h)
-            local nameModelsF, width = livetext(h or 2)(label)
-            for _, m in ipairs(nameModelsF(function() return coor.trans(fAlign(width)) * coor.rotX90N * info.transf end)) do
-                table.insert(result.models, m)
-            end
+    if x == 0 and (y == 1 or y == -1) then
+        local radius = info.radius
+        local xRad = info.xRad
+        if z == 0 then
+            local fz = fzGen(0, 0)
+            local fs = fsGen(0)
+            info.arcPacker = jct.arcPacker(radius, -xRad * 0.5, fz, fs)
+        else
+            local fz = fzGen(info.height, info.height)
+            local fs = fsGen(0)
+            info.arcPacker = jct.arcPacker(radius, xRad * 0.5, fz, fs)
         end
-        
-        addText(text, function(w) return coor.xyz(-0.5 * w, 0, 0) end)
-        addText(pos, function(w) return coor.xyz(-0.5 * w, 0, -2) end, 0.75)
-        
-        jct.marking(result, slotId, params)
+        info.offset = 0
+    elseif x == 0 and y > 1 then
+        local refSlotId = data.grid[z][y - 1][0]
+        info.arcPacker = data.modules[refSlotId].info.arcPacker
+        info.offset = 0
+    elseif x == 0 and y < -1 then
+        local refSlotId = data.grid[z][y + 1][0]
+        info.arcPacker = data.modules[refSlotId].info.arcPacker
+        info.offset = 0
+    elseif x < 0 then
+        local refSlotId = data.grid[z][y][x + 1]
+        local ref = data.modules[refSlotId].info
+        info.arcPacker = ref.arcPacker
+        info.offset = ref.offset - ref.metadata.width * 0.5 - m.metadata.width * 0.5
+    elseif x > 0 then
+        local refSlotId = data.grid[z][y][x - 1]
+        local ref = data.modules[refSlotId].info
+        info.arcPacker = data.modules[refSlotId].info.arcPacker
+        info.offset = ref.offset + ref.metadata.width * 0.5 + m.metadata.width * 0.5
     end
-end
-
-local function gridization(x, y, z, data)
-    local slotId = data.grid[z][x][y]
-    
-    jctg.calculateRaidus(x, y, z, data)
-    jctg.genericArcs(x, y, z, data)
     
     coroutine.yield()
     
-    local refArc = data.modules[slotId].info.arcs
+    local arc, initRad, fn = info.arcPacker(info.offset)(m.metadata.width)
+    info.arcs = {arc = arc, initRad = initRad, fn = fn}
     
-    data.modules[slotId].info.transf =
-        quat.byVec(coor.xyz(0, 1, 0), refArc.center:tangent((refArc.center.inf + refArc.center.sup) * 0.5)):mRot() *
-        coor.trans(refArc.center:pt((refArc.center.inf + refArc.center.sup) * 0.5))
+    coroutine.yield()
+    
+    if x == 0 and (y == 1 or y == -1) then
+        local z1Max = data.modules[data.grid[1][y][func.max(func.keys(data.grid[1][y]))]].info
+        local z1Min = data.modules[data.grid[1][y][func.min(func.keys(data.grid[1][y]))]].info
+        local z0Max = data.modules[data.grid[0][y][func.max(func.keys(data.grid[0][y]))]].info
+        local z0Min = data.modules[data.grid[0][y][func.min(func.keys(data.grid[0][y]))]].info
+        
+        local ptXSup = {
+            func.min(z0Min.arcs.arc[1] - z1Max.arcs.arc[2], ptXSelector),
+            func.min(z0Max.arcs.arc[2] - z1Min.arcs.arc[1], ptXSelector)
+        }
+        
+        info.arcs.ptXSup = ptXSup
+        info.arcs.fn = info.arcs.fn(ptXSup[y == 1 and 1 or 2])
+
+        info.fnArc = info.arcs.fn(ptXSup[y == 1 and 1 or 2])
+    elseif x < 0 then
+        local refSlotId = data.grid[z][y][x + 1]
+        local ref = data.modules[refSlotId].info
+        
+        info.arcs.ptXSup = ref.arcs.ptXSup
+        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup[y == 1 and 1 or 2])
+    elseif x > 0 then
+        local refSlotId = data.grid[z][y][x - 1]
+        local ref = data.modules[refSlotId].info
+        
+        info.arcs.ptXSup = ref.arcs.ptXSup
+        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup[y == 1 and 1 or 2])
+    else
+        
+        end
 end
 
 ---@param modules table<slotid, module>
@@ -329,7 +225,14 @@ end
 ---@param slotId slotid
 ---@param params any
 local postClassify = function(modules, classified, slotId, params)
-    modules[slotId].info.height = ((params.refHeight or 0) - modules[slotId].metadata.height) + (modules[slotId].info.extraHeight or 0)
+    modules[slotId].info.height = modules[slotId].info.pos.z == 1 and params.tunnelHeight or 0
+    modules[slotId].info.xRad = params.xRad
+
+    modules[slotId].info.transf = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
+    
+    if modules[slotId].info.straight then
+        modules[slotId].info.radius = jct.infi
+    end
 end
 
 function data()
@@ -337,7 +240,6 @@ function data()
         preProcessAdd = preProcessAdd,
         preProcessRemove = preProcessRemove,
         slotSetup = slotSetup,
-        updateFn = updateFn,
         preClassify = jct.preClassify,
         postClassify = postClassify,
         getModelsFn = function(params)

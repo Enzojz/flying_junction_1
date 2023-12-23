@@ -53,18 +53,17 @@ local updateFn = function(result, transform, tag, slotId, addModelFn, params, cl
     local isUpper = info.pos.z > 0
     
     local e = pipe.new
-                * {arc.inf, (arc.inf + arc.sup) * 0.5, (arc.inf + arc.sup) * 0.5, arc.sup}
+                * {arc.inf, arc.sup}
                 -- * (isRev and pipe.rev() or pipe.noop())
-                * pipe.map(function(pt) return {arc:pt(pt), arc:tangent(pt) * length * 0.5} end)
+                * pipe.map(function(pt) return {arc:pt(pt), arc:tangent(pt) * length} end)
                 * pipe.map(pipe.map(coor.vec2Tuple))
         -- * (isRev and pipe.rev() or pipe.noop())
         -- * pipe.flatten()
-    dump()(e)
     
     local edges = {
         type = "TRACK",
-        edgeType = isUpper and "BRIDGE" or nil,
-        edgeTypeName = isUpper and "jct_void.lua" or nil,
+        -- edgeType = isUpper and "BRIDGE" or nil,
+        -- edgeTypeName = isUpper and "jct_void.lua" or nil,
         alignTerrain = not isUpper,
         params = {
             type = trackType,
@@ -72,7 +71,7 @@ local updateFn = function(result, transform, tag, slotId, addModelFn, params, cl
             tramTrackType = "NO"
         },
         edges = e,
-        snapNodes = {0, #e - 1},
+        snapNodes = {},
         freeNodes = {},
         tag2nodes = {
             [tag] = func.seq(0, #e - 1)

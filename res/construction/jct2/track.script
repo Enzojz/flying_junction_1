@@ -147,7 +147,7 @@ local function gridization(pos, data)
     
     local m = data.modules[slotId]
     local info = m.info
-    
+    dump()(info)
     if x == 0 and (y == 1 or y == -1) then
         local radius = info.radius
         local xRad = info.xRad
@@ -171,14 +171,14 @@ local function gridization(pos, data)
         info.offset = 0
     elseif x < 0 then
         local refSlotId = data.grid[z][y][x + 1]
-        local ref = data.modules[refSlotId].info
+        local ref = data.modules[refSlotId]
         info.arcPacker = ref.arcPacker
-        info.offset = ref.offset - ref.metadata.width * 0.5 - m.metadata.width * 0.5
+        info.offset = ref.info.offset - ref.metadata.width * 0.5 - m.metadata.width * 0.5
     elseif x > 0 then
         local refSlotId = data.grid[z][y][x - 1]
-        local ref = data.modules[refSlotId].info
+        local ref = data.modules[refSlotId]
         info.arcPacker = data.modules[refSlotId].info.arcPacker
-        info.offset = ref.offset + ref.metadata.width * 0.5 + m.metadata.width * 0.5
+        info.offset = ref.info.offset + ref.metadata.width * 0.5 + m.metadata.width * 0.5
     end
     
     coroutine.yield()
@@ -194,27 +194,31 @@ local function gridization(pos, data)
         local z0Max = data.modules[data.grid[0][y][func.max(func.keys(data.grid[0][y]))]].info
         local z0Min = data.modules[data.grid[0][y][func.min(func.keys(data.grid[0][y]))]].info
         
-        local ptXSup = {
-            func.min(z0Min.arcs.arc[1] - z1Max.arcs.arc[2], ptXSelector),
-            func.min(z0Max.arcs.arc[2] - z1Min.arcs.arc[1], ptXSelector)
-        }
-        
-        info.arcs.ptXSup = ptXSup
-        info.arcs.fn = info.arcs.fn(ptXSup[y == 1 and 1 or 2])
-
-        info.fnArc = info.arcs.fn(ptXSup[y == 1 and 1 or 2])
+        if y == 1 then
+            local ptXSup = func.min(z0Min.arcs.arc[1] - z1Max.arcs.arc[2], ptXSelector)
+            info.arcs.ptXSup = ptXSup
+        else 
+            local ptXSup = func.min(z0Max.arcs.arc[2] - z1Min.arcs.arc[1], ptXSelector)
+            info.arcs.ptXSup = ptXSup
+        end
+        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup)
+        info.fnArc = info.arcs.fn(info.arcs.ptXSup)
     elseif x < 0 then
         local refSlotId = data.grid[z][y][x + 1]
         local ref = data.modules[refSlotId].info
         
         info.arcs.ptXSup = ref.arcs.ptXSup
-        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup[y == 1 and 1 or 2])
+        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup)
+        
+        info.fnArc = info.arcs.fn(info.arcs.ptXSup)
     elseif x > 0 then
         local refSlotId = data.grid[z][y][x - 1]
         local ref = data.modules[refSlotId].info
         
         info.arcs.ptXSup = ref.arcs.ptXSup
-        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup[y == 1 and 1 or 2])
+        info.arcs.fn = info.arcs.fn(info.arcs.ptXSup)
+        
+        info.fnArc = info.arcs.fn(info.arcs.ptXSup)
     else
         
         end

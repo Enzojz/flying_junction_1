@@ -1,0 +1,136 @@
+local func = require "jct/func"
+local coor = require "jct/coor"
+local pipe = require "jct/pipe"
+local jct = require "jct2"
+local quat = require "jct/quaternion"
+local livetext = require "jct/livetext"
+
+local insert = table.insert
+
+local wallTypes = {
+    "jct/concrete_fence",
+    "jct/brick_fence",
+    "jct/brick_2_fence"
+}
+
+local fitModels = {
+    wall = jct.fitModel(0.5, 5, -1, true, true),
+    fence = jct.fitModel(0.5, 5, -1, true, true),
+    surface = jct.fitModel(5, 5, -1, true, true),
+    front = jct.fitModel(5, 0.5, -1, true, true)
+}
+
+local ceilTypes = {
+    "jct/concrete_ceil",
+    "jct/brick_ceil",
+    "jct/brick_ceil"
+}
+
+local withTag = function(tag)
+    return pipe.map(function(m)
+        return func.with(m, {
+            tag = tag
+        })
+    end)
+end
+
+local dump = require "luadump"
+local updateFn = function(result, transform, tag, slotId, addModelFn, params, closureParams)
+    local modelFence = wallTypes[params.wallType + 1]
+    local modelCeil = ceilTypes[params.wallType + 1]
+    
+    local info = params.modules[slotId].info
+    
+    local arc = info.fnArc(0)
+    local arcL = info.fnArc(0.25)
+    local arcR = info.fnArc(-0.25)
+    local length = arc:length()
+    
+    -- local trackWidth = closureParams.trackWidth
+    -- local trackType = closureParams.trackType
+    -- local catenary = false
+    -- local isRev = closureParams.isRev or false
+    -- local isStreet = closureParams.isStreet or false
+    local trackWidth = 5
+    -- local isRev = false
+    local withTag = withTag(tag)
+    local wallWidth = 0.5
+    local isUpper = info.pos.z > 0
+    
+    local biLatCoords = jct.biLatCoords(5, arc)
+    local isRev = false
+    local lc, rc, lce, rce = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5, -wallWidth * 0.5 - 0.5, wallWidth * 0.5 + 0.5)
+    -- if result.config.mirrored then
+    --     lc, rc = rc, lc
+    --     lce, rce = rce, lce
+    -- end
+    local op = isRev and pipe.rev() or pipe.noop()
+    lc, rc = op(lc), op(rc)
+    lce, rce = op(lce), op(rce)
+    local coords = {lc = jct.interlace(lc), rc = jct.interlace(rc), lce = jct.interlace(lce), rce = jct.interlace(rce)}
+    
+    local modelWall = ("jct/%s"):format("concrete_wall")
+    local modelFence = ("jct/%s"):format("concrete_fence")
+
+    if info.isUpper then
+        result.models = result.models + pipe.new
+            * func.map(coords, function(coord)
+                return pipe.new
+                    + (func.map2(coord.lc, coord.rc, function(baseL, baseR) return jct.buildSurface(fitModels.wall, coor.scaleZ(8))()(nil, modelWall, baseL, baseR) * withTag end))
+                    + (func.map2(coord.lc, coord.rc, function(baseL, baseR) return jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5))()(nil, modelFence, baseL, baseR) * withTag end))
+            end)
+            * pipe.flatten()
+            * pipe.flatten()
+    else
+        result.models = result.models + pipe.new
+            * func.map(coords, function(coord)
+                return arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return jct.buildSurface(fitModels.wall, coor.scaleZ(8))()(nil, modelWall, baseL, baseR) * withTag end) or {}
+            end)
+            * pipe.flatten()
+            * pipe.flatten()
+    end
+end
+
+function data()
+    return {
+        availability = {
+            yearFrom = 0,
+            yearTo = 0,
+        },
+        buildMode = "SINGLE",
+        cost = {
+            price = 0,
+        },
+        description = {
+            name = _("STANDARD"),
+            description = _("STANDARD"),
+        },
+        category = {
+            categories = {_("TRACK")},
+        },
+        type = "jct_track",
+        order = {
+            value = 5,
+        },
+        metadata = {
+            typeName = "jct_wall",
+            isTrack = false,
+            width = 0.5,
+            height = 0.0,
+            typeId = 3,
+            scriptName = "construction/jct2/track",
+            preProcessAdd = "preProcessAdd",
+            preProcessRemove = "preProcessRemove",
+            slotSetup = "slotSetup",
+            preClassify = "preClassify",
+            postClassify = "postClassify",
+            gridization = "gridization"
+        },
+        
+        updateFn = updateFn,
+        getModelsFn = function(params)
+            return {}
+        end
+    }
+
+end

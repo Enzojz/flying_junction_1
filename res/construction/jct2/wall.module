@@ -40,10 +40,10 @@ local updateFn = function(result, transform, tag, slotId, addModelFn, params, cl
     local modelCeil = ceilTypes[params.wallType + 1]
     
     local info = params.modules[slotId].info
-    
-    local arc = info.fnArc(0)
-    local arcL = info.fnArc(0.25)
-    local arcR = info.fnArc(-0.25)
+    dump()(slotId)
+    local arc = info.arcs[1]
+    local arcL = info.fnArc(0.25):withLimits(arc.limits)
+    local arcR = info.fnArc(-0.25):withLimits(arc.limits)
     local length = arc:length()
     
     -- local trackWidth = closureParams.trackWidth
@@ -57,37 +57,33 @@ local updateFn = function(result, transform, tag, slotId, addModelFn, params, cl
     local wallWidth = 0.5
     local isUpper = info.pos.z > 0
     
-    local biLatCoords = jct.biLatCoords(5, arc)
+    local biLatCoords = jct.biLatCoords(5, info.fnArc)
     local isRev = false
     local lc, rc, lce, rce = biLatCoords(-wallWidth * 0.5, wallWidth * 0.5, -wallWidth * 0.5 - 0.5, wallWidth * 0.5 + 0.5)
-    -- if result.config.mirrored then
-    --     lc, rc = rc, lc
-    --     lce, rce = rce, lce
-    -- end
+    if info.pos.y > 0 then
+        lc, rc = rc, lc
+        lce, rce = rce, lce
+    end
     local op = isRev and pipe.rev() or pipe.noop()
     lc, rc = op(lc), op(rc)
     lce, rce = op(lce), op(rce)
     local coords = {lc = jct.interlace(lc), rc = jct.interlace(rc), lce = jct.interlace(lce), rce = jct.interlace(rce)}
     
     local modelWall = ("jct/%s"):format("concrete_wall")
-    local modelFence = ("jct/%s"):format("concrete_fence")
-
-    if info.isUpper then
-        result.models = result.models + pipe.new
-            * func.map(coords, function(coord)
-                return pipe.new
-                    + (func.map2(coord.lc, coord.rc, function(baseL, baseR) return jct.buildSurface(fitModels.wall, coor.scaleZ(8))()(nil, modelWall, baseL, baseR) * withTag end))
-                    + (func.map2(coord.lc, coord.rc, function(baseL, baseR) return jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5))()(nil, modelFence, baseL, baseR) * withTag end))
-            end)
-            * pipe.flatten()
-            * pipe.flatten()
+    local modelFence = ("jct/%s"):format("concrete_wall")
+    
+    if isUpper then
+        local models = pipe.new
+            + (func.map2(coords.lc, coords.rc,
+                function(baseL, baseR) return jct.buildSurface(fitModels.wall, coor.scaleZ(8))(modelWall, baseL, baseR) * withTag end))
+            + (func.map2(coords.lc, coords.rc,
+                function(baseL, baseR) return jct.buildSurface(fitModels.fence, coor.scaleZ(1.5) * coor.transZ(1.5))(modelFence, baseL, baseR) * withTag end))
+        result.models = result.models + models * pipe.flatten()
     else
-        result.models = result.models + pipe.new
-            * func.map(coords, function(coord)
-                return arc.wall and func.map2(coord.lc, coord.rc, function(baseL, baseR) return jct.buildSurface(fitModels.wall, coor.scaleZ(8))()(nil, modelWall, baseL, baseR) * withTag end) or {}
-            end)
-            * pipe.flatten()
-            * pipe.flatten()
+        local models = pipe.new
+            + (func.map2(coords.lc, coords.rc,
+                function(baseL, baseR) return jct.buildSurface(fitModels.wall, coor.scaleZ(8))(modelWall, baseL, baseR) * withTag end))
+        result.models = result.models + models * pipe.flatten()
     end
 end
 
@@ -106,19 +102,19 @@ function data()
             description = _("STANDARD"),
         },
         category = {
-            categories = {_("TRACK")},
+            categories = {_("WALL")},
         },
-        type = "jct_track",
+        type = "jct_struct",
         order = {
             value = 5,
         },
         metadata = {
-            typeName = "jct_wall",
-            isTrack = false,
+            typeName = "jct_struct",
+            isTrack = true,
             width = 0.5,
-            height = 0.0,
+            height = 0.51,
             typeId = 3,
-            scriptName = "construction/jct2/track",
+            scriptName = "construction/jct2/wall",
             preProcessAdd = "preProcessAdd",
             preProcessRemove = "preProcessRemove",
             slotSetup = "slotSetup",

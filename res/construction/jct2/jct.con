@@ -124,7 +124,7 @@ local constructionTemplates = {
                     name = _("MENU_TUNNEL_HEIGHT"),
                     values = func.map(tunnelHeightList, tostring),
                     uiType = "SLIDER",
-                    defaultIndex = 4
+                    defaultIndex = 5
                 },
                 {
                     key = "wallType",
@@ -164,8 +164,31 @@ local createTemplateFn = function(params)
                     id = id,
                     type = 1,
                     pos = coor.xyz(x, y, z),
-                    length = 20,
                     width = 5,
+                    ref = {},
+                    straight = true
+                }
+                
+                
+                local slotId, slotIds = jct.slotIds(info)
+                for m, slotIds in pairs(slotIds) do
+                    for _, slotId in ipairs(slotIds) do
+                        result[slotId] = string.format("jct2/data/%s.module", m)
+                    end
+                end
+                id = id + 1
+            end
+        end
+        
+        for _, x in ipairs({-1, params.trackNbLower + 1}) do
+            for _, y in ipairs({-1, 1}) do
+                result[jct.base(id, 3)] = "jct2/wall.module"
+                
+                local info = {
+                    id = id,
+                    type = 3,
+                    pos = coor.xyz(x, y, z),
+                    width = 0.5,
                     ref = {},
                     straight = true
                 }
@@ -192,7 +215,6 @@ local createTemplateFn = function(params)
                     id = id,
                     type = 1,
                     pos = coor.xyz(x, y, z),
-                    length = 20,
                     width = 5,
                     ref = {},
                     straight = true
@@ -207,16 +229,15 @@ local createTemplateFn = function(params)
                 id = id + 1
             end
         end
-        
+
         for _, x in ipairs({-1, params.trackNbUpper + 1}) do
-            for _, y in ipairs({1, -1}) do
-                result[jct.base(id, 1)] = "jct2/wall.module"
+            for _, y in ipairs({-1, 1}) do
+                result[jct.base(id, 3)] = "jct2/wall.module"
                 
                 local info = {
                     id = id,
                     type = 3,
                     pos = coor.xyz(x, y, z),
-                    length = 20,
                     width = 0.5,
                     ref = {},
                     straight = true
@@ -441,9 +462,8 @@ local gridization = function(modules, classedModules)
             fn(pos, data)
         end
     end
-    
+
     for _, slotId in ipairs(queue) do
-        dump()(modules[slotId].info.pos)
         local m = modules[slotId]
         if (m.metadata.scriptName and game.res.script[m.metadata.scriptName]) then
             local fn = game.res.script[m.metadata.scriptName][m.metadata.gridization]
@@ -474,6 +494,12 @@ local gridization = function(modules, classedModules)
         end
     end
     
+    for _, slotId in ipairs(queue) do
+        local result = coroutine.resume(cr[slotId])
+        if not result then
+            error(debug.traceback(cr[slotId]))
+        end
+    end
     return grid
 end
 

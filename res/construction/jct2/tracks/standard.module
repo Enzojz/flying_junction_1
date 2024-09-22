@@ -36,7 +36,7 @@ local updateFn = function(result, transform, tag, slotId, addModelFn, params, cl
 
     local arc = info.fnArc(0)
     local length = arc:length()
-    dump(true)(arc)
+    
     
     -- local trackWidth = closureParams.trackWidth
     -- local trackType = closureParams.trackType
@@ -161,12 +161,12 @@ function data()
         category = {
             categories = {_("TRACK")},
         },
-        type = "jct_track",
+        type = "jct_struct",
         order = {
             value = 5,
         },
         metadata = {
-            typeName = "jct_track",
+            typeName = "jct_struct",
             isTrack = true,
             width = 5,
             height = 0.51,

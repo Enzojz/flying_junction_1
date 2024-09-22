@@ -33,9 +33,7 @@ local classifyGeometry = function(modules, classified, slotId)
     
     local slotId = classified[id].slotId
     
-    if (type == 57) then
-        modules[slotId].info.length = data
-    elseif (type == 58) then
+    if (type == 58) then
         modules[slotId].info.width = data * 0.1
     elseif (type == 59) then
         modules[slotId].info.gradient = data * 0.001

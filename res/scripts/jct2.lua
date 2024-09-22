@@ -8,12 +8,15 @@ local livetext = require "jct/livetext"
 local math = math
 local abs = math.abs
 local floor = math.floor
+local ceil = math.ceil
 local sin = math.sin
 local cos = math.cos
 local pi = math.pi
 
 local unpack = table.unpack
 local insert = table.insert
+
+local dump = require "luadump"
 
 jct.infi = 1e8
 
@@ -99,7 +102,6 @@ jct.slotIds = function(info)
             jct.mixData(jct.base(info.id, 56), 0)
         } or {},
         geometry = func.filter({
-            jct.mixData(jct.base(info.id, 57), info.length),
             jct.mixData(jct.base(info.id, 59), math.floor((info.extraHeight or 0) * 10)),
             info.width and jct.mixData(jct.base(info.id, 58), info.width * 10) or false,
         -- info.gradient and jct.mixData(jct.base(info.id, 61), info.gradient * 1000) or false,
@@ -165,6 +167,7 @@ jct.arcPacker = function(radius, rotRad, fz, fs)
                 arc.byOR(o, abs(radius + dr * 0.5)):withLimits({inf = initRad}),
                 arc.byOR(o, abs(radius - dr * 0.5)):withLimits({inf = initRad})
             }
+            
             return arInf,
                 initRad,
                 function(ptSup)
@@ -184,15 +187,15 @@ jct.arcPacker = function(radius, rotRad, fz, fs)
                         end
                         
                         if checkRange(inf, initRad, finalRad, sup) then
-                        elseif checkRange(inf, initRad, sup, finalRad) then
+                            elseif checkRange(inf, initRad, sup, finalRad) then
                             finalRad = sup
-                        elseif checkRange(initRad, inf, finalRad, sup) then
-                            initRad = inf
-                        elseif checkRange(initRad, inf, sup, finalRad) then
-                            initRad = inf
-                            finalRad = sup
-                        else
-                            return nil
+                            elseif checkRange(initRad, inf, finalRad, sup) then
+                                initRad = inf
+                            elseif checkRange(initRad, inf, sup, finalRad) then
+                                initRad = inf
+                                finalRad = sup
+                            else
+                                return nil
                         end
                         
                         return function(xDr)
@@ -330,35 +333,6 @@ jct.initSlotGrid = function(params, pos)
     if not params.slotGrid[pos.z][pos.x + 1][pos.y] then params.slotGrid[pos.z][pos.x + 1][pos.y] = {} end
     if not params.slotGrid[pos.z][pos.x][pos.y - 1] then params.slotGrid[pos.z][pos.x][pos.y - 1] = {} end
     if not params.slotGrid[pos.z][pos.x][pos.y + 1] then params.slotGrid[pos.z][pos.x][pos.y + 1] = {} end
-end
-
-jct.newTopologySlots = function(params, makeData, pos)
-    return function(x, y, transf, octa)
-        params.slotGrid[pos.z][x][y].track = {
-            id = makeData(1, octa),
-            transf = transf,
-            type = "jct_track",
-            spacing = {0, 0, 0, 0}
-        }
-        params.slotGrid[pos.z][x][y].street = {
-            id = makeData(2, octa),
-            transf = transf,
-            type = "jct_street",
-            spacing = {0, 0, 0, 0}
-        }
-        params.slotGrid[pos.z][x][y].street = {
-            id = makeData(3, octa),
-            transf = transf,
-            type = "jct_wall",
-            spacing = {0, 0, 0, 0}
-        }
-        params.slotGrid[pos.z][x][y].placeholder = {
-            id = makeData(4, octa),
-            transf = transf,
-            type = "jct_placeholder",
-            spacing = {0, 0, 0, 0}
-        }
-    end
 end
 
 ---@param modules table<slotid, module>
@@ -524,18 +498,45 @@ jct.initTerrainList = function(result, id)
     end
 end
 
+jct.assembleSize = function(lc, rc)
+    return {
+        lb = lc.i,
+        lt = lc.s,
+        rb = rc.i,
+        rt = rc.s
+    }
+end
+
 jct.buildSurface = function(fitModel, tZ)
-    return function(fnSize)
-        local fnSize = fnSize or function(_, lc, rc) return jct.assembleSize(lc, rc) end
-        return function(i, s, ...)
-            local sizeS = fnSize(i, ...)
-            return s
-                and pipe.new
-                / general.newModel(s .. "_tl.mdl", tZ, fitModel(sizeS, true))
-                / general.newModel(s .. "_br.mdl", tZ, fitModel(sizeS, false))
-                or pipe.new * {}
-        end
+    local fnSize = function(lc, rc) return jct.assembleSize(lc, rc) end
+    return function(s, ...)
+        local sizeS = fnSize(...)
+        return s
+            and pipe.new
+            / jct.newModel(s .. "_tl.mdl", nil, tZ, fitModel(sizeS, true))
+            / jct.newModel(s .. "_br.mdl", nil, tZ, fitModel(sizeS, false))
+            or pipe.new * {}
     end
 end
 
+jct.biLatCoords = function(length, arc)
+    local arcRef = arc()
+    local nSeg = arcRef:length() / length
+    nSeg = (nSeg < 1 or (nSeg % 1 > 0.5)) and ceil(nSeg) or floor(nSeg)
+    local lRad = (arcRef.sup - arcRef.inf) / nSeg
+    local listRad = func.seqMap({0, nSeg}, function(n) return arcRef.inf + n * lRad end)
+    return function(...)
+        return unpack(func.map({...}, function(o)
+            local refArc = arc(o)
+            return
+                func.map(listRad, function(rad) return refArc:pt(rad) end)
+        end))
+    end, nSeg, arcRef:length() / nSeg,
+    function()
+        local refArc = arc(0)
+        return func.map(listRad, function(rad) return refArc:tangent(rad) end)
+    end
+end
+
+jct.interlace = pipe.interlace({"s", "i"})
 return jct

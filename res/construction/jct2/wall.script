@@ -12,105 +12,9 @@ local insert = table.insert
 
 local preProcessAdd = function(modules, change, classedModules, info)
     local maxId = func.max(func.keys(classedModules))
-
--- if (info.data == -1) then
---     local id = info.id
---     local slotId = classedModules[id].slotId
---     modules[slotId].name = change.module.name
--- else
---     local grid = jct.octa(modules, classedModules)
---     local refPos = modules[classedModules[info.id].slotId].info.pos
---     local pos = ({
---         [1] = coor.xyz(0, 1, 0),
---         [3] = coor.xyz(1, 0, 0),
---         [5] = coor.xyz(0, -1, 0),
---         [7] = coor.xyz(-1, 0, 0)
---     })[info.data] + refPos
---     local x, y, z = pos.x, pos.y, pos.z
---     local octa = {
---         [5] = grid[z][x] and grid[z][x][y - 1] or nil,
---         [1] = grid[z][x] and grid[z][x][y + 1] or nil,
---         [7] = grid[z][x - 1] and grid[z][x - 1][y] or nil,
---         [3] = grid[z][x + 1] and grid[z][x + 1][y] or nil,
---         [6] = grid[z][x - 1] and grid[z][x - 1][y - 1] or nil,
---         [4] = grid[z][x + 1] and grid[z][x + 1][y - 1] or nil,
---         [8] = grid[z][x - 1] and grid[z][x - 1][y + 1] or nil,
---         [2] = grid[z][x + 1] and grid[z][x + 1][y + 1] or nil,
---     }
---     local function isTrack(pos)
---         return octa[pos] and (modules[octa[pos]].metadata.isTrack or modules[octa[pos]].metadata.isStreet or modules[octa[pos]].metadata.isPlaceholder)
---     end
---     local function isPlatform(pos)
---         return octa[pos] and modules[octa[pos]].metadata.isPlatform
---     end
---     local ref = {}
---     if isTrack(1) then
---         ref = {next = true}
---     elseif isTrack(5) then
---         ref = {prev = true}
---     elseif isTrack(3) then
---         ref = {right = true}
---     elseif isTrack(7) then
---         ref = {left = true}
---     elseif isPlatform(1) then
---         ref = {next = true}
---     elseif isPlatform(5) then
---         ref = {prev = true}
---     elseif isPlatform(3) then
---         ref = {right = true}
---     elseif isPlatform(7) then
---         ref = {left = true}
---     end
---     local newInfo = {
---         id = maxId + 1,
---         type = change.module.metadata.typeId,
---         pos = pos,
---         length = 20,
---         width = change.module.metadata.width,
---         ref = ref,
---         extraHeight = (isTrack(5) and modules[octa[5]].info.extraHeight) or (isTrack(1) and modules[octa[1]].info.extraHeight) or nil
---     }
---     local slotId, dataIds = jct.slotIds(newInfo)
---     modules[slotId] = change.module
---     for m, slotIds in pairs(dataIds) do
---         for _, slotId in ipairs(slotIds) do
---             modules[slotId] = {
---                 metadata = {isData = true},
---                 name = string.format("jct2/data/%s.module", m),
---                 updateScript = {
---                     fileName = "",
---                     params = {}
---                 },
---                 variant = 0
---             }
---         end
---     end
--- end
 end
 
 local preProcessRemove = function(modules, change, classedModules, info)
-    -- if info.id ~= 1 then
-    --     jct.octa(modules, classedModules)
-    --     local info = modules[change.slotId].info
-    --     local octaModules = {}
-    --     for i = 1, 8 do
-    --         octaModules[i] = info.octa[i] and modules[info.octa[i]] or false
-    --     end
-    --     if not (
-    --         octaModules[1] and octaModules[1].info.ref.prev
-    --         or octaModules[5] and octaModules[5].info.ref.next
-    --         or octaModules[3] and octaModules[3].info.ref.left
-    --         or octaModules[7] and octaModules[7].info.ref.right)
-    --     then
-    --         modules[change.slotId] = nil
-    --         for slotId, m in pairs(modules) do
-    --             local __, moduleId = jct.slotInfo(slotId)
-    --             if moduleId == info.id then
-    --                 modules[slotId] = nil
-    --             end
-    --         end
-    --     end
-    -- end
     end
 
 local slotSetup = function(params, result, slotId)
@@ -141,6 +45,10 @@ end
 
 local ptXSelector = function(lhs, rhs) return lhs:length2() < rhs:length2() end
 
+local function checkRange(a, b, c, d)
+    return (a <= b and b <= c and c <= d) or (a >= b and b >= c and c >= d)
+end
+
 local function gridization(pos, data)
     local x, y, z = pos.x, pos.y, pos.z
     local slotId = data.grid[z][y][x]
@@ -151,15 +59,15 @@ local function gridization(pos, data)
     if x == 0 and (y == 1 or y == -1) then
         local radius = info.radius
         local xRad = info.xRad
-        if z == 0 then
-            local fz = fzGen(0, 0)
-            local fs = fsGen(0)
-            info.arcPacker = jct.arcPacker(radius, -xRad * 0.5, fz, fs)
-        else
-            local fz = fzGen(info.height, info.height)
-            local fs = fsGen(0)
-            info.arcPacker = jct.arcPacker(radius, xRad * 0.5, fz, fs)
-        end
+        -- if z == 0 then
+        --     local fz = fzGen(0, 0)
+        --     local fs = fsGen(0)
+        --     info.arcPacker = jct.arcPacker(radius, -xRad * 0.5, fz, fs)
+        -- else
+        local fz = fzGen(info.height, info.height)
+        local fs = fsGen(0)
+        info.arcPacker = jct.arcPacker(radius, xRad * 0.5, fz, fs)
+        -- end
         info.offset = 0
     elseif x == 0 and y > 1 then
         local refSlotId = data.grid[z][y - 1][0]
@@ -186,7 +94,6 @@ local function gridization(pos, data)
     info.baseArcs = {arc = arc, initRad = initRad, fn = fn}
     
     coroutine.yield()
-    
     local z1Max = data.modules[data.grid[1][y][func.max(func.keys(data.grid[1][y]))]].info
     local z1Min = data.modules[data.grid[1][y][func.min(func.keys(data.grid[1][y]))]].info
     local z0Max = data.modules[data.grid[0][y][func.max(func.keys(data.grid[0][y]))]].info
@@ -221,8 +128,45 @@ local function gridization(pos, data)
         
         end
     info.arc = info.fnArc(0)
+    dump()(slotId)
+    dump()("x")
     coroutine.yield()
     info.baseArcs = nil
+    info.arcs = {
+        info.arc
+    }
+    if z == 0 then
+        local ptXZ1Min = func.min(info.arc - z1Min.info.arc, ptXSelector)
+        local ptXZ1Max = func.min(info.arc - z1Max.info.arc, ptXSelector)
+        
+        local radZ1Min = info.arc:rad(ptXZ1Min)
+        local radZ1Max = info.arc:rad(ptXZ1Max)
+        local radInf = info.arc.inf
+        local radSup = info.arc.sup
+        
+        if y > 0 then
+            if checkRange(radZ1Max, radInf, radZ1Min, radSup) then
+                info.arcs = {
+                    info.arc:withLimits({inf = radZ1Min, sup = radSup})
+                }
+            else
+                info.arcs = {
+                    info.arc
+                }
+            end
+        else
+            info.arcs = {
+                info.arc
+            }
+        end
+    else
+        info.arcs = {
+            info.arc
+        }
+    end
+
+    dump()(slotId)
+    dump()(info)
 end
 
 ---@param modules table<slotid, module>

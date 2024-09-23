@@ -14,8 +14,6 @@ Lot's of things to be done:
 2. Sunk mode
 4. Length reducer (as you see in compact tunnel entry)
 5. Some details...
-
-This mod requires "Shader Enhancement mod" for extending materials.
 ]]
 
 local descFR = [[

@@ -41,9 +41,9 @@ function data()
             operation_1 =
             {
                 op = "MULTIPLICATION",
-                mode = "NORMAL",
+                mode = "UV_MODE_REF_NRML",
                 scale = { 0.2, 0.2 },
-                opacity = -515.0
+                opacity = 1
             },
             polygon_offset = {facste = 0, units = 0},
             two_sided = {twoSided = false}

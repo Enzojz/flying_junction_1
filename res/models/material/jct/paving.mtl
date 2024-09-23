@@ -13,7 +13,7 @@ function data()
                 wrapT = "REPEAT",
             },
             map_metal_gloss_ao = {
-                fileName = "default_metal_gloss_ao.tga",
+                fileName = "default_metal_gloss_ao.dds",
                 type = "TWOD",
             },
             map_normal = {
